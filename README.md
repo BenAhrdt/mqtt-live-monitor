@@ -19,7 +19,7 @@ cd mqtt-live-monitor
 ```
 Installationsscript aufrufen
 ```bash
-install.sh
+bash install.sh
 ```
 ---
 
