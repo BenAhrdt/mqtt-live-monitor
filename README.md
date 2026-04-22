@@ -8,6 +8,10 @@ Ein einfacher Web-Monitor für MQTT-Nachrichten mit Live-Ansicht, decodierten Da
 
 Repository klonen:
 
+Wenn nicht vorhanden, dann git installieren:
+```bash
+apt install -y git
+```
 ```bash
 git clone https://github.com/BenAhrdt/mqtt-live-monitor.git
 ```
@@ -16,6 +20,11 @@ In das Verzeichniss des live-monitors wechseln
 cd mqtt-live-monitor
 ```
 Abhägigkeiten installieren
+
+Wenn nicht vorhanden, dann npm installieren:
+```bash
+apt install -y nodejs npm
+```
 ```bash
 npm install
 ```
