@@ -7,28 +7,35 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="appLayout">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-icon">◉</div>
-        <div>
-          <div class="brand-title">MQTT Live Monitor</div>
-          <div class="brand-subtitle">v0.1</div>
+        <div class="brand-left">
+          <div class="brand-icon">◉</div>
+          <div class="brand-text">
+            <div class="brand-title">MQTT Live Monitor</div>
+            <div class="brand-subtitle">v1.0.1</div>
+          </div>
         </div>
+
+        <button id="sidebarToggleBtn" class="sidebar-toggle-btn" title="Navigation ein-/ausblenden">
+          ☰
+        </button>
       </div>
 
       <nav class="nav">
-        <button class="nav-item active">Live Monitor</button>
-        <button class="nav-item">Topics</button>
-        <button class="nav-item">Statistiken</button>
-        <button class="nav-item">Einstellungen</button>
+        <button class="nav-btn active" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
+        <button class="nav-btn" id="showDashboardBtn"><span>Dashboard</span></button>
+        <button class="nav-item"><span>Topics</span></button>
+        <button class="nav-item"><span>Statistiken</span></button>
+        <button class="nav-item"><span>Einstellungen</span></button>
       </nav>
 
       <div class="sidebar-section">
         <h3>Broker Konfiguration</h3>
 
         <label class="form-label">Host</label>
-        <input id="mqttHost" type="text" value="192.168.2.212">
+        <input id="mqttHost" type="text" value="192.168.2.243">
 
         <label class="form-label">Port</label>
         <input id="mqttPort" type="number" value="1883">
@@ -37,17 +44,17 @@
         <input id="mqttTopic" type="text" value="#">
 
         <label class="form-label">Username</label>
-        <input id="mqttUsername" type="text" placeholder="optional">
+        <input id="mqttUsername" type="text" value="mqttuser">
 
         <label class="form-label">Passwort</label>
-        <input id="mqttPassword" type="password" placeholder="optional">
+        <input id="mqttPassword" type="password" value="MQTTpass1">
 
         <label class="form-label">Client ID</label>
         <input id="mqttClientId" type="text" value="LiveMonitor">
 
         <div class="button-group-vertical">
-            <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
-            <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
+          <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
+          <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
         </div>
         <div id="configMessage" class="config-message"></div>
       </div>
@@ -79,134 +86,146 @@
     </aside>
 
     <main class="main">
-      <header class="topbar">
-        <div>
-          <h1>Live Monitor</h1>
-          <p class="subtitle">MQTT-Nachrichten in Echtzeit</p>
-        </div>
+      <section id="liveMonitorView">
+        <header class="topbar">
+          <div>
+            <h1>Live Monitor</h1>
+            <p class="subtitle">MQTT-Nachrichten in Echtzeit</p>
+          </div>
 
-        <div class="topbar-actions">
-          <button id="pauseBtn" class="btn secondary">Pause</button>
-          <button id="clearBtn" class="btn danger">Leeren</button>
-        </div>
-      </header>
+          <div class="topbar-actions">
+            <button id="pauseBtn" class="btn secondary">Pause</button>
+            <button id="clearBtn" class="btn danger">Leeren</button>
+          </div>
+        </header>
 
-      <section class="cards">
-        <div class="card stat-card">
-          <div class="stat-label">Verbindungsstatus</div>
-          <div class="stat-value" id="connectionState">Getrennt</div>
-          <div class="stat-small" id="connectionMessage">Noch keine Verbindung</div>
-        </div>
+        <section class="cards">
+          <div class="card stat-card">
+            <div class="stat-label">Verbindungsstatus</div>
+            <div class="stat-value" id="connectionState">Getrennt</div>
+            <div class="stat-small" id="connectionMessage">Noch keine Verbindung</div>
+          </div>
 
-        <div class="card stat-card">
-          <div class="stat-label">Nachrichten gesamt</div>
-          <div class="stat-value" id="totalMessages">0</div>
-          <div class="stat-small">seit Start</div>
-        </div>
+          <div class="card stat-card">
+            <div class="stat-label">Nachrichten gesamt</div>
+            <div class="stat-value" id="totalMessages">0</div>
+            <div class="stat-small">seit Start</div>
+          </div>
 
-        <div class="card stat-card">
-          <div class="stat-label">Topics gesehen</div>
-          <div class="stat-value" id="topicCount">0</div>
-          <div class="stat-small">eindeutige Topics</div>
-        </div>
+          <div class="card stat-card">
+            <div class="stat-label">Topics gesehen</div>
+            <div class="stat-value" id="topicCount">0</div>
+            <div class="stat-small">eindeutige Topics</div>
+          </div>
 
-        <div class="card stat-card">
-          <div class="stat-label">Letzte Nachricht</div>
-          <div class="stat-value" id="lastMessageTime">-</div>
-          <div class="stat-small">Zeitpunkt</div>
-        </div>
-      </section>
+          <div class="card stat-card">
+            <div class="stat-label">Letzte Nachricht</div>
+            <div class="stat-value" id="lastMessageTime">-</div>
+            <div class="stat-small">Zeitpunkt</div>
+          </div>
+        </section>
 
-      <section class="content-grid">
-        <div class="card panel">
+        <section class="content-grid">
+          <div class="card panel">
+            <div class="panel-header">
+              <h2>Topics</h2>
+              <span class="badge" id="topicBadge">0</span>
+            </div>
+            <div id="topicList" class="topic-list empty-state">
+              Noch keine Topics empfangen
+            </div>
+          </div>
+
+          <div class="card panel large-panel">
+            <div class="panel-header">
+              <h2>Live Nachrichten</h2>
+              <label class="checkbox">
+                <input type="checkbox" id="autoScroll" checked>
+                Auto-Scroll
+              </label>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zeit</th>
+                    <th>Topic</th>
+                    <th>Payload</th>
+                  </tr>
+                </thead>
+                <tbody id="messageTable">
+                  <tr>
+                    <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="card details-panel">
           <div class="panel-header">
-            <h2>Topics</h2>
-            <span class="badge" id="topicBadge">0</span>
-          </div>
-          <div id="topicList" class="topic-list empty-state">
-            Noch keine Topics empfangen
-          </div>
-        </div>
-
-        <div class="card panel large-panel">
-          <div class="panel-header">
-            <h2>Live Nachrichten</h2>
-            <label class="checkbox">
-              <input type="checkbox" id="autoScroll" checked>
-              Auto-Scroll
-            </label>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Zeit</th>
-                  <th>Topic</th>
-                  <th>Payload</th>
-                </tr>
-              </thead>
-              <tbody id="messageTable">
-                <tr>
-                  <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="card details-panel">
-        <div class="panel-header">
             <h2>Nachrichtendetails</h2>
             <button id="copyBtn" class="btn secondary">Kopieren</button>
-        </div>
+          </div>
 
-        <div class="details-sections">
+          <div class="details-sections">
+            <div class="details-card full-width compact-card">
+              <h3>Details</h3>
+              <div class="details-meta">
+                <div><strong>Topic:</strong> <span id="detailsTopic">-</span></div>
+                <div><strong>Zeit:</strong> <span id="detailsTime">-</span></div>
+              </div>
 
-        <!-- TOP INFO BAR -->
-        <div class="details-card full-width compact-card">
-            <h3>Details</h3>
-                <div class="details-meta">
-                    <div><strong>Topic:</strong> <span id="detailsTopic">-</span></div>
-                    <div><strong>Zeit:</strong> <span id="detailsTime">-</span></div>
-                </div>
+              <div id="deviceRow" class="details-meta">
+                <div><strong>Device:</strong> <span id="detailsDevice"></span></div>
+              </div>
 
-                <div id="deviceRow" class="details-meta">
-                  <div><strong>Device:</strong> <span id="detailsDevice"></span></div>
-                </div>
+              <div class="details-meta" id="devEuiRow">
+                <div id="devEuiField"><strong>DevEUI:</strong> <span id="detailsDevEui"></span></div>
+              </div>
 
-                <div id="devEuiRssiRow" class="details-meta">
-                  <div id="devEuiField"><strong>DevEUI:</strong> <span id="detailsDevEui"></span></div>
-                </div>
-
-                <div id="devEuiRssiRow" class="details-meta">
-                  <div id="rssiField"><strong>RSSI:</strong> <span id="detailsRssi"></span></div>
-                </div>
-        </div>
-
-        <!-- LINKS: DECODED -->
-        <div id="decodedCard" class="details-card">
-            <h3>Decodierte Daten</h3>
-            <div id="decodedDataBox" class="decoded-data-empty">
-            Keine decodierten Daten vorhanden.
+              <div class="details-meta" id="rssiRow">
+                <div id="rssiField"><strong>RSSI:</strong> <span id="detailsRssi"></span></div>
+              </div>
             </div>
-        </div>
 
-        <!-- RECHTS: RAW JSON -->
-        <div id="rawMessageCard" class="details-card">
-            <h3>Komplette Nachricht</h3>
-            <pre id="detailsBox">Klicke auf eine Nachricht, um Details zu sehen.</pre>
-        </div>
+            <div id="decodedCard" class="details-card">
+              <h3>Decodierte Daten</h3>
+              <div id="decodedDataBox" class="decoded-data-empty">
+                Keine decodierten Daten vorhanden.
+              </div>
+            </div>
 
-        </div>
+            <div id="rawMessageCard" class="details-card">
+              <h3>Komplette Nachricht</h3>
+              <pre id="detailsBox">Klicke auf eine Nachricht, um Details zu sehen.</pre>
+            </div>
+          </div>
         </section>
+      </section>
+
+      <section id="dashboardView" style="display:none;">
+        <header class="topbar">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="subtitle">Geräte und Entitäten in Echtzeit</p>
+          </div>
+        </header>
+
+        <div id="dashboardGrid"></div>
+      </section>
     </main>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+
+    socket.on("connect", () => {
+      console.log("Browser Socket verbunden:", socket.id);
+    });
 
     const topicFilterInput = document.getElementById('topicFilter');
     const messageTable = document.getElementById('messageTable');
@@ -222,7 +241,7 @@
     const mqttTopicInput = document.getElementById('mqttTopic');
     const mqttUsernameInput = document.getElementById('mqttUsername');
     const mqttPasswordInput = document.getElementById('mqttPassword');
-const mqttClientIdInput = document.getElementById('mqttClientId');
+    const mqttClientIdInput = document.getElementById('mqttClientId');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const configMessageEl = document.getElementById('configMessage');
     const disconnectBtn = document.getElementById('disconnectBtn');
@@ -239,17 +258,193 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
     const connectionStateEl = document.getElementById('connectionState');
     const connectionMessageEl = document.getElementById('connectionMessage');
 
+    const showLiveMonitorBtn = document.getElementById('showLiveMonitorBtn');
+    const showDashboardBtn = document.getElementById('showDashboardBtn');
+    const liveMonitorView = document.getElementById('liveMonitorView');
+    const dashboardView = document.getElementById('dashboardView');
+    const appLayout = document.getElementById('appLayout');
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+
     let paused = false;
     let totalMessages = 0;
     let selectedPayload = '';
     const topics = new Map();
+    let dashboardDevices = [];
+
+    function showView(viewName) {
+      if (viewName === 'dashboard') {
+        liveMonitorView.style.display = 'none';
+        dashboardView.style.display = 'block';
+        showLiveMonitorBtn.classList.remove('active');
+        showDashboardBtn.classList.add('active');
+        loadDashboardDevices();
+        return;
+      }
+
+      liveMonitorView.style.display = 'block';
+      dashboardView.style.display = 'none';
+      showDashboardBtn.classList.remove('active');
+      showLiveMonitorBtn.classList.add('active');
+    }
 
     function escapeHtml(text) {
       return String(text)
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;');
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
     }
+
+    function renderLightEntity(entity) {
+      const isOn = String(entity.value?.state || '').toUpperCase() === 'ON';
+      const brightness = entity.value?.brightness ?? 0;
+      const brightnessMax = entity.brightnessScale || 255;
+
+      return `
+        <div class="entity-card modern" id="entity-${entity.id}">
+          <div class="entity-header">
+            <span class="entity-name">${escapeHtml(entity.name || entity.id)}</span>
+          </div>
+
+          <div class="entity-body">
+            <div class="entity-row">
+              <span>Aus / An</span>
+              <div class="toggle-switch" data-entity="${entity.id}">
+                <div class="toggle-knob ${isOn ? 'on' : ''}"></div>
+              </div>
+            </div>
+
+            <div class="entity-row">
+              <span>Helligkeit</span>
+              <input
+                type="range"
+                min="0"
+                max="${brightnessMax}"
+                value="${brightness}"
+                class="brightness-slider"
+                data-entity="${entity.id}"
+              >
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderEntity(entity) {
+      if (entity.type === 'light') {
+        return renderLightEntity(entity);
+      }
+
+      return `
+        <div class="entity-card" id="entity-${entity.id}">
+          <div class="entity-header">
+            <span class="entity-name">${escapeHtml(entity.name || entity.id)}</span>
+          </div>
+          <div class="entity-body">
+            <span class="muted">Typ noch nicht unterstützt: ${escapeHtml(entity.type || '-')}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDashboard() {
+      const dashboardGrid = document.getElementById('dashboardGrid');
+      if (!dashboardGrid) return;
+
+      if (!dashboardDevices.length) {
+        dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
+        return;
+      }
+
+      dashboardGrid.innerHTML = dashboardDevices.map((device) => {
+        const entitiesHtml = (device.entities || []).map((entity) => {
+          const isOn = String(entity.value?.state || '').toUpperCase() === 'ON';
+          const brightness = entity.value?.brightness ?? 0;
+          const brightnessMax = entity.brightnessScale || 255;
+
+          return `
+            <div class="dashboard-entity-row-block" id="entity-${entity.id}">
+              <div class="dashboard-entity-title">
+                ${escapeHtml(entity.name || 'Light')}
+              </div>
+
+              <div class="dashboard-control-row">
+                <span class="dashboard-label">Aus / An</span>
+                <label class="switch">
+                  <input type="checkbox" ${isOn ? 'checked' : ''} disabled>
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="dashboard-control-row">
+                <span class="dashboard-label">Helligkeit</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="${brightnessMax}"
+                  value="${brightness}"
+                  disabled
+                  class="dashboard-range"
+                >
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="dashboard-device-card" id="device-${device.id}">
+            <div class="dashboard-device-header">
+              <div class="dashboard-device-icon">💡</div>
+              <div class="dashboard-device-header-text">
+                <div class="dashboard-device-name">${escapeHtml(device.name || device.id)}</div>
+                <div class="dashboard-device-subtitle">
+                  Entitäten: ${escapeHtml(device.entityCount || 0)}
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-device-body">
+              ${entitiesHtml || '<div class="muted">Keine Entitäten</div>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadDashboardDevices() {
+      try {
+        const response = await fetch('/api/devices');
+        const data = await response.json();
+        dashboardDevices = Array.isArray(data) ? data : [];
+        renderDashboard();
+      } catch (error) {
+        console.error('Fehler beim Laden von /api/devices:', error);
+      }
+    }
+
+    function updateDashboardEntity(update) {
+      const device = dashboardDevices.find(d => d.id === update.deviceId);
+      if (!device) return;
+
+      const entityIndex = (device.entities || []).findIndex(
+        entity => entity.id === update.entityId
+      );
+
+      if (entityIndex === -1) return;
+
+      device.entities[entityIndex] = {
+        ...device.entities[entityIndex],
+        ...update.entity
+      };
+
+      renderDashboard();
+    }
+
+    socket.on("entity-update", (data) => {
+      console.log("Browser entity-update angekommen:", data);
+      updateDashboardEntity(data);
+    });
 
     function formatPayload(payload) {
       try {
@@ -287,41 +482,8 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
       `).join('');
     }
 
-    function formatValueByKey(key, value) {
-    if (value === null || value === undefined) {
-        return '-';
-    }
-
-    const lowerKey = String(key).toLowerCase();
-
-    if (typeof value === 'number') {
-        if (lowerKey.includes('temperature')) {
-        return `${value} °C`;
-        }
-
-        if (lowerKey.includes('voltage')) {
-        return `${value} V`;
-        }
-
-        if (lowerKey.includes('motorrange') || lowerKey.includes('motorposition')) {
-        return `${value} INC`;
-        }
-
-        if (lowerKey.includes('valve') || lowerKey.includes('percent') || lowerKey.includes('relativehumidity')) {
-        return `${value} %`;
-        }
-    }
-
-    if (typeof value === 'object') {
-        return JSON.stringify(value);
-    }
-
-    return String(value);
-    }
-
     function renderDecodedData(payload) {
       const decodedCardEl = document.getElementById('decodedCard');
-      const decodedDataBoxEl = document.getElementById('decodedDataBox');
       const rawMessageCardEl = document.getElementById('rawMessageCard');
 
       let parsed;
@@ -379,79 +541,71 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
         <td><code>${escapeHtml(shortPayload)}</code></td>
       `;
 
-    tr.addEventListener('click', () => {
-    selectedPayload = formattedPayload;
-    detailsBox.textContent = formattedPayload;
-    detailsTopicEl.textContent = data.topic;
+      tr.addEventListener('click', () => {
+        selectedPayload = formattedPayload;
+        detailsBox.textContent = formattedPayload;
+        detailsTopicEl.textContent = data.topic;
 
-    // Zeit
-    document.getElementById('detailsTime').textContent =
-        new Date(data.timestamp).toLocaleString();
+        document.getElementById('detailsTime').textContent =
+          new Date(data.timestamp).toLocaleString();
 
-    // JSON parsen
-    let parsed;
-    try {
-        parsed = JSON.parse(data.payload);
-    } catch {
-        parsed = null;
-    }
+        let parsed;
+        try {
+          parsed = JSON.parse(data.payload);
+        } catch {
+          parsed = null;
+        }
 
-    // Device
-    const deviceName = parsed?.deviceInfo?.deviceName;
-    const deviceRow = document.getElementById('deviceRow');
+        const deviceName = parsed?.deviceInfo?.deviceName;
+        const deviceRow = document.getElementById('deviceRow');
 
-    if (deviceName) {
-      document.getElementById('detailsDevice').textContent = deviceName;
-      deviceRow.style.display = 'block';
-    } else {
-      deviceRow.style.display = 'none';
-    }
+        if (deviceName) {
+          document.getElementById('detailsDevice').textContent = deviceName;
+          deviceRow.style.display = 'block';
+        } else {
+          deviceRow.style.display = 'none';
+        }
 
-    // DevEUI
-    const devEui = parsed?.deviceInfo?.devEui;
-    const devEuiField = document.getElementById('devEuiField');
+        const devEui = parsed?.deviceInfo?.devEui;
+        const devEuiField = document.getElementById('devEuiField');
+        const devEuiRow = document.getElementById('devEuiRow');
 
-    if (devEui) {
-      document.getElementById('detailsDevEui').textContent = devEui;
-      devEuiField.style.display = 'block';
-    } else {
-      devEuiField.style.display = 'none';
-    }
+        if (devEui) {
+          document.getElementById('detailsDevEui').textContent = devEui;
+          devEuiField.style.display = 'block';
+          devEuiRow.style.display = 'flex';
+        } else {
+          devEuiField.style.display = 'none';
+          devEuiRow.style.display = 'none';
+        }
 
-    // 👉 RSSI (DEIN CODE – HIER GEHÖRT ER HIN)
-    const rssi = parsed?.rxInfo?.[0]?.rssi;
-    const rssiField = document.getElementById('rssiField');
-    const rssiEl = document.getElementById('detailsRssi');
+        const rssi = parsed?.rxInfo?.[0]?.rssi;
+        const rssiField = document.getElementById('rssiField');
+        const rssiRow = document.getElementById('rssiRow');
+        const rssiEl = document.getElementById('detailsRssi');
 
-    if (rssi !== undefined) {
-      rssiEl.textContent = `${rssi} dBm`;
-      rssiField.style.display = 'block';
+        if (rssi !== undefined) {
+          rssiEl.textContent = `${rssi} dBm`;
+          rssiField.style.display = 'block';
+          rssiRow.style.display = 'flex';
 
-      if (rssi > -70) {
-        rssiEl.style.color = '#4ade80';
-      } else if (rssi > -90) {
-        rssiEl.style.color = '#facc15';
-      } else {
-        rssiEl.style.color = '#f87171';
-      }
-    } else {
-      rssiField.style.display = 'none';
-    }
+          if (rssi > -70) {
+            rssiEl.style.color = '#4ade80';
+          } else if (rssi > -90) {
+            rssiEl.style.color = '#facc15';
+          } else {
+            rssiEl.style.color = '#f87171';
+          }
+        } else {
+          rssiField.style.display = 'none';
+          rssiRow.style.display = 'none';
+        }
 
-    const devEuiRssiRow = document.getElementById('devEuiRssiRow');
+        renderDecodedData(formattedPayload);
 
-    if (!devEui && rssi === undefined) {
-      devEuiRssiRow.style.display = 'none';
-    } else {
-      devEuiRssiRow.style.display = 'flex';
-    }
-
-    // Decoded Daten anzeigen
-    renderDecodedData(formattedPayload);
-
-    document.querySelectorAll('.message-row').forEach(row => row.classList.remove('selected'));
-    tr.classList.add('selected');
-    });
+        document.querySelectorAll('.message-row').forEach(row => row.classList.remove('selected'));
+        tr.classList.add('selected');
+      });
 
       messageTable.prepend(tr);
 
@@ -480,59 +634,71 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
     }
 
     async function saveConfig() {
-    const payload = {
+      const payload = {
         host: mqttHostInput.value.trim(),
         port: Number(mqttPortInput.value),
         topic: mqttTopicInput.value.trim(),
         username: mqttUsernameInput.value.trim(),
         password: mqttPasswordInput.value,
         clientId: mqttClientIdInput.value.trim()
-    };
+      };
 
-    console.log('Sende Config:', payload);
+      console.log('Sende Config:', payload);
 
-    configMessageEl.textContent = 'Speichere...';
+      configMessageEl.textContent = 'Speichere...';
 
-    const res = await fetch('/api/config', {
+      const res = await fetch('/api/config', {
         method: 'POST',
         headers: {
-        'Content-Type': 'application/json'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
-    });
+      });
 
-    const result = await res.json();
-    console.log('Antwort:', result);
+      const result = await res.json();
+      console.log('Antwort:', result);
 
-    if (!res.ok) {
+      if (!res.ok) {
         configMessageEl.textContent = result.error || 'Fehler beim Speichern';
         return;
-    }
+      }
 
-    brokerTextEl.textContent = `${result.config.host}:${result.config.port}`;
-    topicTextEl.textContent = result.config.topic;
-    configMessageEl.textContent = 'Konfiguration gespeichert, verbinde neu...';
+      brokerTextEl.textContent = `${result.config.host}:${result.config.port}`;
+      topicTextEl.textContent = result.config.topic;
+      configMessageEl.textContent = 'Konfiguration gespeichert, verbinde neu...';
     }
 
     async function disconnectBroker() {
-    configMessageEl.textContent = 'Trenne...';
+      configMessageEl.textContent = 'Trenne...';
 
-    const res = await fetch('/api/disconnect', {
+      const res = await fetch('/api/disconnect', {
         method: 'POST'
-    });
+      });
 
-    const result = await res.json();
+      const result = await res.json();
 
-    if (!res.ok || !result.success) {
+      if (!res.ok || !result.success) {
         configMessageEl.textContent = 'Fehler beim Trennen';
         return;
-    }
+      }
 
-    configMessageEl.textContent = 'MQTT-Verbindung getrennt';
+      configMessageEl.textContent = 'MQTT-Verbindung getrennt';
     }
 
     saveConfigBtn.addEventListener('click', saveConfig);
     disconnectBtn.addEventListener('click', disconnectBroker);
+
+    showLiveMonitorBtn.addEventListener('click', () => {
+      showView('live');
+    });
+
+    showDashboardBtn.addEventListener('click', () => {
+      showView('dashboard');
+    });
+
+    sidebarToggleBtn.addEventListener('click', () => {
+      appLayout.classList.toggle('sidebar-collapsed');
+    });
 
     socket.on('mqtt-message', (data) => {
       if (paused) return;
@@ -578,16 +744,16 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
     });
 
     clearBtn.addEventListener('click', () => {
-    messageTable.innerHTML = `
+      messageTable.innerHTML = `
         <tr>
-        <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
+          <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
         </tr>
-    `;
-    detailsBox.textContent = 'Klicke auf eine Nachricht, um Details zu sehen.';
-    detailsTopicEl.textContent = '-';
-    decodedDataBoxEl.className = 'decoded-data-empty';
-    decodedDataBoxEl.textContent = 'Keine decodierten Daten vorhanden.';
-    selectedPayload = '';
+      `;
+      detailsBox.textContent = 'Klicke auf eine Nachricht, um Details zu sehen.';
+      detailsTopicEl.textContent = '-';
+      decodedDataBoxEl.className = 'decoded-data-empty';
+      decodedDataBoxEl.textContent = 'Keine decodierten Daten vorhanden.';
+      selectedPayload = '';
     });
 
     pauseBtn.addEventListener('click', () => {
@@ -602,7 +768,66 @@ const mqttClientIdInput = document.getElementById('mqttClientId');
       setTimeout(() => copyBtn.textContent = 'Kopieren', 1200);
     });
 
+        document.addEventListener('click', async (event) => {
+      const toggle = event.target.closest('.toggle-switch');
+      if (!toggle) return;
+
+      const entityId = toggle.dataset.entity;
+      const device = dashboardDevices.find(d => (d.entities || []).some(e => e.id === entityId));
+      if (!device) return;
+
+      const entity = (device.entities || []).find(e => e.id === entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      const currentState = String(entity.value?.state || '').toUpperCase();
+      const newState = currentState === 'ON' ? 'OFF' : 'ON';
+
+      try {
+        await fetch('/api/mqtt/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            topic: entity.commandTopic,
+            payload: JSON.stringify({ state: newState })
+          })
+        });
+      } catch (error) {
+        console.error('Fehler beim Schalten:', error);
+      }
+    });
+
+    document.addEventListener('change', async (event) => {
+      if (!event.target.classList.contains('brightness-slider')) return;
+
+      const entityId = event.target.dataset.entity;
+      const brightness = Number(event.target.value);
+
+      const device = dashboardDevices.find(d => (d.entities || []).some(e => e.id === entityId));
+      if (!device) return;
+
+      const entity = (device.entities || []).find(e => e.id === entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      try {
+        await fetch('/api/mqtt/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            topic: entity.commandTopic,
+            payload: JSON.stringify({ brightness })
+          })
+        });
+      } catch (error) {
+        console.error('Fehler beim Setzen der Helligkeit:', error);
+      }
+    });
+
     loadConfig();
+    loadDashboardDevices();
   </script>
 </body>
 </html>
