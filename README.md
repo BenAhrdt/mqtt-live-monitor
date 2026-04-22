@@ -15,7 +15,7 @@ In das Verzeichnis des mqtt-live-monitors wechseln
 cd mqtt-live-monitor
 ```
 Installationsscript aufrufen
-````bash
+```bash
 install.sh
 ```
 ---
