@@ -5,7 +5,10 @@ Ein einfacher Web-Monitor für MQTT-Nachrichten mit Live-Ansicht, Filter, Detail
 ---
 
 ## ⚡ Quick Start
-
+Git installieren, wenn nicht vorhanden
+```bash
+apt install -y git
+```
 Repository klonen
 ```bash
 git clone https://github.com/BenAhrdt/mqtt-live-monitor.git
