@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQTT Live Monitor</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">◉</div>
+        <div>
+          <div class="brand-title">MQTT Live Monitor</div>
+          <div class="brand-subtitle">v0.1</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active">Live Monitor</button>
+        <button class="nav-item">Topics</button>
+        <button class="nav-item">Statistiken</button>
+        <button class="nav-item">Einstellungen</button>
+      </nav>
+
+      <div class="sidebar-section">
+        <h3>Broker Konfiguration</h3>
+
+        <label class="form-label">Host</label>
+        <input id="mqttHost" type="text" value="192.168.2.212">
+
+        <label class="form-label">Port</label>
+        <input id="mqttPort" type="number" value="1883">
+
+        <label class="form-label">Topic</label>
+        <input id="mqttTopic" type="text" value="#">
+
+        <label class="form-label">Username</label>
+        <input id="mqttUsername" type="text" placeholder="optional">
+
+        <label class="form-label">Passwort</label>
+        <input id="mqttPassword" type="password" placeholder="optional">
+
+        <label class="form-label">Client ID</label>
+        <input id="mqttClientId" type="text" value="LiveMonitor">
+
+        <div class="button-group-vertical">
+            <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
+            <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
+        </div>
+        <div id="configMessage" class="config-message"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Filter</h3>
+        <input id="topicFilter" type="text" placeholder="Topic filtern, z. B. chirpstack">
+      </div>
+
+      <div class="sidebar-section connection-box">
+        <h3>Verbindung</h3>
+        <div class="meta-row">
+          <span>Status</span>
+          <span id="statusText" class="status disconnected">Getrennt</span>
+        </div>
+        <div class="meta-row">
+          <span>Broker</span>
+          <span id="brokerText">-</span>
+        </div>
+        <div class="meta-row">
+          <span>Topic</span>
+          <span id="topicText">-</span>
+        </div>
+        <div class="meta-row">
+          <span>Nachrichten</span>
+          <span id="messageCount">0</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>Live Monitor</h1>
+          <p class="subtitle">MQTT-Nachrichten in Echtzeit</p>
+        </div>
+
+        <div class="topbar-actions">
+          <button id="pauseBtn" class="btn secondary">Pause</button>
+          <button id="clearBtn" class="btn danger">Leeren</button>
+        </div>
+      </header>
+
+      <section class="cards">
+        <div class="card stat-card">
+          <div class="stat-label">Verbindungsstatus</div>
+          <div class="stat-value" id="connectionState">Getrennt</div>
+          <div class="stat-small" id="connectionMessage">Noch keine Verbindung</div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-label">Nachrichten gesamt</div>
+          <div class="stat-value" id="totalMessages">0</div>
+          <div class="stat-small">seit Start</div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-label">Topics gesehen</div>
+          <div class="stat-value" id="topicCount">0</div>
+          <div class="stat-small">eindeutige Topics</div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-label">Letzte Nachricht</div>
+          <div class="stat-value" id="lastMessageTime">-</div>
+          <div class="stat-small">Zeitpunkt</div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="card panel">
+          <div class="panel-header">
+            <h2>Topics</h2>
+            <span class="badge" id="topicBadge">0</span>
+          </div>
+          <div id="topicList" class="topic-list empty-state">
+            Noch keine Topics empfangen
+          </div>
+        </div>
+
+        <div class="card panel large-panel">
+          <div class="panel-header">
+            <h2>Live Nachrichten</h2>
+            <label class="checkbox">
+              <input type="checkbox" id="autoScroll" checked>
+              Auto-Scroll
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Zeit</th>
+                  <th>Topic</th>
+                  <th>Payload</th>
+                </tr>
+              </thead>
+              <tbody id="messageTable">
+                <tr>
+                  <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card details-panel">
+        <div class="panel-header">
+            <h2>Nachrichtendetails</h2>
+            <button id="copyBtn" class="btn secondary">Kopieren</button>
+        </div>
+
+        <div class="details-sections">
+
+        <!-- TOP INFO BAR -->
+        <div class="details-card full-width compact-card">
+            <h3>Details</h3>
+                <div class="details-meta">
+                    <div><strong>Topic:</strong> <span id="detailsTopic">-</span></div>
+                    <div><strong>Zeit:</strong> <span id="detailsTime">-</span></div>
+                </div>
+
+                <div id="deviceRow" class="details-meta">
+                  <div><strong>Device:</strong> <span id="detailsDevice"></span></div>
+                </div>
+
+                <div id="devEuiRssiRow" class="details-meta">
+                  <div id="devEuiField"><strong>DevEUI:</strong> <span id="detailsDevEui"></span></div>
+                </div>
+
+                <div id="devEuiRssiRow" class="details-meta">
+                  <div id="rssiField"><strong>RSSI:</strong> <span id="detailsRssi"></span></div>
+                </div>
+        </div>
+
+        <!-- LINKS: DECODED -->
+        <div id="decodedCard" class="details-card">
+            <h3>Decodierte Daten</h3>
+            <div id="decodedDataBox" class="decoded-data-empty">
+            Keine decodierten Daten vorhanden.
+            </div>
+        </div>
+
+        <!-- RECHTS: RAW JSON -->
+        <div id="rawMessageCard" class="details-card">
+            <h3>Komplette Nachricht</h3>
+            <pre id="detailsBox">Klicke auf eine Nachricht, um Details zu sehen.</pre>
+        </div>
+
+        </div>
+        </section>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const topicFilterInput = document.getElementById('topicFilter');
+    const messageTable = document.getElementById('messageTable');
+    const detailsTopicEl = document.getElementById('detailsTopic');
+    const decodedDataBoxEl = document.getElementById('decodedDataBox');
+    const clearBtn = document.getElementById('clearBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const autoScrollCheckbox = document.getElementById('autoScroll');
+
+    const mqttHostInput = document.getElementById('mqttHost');
+    const mqttPortInput = document.getElementById('mqttPort');
+    const mqttTopicInput = document.getElementById('mqttTopic');
+    const mqttUsernameInput = document.getElementById('mqttUsername');
+    const mqttPasswordInput = document.getElementById('mqttPassword');
+const mqttClientIdInput = document.getElementById('mqttClientId');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const configMessageEl = document.getElementById('configMessage');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+
+    const totalMessagesEl = document.getElementById('totalMessages');
+    const topicCountEl = document.getElementById('topicCount');
+    const topicBadgeEl = document.getElementById('topicBadge');
+    const lastMessageTimeEl = document.getElementById('lastMessageTime');
+    const messageCountEl = document.getElementById('messageCount');
+    const topicListEl = document.getElementById('topicList');
+    const brokerTextEl = document.getElementById('brokerText');
+    const topicTextEl = document.getElementById('topicText');
+    const statusTextEl = document.getElementById('statusText');
+    const connectionStateEl = document.getElementById('connectionState');
+    const connectionMessageEl = document.getElementById('connectionMessage');
+
+    let paused = false;
+    let totalMessages = 0;
+    let selectedPayload = '';
+    const topics = new Map();
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    }
+
+    function formatPayload(payload) {
+      try {
+        const parsed = JSON.parse(payload);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return payload;
+      }
+    }
+
+    function updateTopicList() {
+      const filter = topicFilterInput.value.trim().toLowerCase();
+      const entries = [...topics.entries()]
+        .filter(([topic]) => topic.toLowerCase().includes(filter))
+        .sort((a, b) => b[1].count - a[1].count);
+
+      topicCountEl.textContent = topics.size;
+      topicBadgeEl.textContent = entries.length;
+
+      if (entries.length === 0) {
+        topicListEl.className = 'topic-list empty-state';
+        topicListEl.textContent = 'Keine passenden Topics';
+        return;
+      }
+
+      topicListEl.className = 'topic-list';
+      topicListEl.innerHTML = entries.map(([topic, info]) => `
+        <div class="topic-item">
+          <div class="topic-name">${escapeHtml(topic)}</div>
+          <div class="topic-meta">
+            <span>${info.count} Msg</span>
+            <span>${info.lastTime}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function formatValueByKey(key, value) {
+    if (value === null || value === undefined) {
+        return '-';
+    }
+
+    const lowerKey = String(key).toLowerCase();
+
+    if (typeof value === 'number') {
+        if (lowerKey.includes('temperature')) {
+        return `${value} °C`;
+        }
+
+        if (lowerKey.includes('voltage')) {
+        return `${value} V`;
+        }
+
+        if (lowerKey.includes('motorrange') || lowerKey.includes('motorposition')) {
+        return `${value} INC`;
+        }
+
+        if (lowerKey.includes('valve') || lowerKey.includes('percent') || lowerKey.includes('relativehumidity')) {
+        return `${value} %`;
+        }
+    }
+
+    if (typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+
+    return String(value);
+    }
+
+    function renderDecodedData(payload) {
+      const decodedCardEl = document.getElementById('decodedCard');
+      const decodedDataBoxEl = document.getElementById('decodedDataBox');
+      const rawMessageCardEl = document.getElementById('rawMessageCard');
+
+      let parsed;
+
+      try {
+        parsed = JSON.parse(payload);
+      } catch {
+        decodedCardEl.style.display = 'none';
+        rawMessageCardEl.classList.add('full-width-card');
+        return;
+      }
+
+      if (!parsed.object || Object.keys(parsed.object).length === 0) {
+        decodedCardEl.style.display = 'none';
+        rawMessageCardEl.classList.add('full-width-card');
+        return;
+      }
+
+      decodedCardEl.style.display = 'block';
+      rawMessageCardEl.classList.remove('full-width-card');
+
+      const entries = Object.entries(parsed.object)
+        .sort(([a], [b]) => a.localeCompare(b));
+
+      decodedDataBoxEl.className = 'decoded-data';
+      decodedDataBoxEl.innerHTML = entries.map(([key, value]) => `
+        <div class="decoded-row">
+          <div class="decoded-key">${key}</div>
+          <div class="decoded-value">${value}</div>
+        </div>
+      `).join('');
+    }
+
+    function addMessageRow(data) {
+      const filter = topicFilterInput.value.trim().toLowerCase();
+      if (filter && !data.topic.toLowerCase().includes(filter)) {
+        return;
+      }
+
+      const formattedPayload = formatPayload(data.payload);
+      const shortPayload = formattedPayload.length > 140
+        ? formattedPayload.slice(0, 140) + ' ...'
+        : formattedPayload;
+
+      const emptyRow = messageTable.querySelector('.empty-cell');
+      if (emptyRow) {
+        messageTable.innerHTML = '';
+      }
+
+      const tr = document.createElement('tr');
+      tr.className = 'message-row';
+      tr.innerHTML = `
+        <td>${new Date(data.timestamp).toLocaleTimeString()}</td>
+        <td class="topic-cell">${escapeHtml(data.topic)}</td>
+        <td><code>${escapeHtml(shortPayload)}</code></td>
+      `;
+
+    tr.addEventListener('click', () => {
+    selectedPayload = formattedPayload;
+    detailsBox.textContent = formattedPayload;
+    detailsTopicEl.textContent = data.topic;
+
+    // Zeit
+    document.getElementById('detailsTime').textContent =
+        new Date(data.timestamp).toLocaleString();
+
+    // JSON parsen
+    let parsed;
+    try {
+        parsed = JSON.parse(data.payload);
+    } catch {
+        parsed = null;
+    }
+
+    // Device
+    const deviceName = parsed?.deviceInfo?.deviceName;
+    const deviceRow = document.getElementById('deviceRow');
+
+    if (deviceName) {
+      document.getElementById('detailsDevice').textContent = deviceName;
+      deviceRow.style.display = 'block';
+    } else {
+      deviceRow.style.display = 'none';
+    }
+
+    // DevEUI
+    const devEui = parsed?.deviceInfo?.devEui;
+    const devEuiField = document.getElementById('devEuiField');
+
+    if (devEui) {
+      document.getElementById('detailsDevEui').textContent = devEui;
+      devEuiField.style.display = 'block';
+    } else {
+      devEuiField.style.display = 'none';
+    }
+
+    // 👉 RSSI (DEIN CODE – HIER GEHÖRT ER HIN)
+    const rssi = parsed?.rxInfo?.[0]?.rssi;
+    const rssiField = document.getElementById('rssiField');
+    const rssiEl = document.getElementById('detailsRssi');
+
+    if (rssi !== undefined) {
+      rssiEl.textContent = `${rssi} dBm`;
+      rssiField.style.display = 'block';
+
+      if (rssi > -70) {
+        rssiEl.style.color = '#4ade80';
+      } else if (rssi > -90) {
+        rssiEl.style.color = '#facc15';
+      } else {
+        rssiEl.style.color = '#f87171';
+      }
+    } else {
+      rssiField.style.display = 'none';
+    }
+
+    const devEuiRssiRow = document.getElementById('devEuiRssiRow');
+
+    if (!devEui && rssi === undefined) {
+      devEuiRssiRow.style.display = 'none';
+    } else {
+      devEuiRssiRow.style.display = 'flex';
+    }
+
+    // Decoded Daten anzeigen
+    renderDecodedData(formattedPayload);
+
+    document.querySelectorAll('.message-row').forEach(row => row.classList.remove('selected'));
+    tr.classList.add('selected');
+    });
+
+      messageTable.prepend(tr);
+
+      while (messageTable.children.length > 100) {
+        messageTable.removeChild(messageTable.lastChild);
+      }
+
+      if (autoScrollCheckbox.checked) {
+        tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    async function loadConfig() {
+      const res = await fetch('/api/config');
+      const config = await res.json();
+
+      mqttHostInput.value = config.host || '';
+      mqttPortInput.value = config.port || 1883;
+      mqttTopicInput.value = config.topic || '#';
+      mqttUsernameInput.value = config.username || '';
+      mqttPasswordInput.value = config.password || '';
+      mqttClientIdInput.value = config.clientId || '';
+
+      brokerTextEl.textContent = `${config.host}:${config.port}`;
+      topicTextEl.textContent = config.topic;
+    }
+
+    async function saveConfig() {
+    const payload = {
+        host: mqttHostInput.value.trim(),
+        port: Number(mqttPortInput.value),
+        topic: mqttTopicInput.value.trim(),
+        username: mqttUsernameInput.value.trim(),
+        password: mqttPasswordInput.value,
+        clientId: mqttClientIdInput.value.trim()
+    };
+
+    console.log('Sende Config:', payload);
+
+    configMessageEl.textContent = 'Speichere...';
+
+    const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    console.log('Antwort:', result);
+
+    if (!res.ok) {
+        configMessageEl.textContent = result.error || 'Fehler beim Speichern';
+        return;
+    }
+
+    brokerTextEl.textContent = `${result.config.host}:${result.config.port}`;
+    topicTextEl.textContent = result.config.topic;
+    configMessageEl.textContent = 'Konfiguration gespeichert, verbinde neu...';
+    }
+
+    async function disconnectBroker() {
+    configMessageEl.textContent = 'Trenne...';
+
+    const res = await fetch('/api/disconnect', {
+        method: 'POST'
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result.success) {
+        configMessageEl.textContent = 'Fehler beim Trennen';
+        return;
+    }
+
+    configMessageEl.textContent = 'MQTT-Verbindung getrennt';
+    }
+
+    saveConfigBtn.addEventListener('click', saveConfig);
+    disconnectBtn.addEventListener('click', disconnectBroker);
+
+    socket.on('mqtt-message', (data) => {
+      if (paused) return;
+
+      totalMessages += 1;
+      totalMessagesEl.textContent = totalMessages;
+      messageCountEl.textContent = totalMessages;
+      lastMessageTimeEl.textContent = new Date(data.timestamp).toLocaleTimeString();
+
+      const existing = topics.get(data.topic) || { count: 0, lastTime: '-' };
+      topics.set(data.topic, {
+        count: existing.count + 1,
+        lastTime: new Date(data.timestamp).toLocaleTimeString()
+      });
+
+      updateTopicList();
+      addMessageRow(data);
+    });
+
+    socket.on('mqtt-status', (status) => {
+      brokerTextEl.textContent = `${status.host}:${status.port}`;
+      topicTextEl.textContent = status.topic;
+      connectionMessageEl.textContent = status.message || '-';
+
+      if (status.connected) {
+        statusTextEl.textContent = 'Verbunden';
+        statusTextEl.className = 'status connected';
+        connectionStateEl.textContent = 'Verbunden';
+      } else {
+        statusTextEl.textContent = 'Getrennt';
+        statusTextEl.className = 'status disconnected';
+        connectionStateEl.textContent = 'Getrennt';
+      }
+    });
+
+    topicFilterInput.addEventListener('input', () => {
+      updateTopicList();
+      messageTable.innerHTML = `
+        <tr>
+          <td colspan="3" class="empty-cell">Filter geändert. Neue Nachrichten werden passend angezeigt.</td>
+        </tr>
+      `;
+    });
+
+    clearBtn.addEventListener('click', () => {
+    messageTable.innerHTML = `
+        <tr>
+        <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
+        </tr>
+    `;
+    detailsBox.textContent = 'Klicke auf eine Nachricht, um Details zu sehen.';
+    detailsTopicEl.textContent = '-';
+    decodedDataBoxEl.className = 'decoded-data-empty';
+    decodedDataBoxEl.textContent = 'Keine decodierten Daten vorhanden.';
+    selectedPayload = '';
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Fortsetzen' : 'Pause';
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      if (!selectedPayload) return;
+      await navigator.clipboard.writeText(selectedPayload);
+      copyBtn.textContent = 'Kopiert';
+      setTimeout(() => copyBtn.textContent = 'Kopieren', 1200);
+    });
+
+    loadConfig();
+  </script>
+</body>
+</html>
