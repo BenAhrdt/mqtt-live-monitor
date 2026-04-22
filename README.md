@@ -4,11 +4,23 @@ Ein einfacher Web-Monitor für MQTT-Nachrichten mit Live-Ansicht, decodierten Da
 
 ## Erste Tests mir dem Liveserver
 
-Zur Installation:
+# Installation:
 
-Repository klonen
+Repository klonen:
+
+```bash
+git clone https://github.com/BenAhrdt/mqtt-live-monitor.git
+```
+In das Verzeichniss des live-monitors wechseln
+```bash
+cd mqtt-live-monitor
+```
+Abhägigkeiten installieren
 ```bash
 npm install
+```
+Anwendung starten
+```bash
 npm start
 ```
 
