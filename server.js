@@ -1,16 +1,21 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const http = require("http");
 const mqtt = require("mqtt");
 const { Server } = require("socket.io");
 
 const isDev = process.env.DEV_MODE === "true";
+let allowedDiscoveryViaDevicePrefixes = [
+  "lorawan"
+];
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 3000;
+const DEFAULT_WEB_PORT = 3000;
+const CONFIG_PATH = path.join(__dirname, "config.json");
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -30,13 +35,19 @@ const deviceStore = {};
 const topicStore = {};
 
 let mqttConfig = {
-  host: "192.168.2.243",
+  webPort: 3000,
   port: 1883,
   topic: "#",
-  username: "mqttuser",
-  password: "MQTTpass1",
   clientId: "LiveMonitor",
-};
+  discoveryViaPrefixes: ["lorawan"],
+  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower"],
+}
+
+allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
+  ? [...mqttConfig.discoveryViaPrefixes]
+  : ["lorawan"];
+
+loadConfigFromFile();
 
 let mqttStatus = {
   connected: false,
@@ -45,6 +56,37 @@ let mqttStatus = {
   topic: mqttConfig.topic,
   message: "Nicht verbunden",
 };
+
+function loadConfigFromFile() {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
+      return;
+    }
+
+    const raw = fs.readFileSync(CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+
+    mqttConfig = {
+      ...mqttConfig,
+      ...parsed,
+      discoveryViaPrefixes: Array.isArray(parsed.discoveryViaPrefixes) && parsed.discoveryViaPrefixes.length
+        ? parsed.discoveryViaPrefixes.map(v => String(v).trim()).filter(v => v !== "")
+        : ["lorawan"],
+    };
+
+    allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];
+  } catch (error) {
+    console.error("Fehler beim Laden von config.json:", error.message);
+  }
+}
+
+function saveConfigToFile() {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(mqttConfig, null, 2), "utf8");
+  } catch (error) {
+    console.error("Fehler beim Speichern von config.json:", error.message);
+  }
+}
 
 function emitStatus(status) {
   mqttStatus = { ...mqttStatus, ...status };
@@ -519,6 +561,16 @@ function handleDiscoveryMessage(topic, message) {
     return { handled: false, reason: "invalid-json" };
   }
 
+  const viaDevice = String(payload?.device?.via_device || "").toLowerCase();
+
+  const isAllowed = allowedDiscoveryViaDevicePrefixes.some(prefix =>
+    viaDevice.startsWith(prefix.toLowerCase())
+  );
+
+  if (!isAllowed) {
+    return { handled: false, reason: "via-device-filtered" };
+  }
+
   // Nur unterstützte Typen überhaupt anlegen
   if (
     entityType !== "light" &&
@@ -529,6 +581,12 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "lawn_mower"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
+  }
+
+  const isEntityTypeAllowed = (mqttConfig.enabledEntityTypes || []).includes(entityType);
+
+  if (!isEntityTypeAllowed) {
+    return { handled: false, reason: "entity-type-filtered" };
   }
 
   const deviceId = getDeviceIdFromDiscovery(payload, topic);
@@ -1026,17 +1084,37 @@ function getDevicesForDashboard() {
 
 app.get("/api/config", (req, res) => {
   res.json({
+    webPort: mqttConfig.webPort,
     host: mqttConfig.host,
     port: mqttConfig.port,
     topic: mqttConfig.topic,
     username: mqttConfig.username,
     password: mqttConfig.password,
     clientId: mqttConfig.clientId,
+    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes || ["lorawan"],
+    enabledEntityTypes: mqttConfig.enabledEntityTypes || [
+      "light",
+      "climate",
+      "cover",
+      "lock",
+      "humidifier",
+      "lawn_mower",
+    ],
   });
 });
 
 app.post("/api/config", (req, res) => {
-  const { host, port, topic, username, password, clientId } = req.body;
+  const {
+  webPort,
+  host,
+  port,
+  topic,
+  username,
+  password,
+  clientId,
+  discoveryViaPrefixes,
+  enabledEntityTypes
+} = req.body;
 
   if (!host || !port || !topic) {
     return res.status(400).json({
@@ -1045,14 +1123,26 @@ app.post("/api/config", (req, res) => {
   }
 
   mqttConfig = {
+    webPort: Number(webPort) || mqttConfig.webPort || 3000,
     host: String(host).trim(),
     port: Number(port),
     topic: String(topic).trim(),
     username: String(username || "").trim(),
     password: String(password || ""),
     clientId: String(clientId || "").trim(),
+    discoveryViaPrefixes: Array.isArray(discoveryViaPrefixes) && discoveryViaPrefixes.length
+      ? discoveryViaPrefixes.map(v => String(v).trim()).filter(v => v !== "")
+      : ["lorawan"],
+    enabledEntityTypes: Array.isArray(enabledEntityTypes)
+      ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
+      : (Array.isArray(mqttConfig.enabledEntityTypes)
+          ? mqttConfig.enabledEntityTypes
+          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower"]),
   };
 
+  allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];
+
+  saveConfigToFile();
   connectMqtt();
 
   res.json({
@@ -1116,8 +1206,10 @@ io.on("connection", (socket) => {
   socket.emit("topic-store", topicStore);
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Webserver läuft auf http://0.0.0.0:${PORT}`);
+const WEB_PORT = Number(mqttConfig.webPort || DEFAULT_WEB_PORT);
+
+server.listen(WEB_PORT, "0.0.0.0", () => {
+  console.log(`Webserver läuft auf http://0.0.0.0:${WEB_PORT}`);
 
   // automatische Verbindung beim Start
   connectMqtt();

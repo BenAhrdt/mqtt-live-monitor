@@ -1,0 +1,20 @@
+{
+  "webPort": 3000,
+  "host": "192.168.2.243",
+  "port": 1883,
+  "topic": "#",
+  "username": "mqttuser",
+  "password": "MQTTpass1",
+  "clientId": "LiveMonitor",
+  "discoveryViaPrefixes": [
+    "lorawan"
+  ],
+  "enabledEntityTypes": [
+    "light",
+    "climate",
+    "cover",
+    "lock",
+    "humidifier",
+    "lawn_mower"
+  ]
+}

@@ -553,12 +553,76 @@ code {
 }
 
 .dashboard-topbar {
-  margin-bottom: 18px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  margin: 0 0 18px;
+  padding: 14px 0;
+  background: rgba(11, 18, 32, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(36, 50, 74, 0.75);
 }
 
 .dashboard-title-wrap {
   display: flex;
   flex-direction: column;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.entity-filter-dropdown {
+  position: relative;
+}
+
+.entity-filter-btn {
+  border: 1px solid rgba(117, 156, 255, 0.35);
+  background: rgba(83, 126, 255, 0.14);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.entity-filter-btn:hover {
+  background: rgba(83, 126, 255, 0.22);
+}
+
+.entity-filter-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: #0b1422;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  padding: 10px;
+  display: none;
+  z-index: 1001;
+}
+
+.entity-filter-dropdown.open .entity-filter-menu {
+  display: block;
+}
+
+.entity-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.entity-filter-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
 .dashboard-title-row {
@@ -836,16 +900,18 @@ code {
 }
 
 .app.sidebar-collapsed .sidebar-toggle-btn {
-  position: relative;
-  top: 0;
-  left: 0;
+  position: fixed;
+  top: 14px;
+  left: 10px;
   width: 44px;
   height: 44px;
-  z-index: 20;
+  z-index: 1100;
   background: rgba(15, 23, 54, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  margin: 0 auto;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  margin: 0;
 }
 
 .muted {
@@ -923,15 +989,8 @@ code {
   }
 
   .dashboard-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
     margin: 0 -16px 18px;
     padding: 14px 16px 14px 72px;
-    background: rgba(11, 18, 32, 0.94);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(36, 50, 74, 0.75);
   }
 
   .dashboard-topbar .topbar-actions {
@@ -1417,4 +1476,26 @@ code {
 .lawn-mower-action-btn.secondary {
   background: #121d2f;
   border-color: rgba(148, 163, 184, 0.22);
+}
+
+.entity-filter-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.entity-filter-actions button {
+  flex: 1;
+  background: #121d2f;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.entity-filter-actions button:hover {
+  background: #182742;
 }
