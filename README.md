@@ -97,6 +97,13 @@ journalctl -u mqtt-live-monitor -f
 
 ---
 
+## Changelog
+
+### V1.1.1 Updatefähig
+* (BenAhrdt) Coder updatefägi durch button (erster Test)
+
+### V1.1.0 Einige Entitäten verfügbar
+
 ## 📦 Voraussetzungen
 
 - Debian / Ubuntu (z. B. LXC Container)
