@@ -14,7 +14,10 @@
           <div class="brand-icon">◉</div>
           <div class="brand-text">
             <div class="brand-title">MQTT Live Monitor</div>
-            <div class="brand-subtitle" id="appVersion">v-</div>
+              <div class="brand-subtitle">
+                <span id="appVersion">v-</span>
+                <button id="updateBtn" class="update-btn hidden"></button>
+              </div>
           </div>
         </div>
 
@@ -649,59 +652,73 @@
     }
 
     function getDeviceIcons(device) {
-      const icons = [];
+      const iconSet = new Set();
 
       for (const entity of (device.entities || [])) {
         if (entity.type === 'light') {
-          icons.push('💡');
+          iconSet.add('💡');
         }
 
         if (entity.type === 'climate') {
-          icons.push('🌡️');
+          iconSet.add('🌡️');
         }
 
         if (entity.type === 'cover') {
           switch (entity.deviceClass) {
             case 'garage':
-              icons.push('🚗'); // Garagentor
+              iconSet.add('🚗');
               break;
             case 'door':
-              icons.push('🚪');
+              iconSet.add('🚪');
               break;
             case 'window':
-              icons.push('🪟');
+              iconSet.add('🪟');
               break;
             case 'shutter':
-              icons.push('🧱');
+              iconSet.add('🧱');
               break;
             case 'blind':
-              icons.push('🪄');
+              iconSet.add('🪄');
               break;
             case 'curtain':
-              icons.push('🧵');
+              iconSet.add('🧵');
               break;
             case 'gate':
-              icons.push('⛩️');
+              iconSet.add('⛩️');
               break;
             default:
-              icons.push('🚪');
+              iconSet.add('🚪');
           }
         }
 
         if (entity.type === 'lock') {
-          icons.push('🔒');
+          iconSet.add('🔒');
         }
 
         if (entity.type === 'humidifier') {
-          icons.push('💧');
+          iconSet.add('💧');
         }
 
         if (entity.type === 'lawn_mower') {
-          icons.push('🤖');
+          iconSet.add('🤖');
         }
-
       }
-      return icons.length ? icons.join(' ') : '📦';
+
+      return iconSet.size ? Array.from(iconSet).join(' ') : '📦';
+    }
+
+    function getViaDeviceClass(viaDevice) {
+      const value = String(viaDevice || '').toLowerCase();
+
+      if (value.startsWith('zigbee')) {
+        return 'via-zigbee';
+      }
+
+      if (value.startsWith('lorawan')) {
+        return 'via-lorawan';
+      }
+
+      return 'via-default';
     }
 
     function renderCoverEntity(entity) {
@@ -1111,8 +1128,9 @@
           `;
         }).join('');
 
+        const viaClass = getViaDeviceClass(device.viaDevice);
         return `
-          <div class="dashboard-device-card" id="device-${device.id}">
+          <div class="dashboard-device-card ${viaClass}" id="device-${device.id}">
             <div class="dashboard-device-header">
               <div class="dashboard-device-icon">${getDeviceIcons(device)}</div>
               <div class="dashboard-device-header-text">
@@ -1577,6 +1595,14 @@
     }
 
     socket.on("entity-update", (data) => {
+      const exists = findDashboardEntityById(data.entityId);
+
+      if (!exists) {
+        // neues Gerät oder neue Entity → komplett neu laden
+        loadDashboardDevices();
+        return;
+      }
+
       updateDashboardEntity(data);
     });
 
@@ -1778,6 +1804,32 @@
       }
     }
 
+    async function checkForUpdates() {
+      try {
+        const res = await fetch('/api/update/check');
+        const data = await res.json();
+
+        const btn = document.getElementById('updateBtn');
+
+        if (data.updateAvailable && btn.classList.contains('hidden')) {
+          btn.classList.remove('hidden');
+          btn.textContent = `update verfügbar ${data.latest}`;
+
+          btn.onclick = async () => {
+            if (!confirm(`Update auf ${data.latest} starten?`)) return;
+
+            btn.textContent = 'Update läuft...';
+
+            await fetch('/api/update/run', { method: 'POST' });
+
+            btn.textContent = 'Neustart...';
+          };
+        }
+      } catch (err) {
+        console.error('Update-Check fehlgeschlagen', err);
+      }
+    }
+
     async function loadConfig() {
       const res = await fetch('/api/config');
       const config = await res.json();
@@ -1834,6 +1886,12 @@
       brokerTextEl.textContent = `${result.config.host}:${result.config.port}`;
       topicTextEl.textContent = result.config.topic;
       configMessageEl.textContent = 'Konfiguration gespeichert, verbinde neu...';
+
+      if (currentView === 'dashboard') {
+        setTimeout(() => {
+          loadDashboardDevices();
+        }, 1000);
+      }
     }
 
     async function disconnectBroker() {
@@ -2003,10 +2061,13 @@
         .forEach(d => d.classList.remove('open'));
     });
 
-    loadVersion();
     loadConfig();
+    loadVersion();
+    checkForUpdates();
     applyInitialMobileSidebarState();
     showView('dashboard');
+
+    setInterval(checkForUpdates, 60_000);
   </script>
 </body>
 </html>

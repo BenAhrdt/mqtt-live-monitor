@@ -7,6 +7,32 @@ const packageJson = require("./package.json");
 
 const { Server } = require("socket.io");
 
+const https = require('https');
+
+function fetchLatestVersion() {
+  return new Promise((resolve) => {
+    https.get(
+      'https://api.github.com/repos/BenAhrdt/mqtt-live-monitor/releases/latest',
+      {
+        headers: { 'User-Agent': 'mqtt-live-monitor' }
+      },
+      (res) => {
+        let data = '';
+
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json.tag_name || null);
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    ).on('error', () => resolve(null));
+  });
+}
+
 const isDev = process.env.DEV_MODE === "true";
 let allowedDiscoveryViaDevicePrefixes = [
   "lorawan"
@@ -15,6 +41,18 @@ let allowedDiscoveryViaDevicePrefixes = [
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+app.get('/api/update/check', async (req, res) => {
+  const currentVersion = require('./package.json').version;
+  const latestVersion = '1.0.0';//await fetchLatestVersion();
+
+  res.json({
+    current: currentVersion,
+    latest: latestVersion,
+    updateAvailable:
+      latestVersion && latestVersion !== `v${currentVersion}`
+  });
+});
 
 const DEFAULT_WEB_PORT = 3000;
 const CONFIG_PATH = path.join(__dirname, "config.json");

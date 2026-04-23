@@ -85,6 +85,10 @@ input {
 .brand-subtitle {
   color: var(--muted);
   font-size: 13px;
+
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .sidebar-toggle-btn {
@@ -665,6 +669,21 @@ code {
   color: #fff;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
+}
+
+.dashboard-device-card.via-lorawan .dashboard-device-header {
+  background: linear-gradient(90deg, #3f97cb 0%, #3a8fc2 100%);
+  color: #fff;
+}
+
+.dashboard-device-card.via-zigbee .dashboard-device-header {
+  background: linear-gradient(90deg, #d8b200 0%, #d1ab00 100%);
+  color: #fff;
+}
+
+.dashboard-device-card.via-default .dashboard-device-header {
+  background: linear-gradient(90deg, #4b5f86 0%, #5b6f96 100%);
+  color: #fff;
 }
 
 .dashboard-device-icon {
@@ -1498,4 +1517,23 @@ code {
 
 .entity-filter-actions button:hover {
   background: #182742;
+}
+
+.update-btn {
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: #22c55e;
+  color: #fff;
+}
+
+.update-btn:hover {
+  background: #16a34a;
+}
+
+.hidden {
+  display: none;
 }
