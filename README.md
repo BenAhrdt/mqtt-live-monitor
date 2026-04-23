@@ -35,6 +35,36 @@ Das Installations-Skript übernimmt automatisch:
 
 ---
 
+Installationsscript aufrufen
+```bash
+bash install.sh
+```
+---
+
+## 🚀 Update
+
+Das Updatescript (sofern schon vorhanden) übernimmt automatisch das update
+
+```bash
+cd /opt/mqtt-live-monitor
+sudo bash update.sh
+```
+
+Sollte noch kein update.sh vorhanden sein, dann folgernde Befehle ausführen:
+
+```bash
+cd /opt/mqtt-live-monitor
+cp config.json /root/config.json.backup
+git fetch --all --tags
+git checkout main || git checkout -b main origin/main
+git reset --hard origin/main
+cp /root/config.json.backup config.json
+npm install --omit=dev
+systemctl daemon-reload
+systemctl restart mqtt-live-monitor
+```
+---
+
 ## 🌐 Zugriff
 
 Nach der Installation erreichst du die Weboberfläche unter:
