@@ -24,8 +24,8 @@
       </div>
 
       <nav class="nav">
-        <button class="nav-btn active" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
-        <button class="nav-btn" id="showDashboardBtn"><span>Dashboard</span></button>
+        <button class="nav-btn active" id="showDashboardBtn"><span>Dashboard</span></button>
+        <button class="nav-btn" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
         <button class="nav-item"><span>Topics</span></button>
         <button class="nav-item"><span>Statistiken</span></button>
         <button class="nav-item"><span>Einstellungen</span></button>
@@ -86,7 +86,7 @@
     </aside>
 
     <main class="main">
-      <section id="liveMonitorView">
+      <section id="liveMonitorView" style="display:none;">
         <header class="topbar">
           <div>
             <h1>Live Monitor</h1>
@@ -206,10 +206,13 @@
         </section>
       </section>
 
-      <section id="dashboardView" style="display:none;">
-        <header class="topbar">
-          <div>
-            <h1>Dashboard</h1>
+      <section id="dashboardView">
+        <header class="topbar dashboard-topbar">
+          <div class="dashboard-title-wrap">
+            <div class="dashboard-title-row">
+              <h1>Dashboard</h1>
+              <span id="dashboardConnectionDot" class="dashboard-connection-dot disconnected" title="Nicht verbunden"></span>
+            </div>
             <p class="subtitle">Geräte und Entitäten in Echtzeit</p>
           </div>
         </header>
@@ -224,13 +227,14 @@
     const socket = io();
 
     socket.on("connect", () => {
-      console.log("Browser Socket verbunden:", socket.id);
+      // console.log("Browser Socket verbunden:", socket.id);
     });
 
     const topicFilterInput = document.getElementById('topicFilter');
     const messageTable = document.getElementById('messageTable');
     const detailsTopicEl = document.getElementById('detailsTopic');
     const decodedDataBoxEl = document.getElementById('decodedDataBox');
+    const detailsBox = document.getElementById('detailsBox');
     const clearBtn = document.getElementById('clearBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const copyBtn = document.getElementById('copyBtn');
@@ -257,6 +261,7 @@
     const statusTextEl = document.getElementById('statusText');
     const connectionStateEl = document.getElementById('connectionState');
     const connectionMessageEl = document.getElementById('connectionMessage');
+    const dashboardConnectionDot = document.getElementById('dashboardConnectionDot');
 
     const showLiveMonitorBtn = document.getElementById('showLiveMonitorBtn');
     const showDashboardBtn = document.getElementById('showDashboardBtn');
@@ -270,8 +275,16 @@
     let selectedPayload = '';
     const topics = new Map();
     let dashboardDevices = [];
+    let currentView = 'dashboard';
+    let dashboardRenderScheduled = false;
+
+    function applyInitialMobileSidebarState() {
+      appLayout.classList.add('sidebar-collapsed');
+    }
 
     function showView(viewName) {
+      currentView = viewName;
+
       if (viewName === 'dashboard') {
         liveMonitorView.style.display = 'none';
         dashboardView.style.display = 'block';
@@ -296,53 +309,524 @@
         .replaceAll("'", '&#039;');
     }
 
-    function renderLightEntity(entity) {
-      const isOn = String(entity.value?.state || '').toUpperCase() === 'ON';
-      const brightness = entity.value?.brightness ?? 0;
-      const brightnessMax = entity.brightnessScale || 255;
+    function getLightStateValue(value) {
+      if (value === null || value === undefined) {
+        return false;
+      }
+
+      if (typeof value === 'boolean') {
+        return value;
+      }
+
+      if (typeof value === 'string') {
+        const normalized = value.trim().toUpperCase();
+        return normalized === 'ON' || normalized === 'TRUE' || normalized === '1';
+      }
+
+      if (typeof value === 'object') {
+        const state = value.state;
+
+        if (typeof state === 'boolean') {
+          return state;
+        }
+
+        if (typeof state === 'string') {
+          const normalized = state.trim().toUpperCase();
+          return normalized === 'ON' || normalized === 'TRUE' || normalized === '1';
+        }
+
+        if (typeof state === 'number') {
+          return state === 1;
+        }
+      }
+
+      return false;
+    }
+
+    function rgbToHex(r, g, b) {
+      const toHex = (value) => {
+        const safe = Math.max(0, Math.min(255, Number(value) || 0));
+        return safe.toString(16).padStart(2, '0');
+      };
+
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    function handleHumidifierSliderStart(input) {
+      const wrap = input.closest('.humidifier-slider-wrap');
+      const bubble = wrap?.querySelector('.humidifier-slider-bubble');
+      if (!bubble) return;
+
+      bubble.classList.remove('hidden');
+      updateHumidifierSliderBubble(input);
+    }
+
+    function handleHumidifierSliderInput(input) {
+      updateHumidifierSliderBubble(input);
+    }
+
+    function handleHumidifierSliderEnd(input) {
+      const wrap = input.closest('.humidifier-slider-wrap');
+      const bubble = wrap?.querySelector('.humidifier-slider-bubble');
+      if (!bubble) return;
+
+      setTimeout(() => {
+        bubble.classList.add('hidden');
+      }, 300);
+    }
+
+    function updateHumidifierSliderBubble(input) {
+      const wrap = input.closest('.humidifier-slider-wrap');
+      const bubble = wrap?.querySelector('.humidifier-slider-bubble');
+      if (!bubble) return;
+
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const value = Number(input.value);
+      const percent = ((value - min) / (max - min)) * 100;
+
+      bubble.textContent = `${value.toFixed(0)} %`;
+      bubble.style.left = `calc(${percent}% + (${10 - percent * 0.2}px))`;
+    }
+
+    function handleClimateSliderStart(input) {
+      const wrap = input.closest('.climate-inline-slider-wrap');
+      const bubble = wrap?.querySelector('.climate-slider-bubble');
+      if (!bubble) return;
+
+      bubble.classList.remove('hidden');
+      updateClimateSliderBubble(input);
+    }
+
+    function handleClimateSliderInput(input) {
+      updateClimateSliderBubble(input);
+    }
+
+    function handleClimateSliderEnd(input) {
+      const wrap = input.closest('.climate-inline-slider-wrap');
+      const bubble = wrap?.querySelector('.climate-slider-bubble');
+      if (!bubble) return;
+
+      setTimeout(() => {
+        bubble.classList.add('hidden');
+      }, 300);
+    }
+
+    function updateClimateSliderBubble(input) {
+      const wrap = input.closest('.climate-inline-slider-wrap');
+      const bubble = wrap?.querySelector('.climate-slider-bubble');
+      if (!bubble) return;
+
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const value = Number(input.value);
+
+      const percent = ((value - min) / (max - min)) * 100;
+
+      bubble.textContent = `${value.toFixed(1)} °C`;
+      bubble.style.left = `calc(${percent}% + (${10 - percent * 0.2}px))`;
+    }
+
+    function scheduleDashboardRender() {
+      if (dashboardRenderScheduled) return;
+
+      dashboardRenderScheduled = true;
+
+      requestAnimationFrame(() => {
+        dashboardRenderScheduled = false;
+        renderDashboard();
+      });
+    }
+
+    function renderClimateEntity(entity) {
+      const modes = Array.isArray(entity.modes) ? entity.modes : [];
+      const currentMode = entity.mode || 'off';
+      const currentTemp = Number(entity.currentTemperature ?? 0);
+      const targetTemp = Number(entity.targetTemperature ?? entity.minTemp ?? 20);
+      const minTemp = Number(entity.minTemp ?? 6);
+      const maxTemp = Number(entity.maxTemp ?? 30);
+      const tempStep = Number(entity.tempStep ?? 0.1);
 
       return `
-        <div class="entity-card modern" id="entity-${entity.id}">
-          <div class="entity-header">
-            <span class="entity-name">${escapeHtml(entity.name || entity.id)}</span>
+        <div class="dashboard-entity-row-block climate-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-entity-title">
+            ${escapeHtml(entity.name || 'Climate')}
           </div>
 
-          <div class="entity-body">
-            <div class="entity-row">
-              <span>Aus / An</span>
-              <div class="toggle-switch" data-entity="${entity.id}">
-                <div class="toggle-knob ${isOn ? 'on' : ''}"></div>
-              </div>
+          <div class="climate-current-line">
+            Isttemperatur <strong>${currentTemp.toFixed(1)} °C</strong>
+          </div>
+
+          <div class="climate-target-panel">
+            <div class="climate-target-label">Solltemperatur</div>
+
+            <button
+              type="button"
+              class="climate-target-value-btn"
+              onclick="promptClimateTargetTemperature('${entity.id}')"
+              title="Solltemperatur direkt eingeben"
+            >
+              <span class="climate-target-value">${targetTemp.toFixed(1)} °C</span>
+            </button>
+
+            <div class="climate-inline-slider-wrap">
+              <div class="climate-slider-bubble hidden"></div>
+
+              <input
+                type="range"
+                min="${minTemp}"
+                max="${maxTemp}"
+                step="${tempStep}"
+                value="${targetTemp}"
+                class="dashboard-range climate-temp-range"
+                oninput="handleClimateSliderInput(this)"
+                onmousedown="handleClimateSliderStart(this)"
+                onmouseup="handleClimateSliderEnd(this)"
+                ontouchstart="handleClimateSliderStart(this)"
+                ontouchend="handleClimateSliderEnd(this)"
+                onchange="setClimateTargetTemperature('${entity.id}', this.value)"
+              >
             </div>
 
-            <div class="entity-row">
-              <span>Helligkeit</span>
+            <div class="climate-adjust-row">
+              <button
+                class="climate-adjust-btn"
+                onclick="adjustClimateTargetTemperature('${entity.id}', -${tempStep})"
+                type="button"
+              >
+                −
+              </button>
+
+              <button
+                class="climate-adjust-btn"
+                onclick="adjustClimateTargetTemperature('${entity.id}', ${tempStep})"
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="climate-mode-row">
+            ${modes.map((modeName) => `
+              <button
+                type="button"
+                class="climate-mode-btn ${currentMode === modeName ? 'active' : ''}"
+                onclick="setClimateMode('${entity.id}', '${escapeHtml(modeName)}')"
+              >
+                ${escapeHtml(modeName)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function getDeviceIcons(device) {
+      const icons = [];
+
+      for (const entity of (device.entities || [])) {
+        if (entity.type === 'light') {
+          icons.push('💡');
+        }
+
+        if (entity.type === 'climate') {
+          icons.push('🌡️');
+        }
+
+        if (entity.type === 'cover') {
+          switch (entity.deviceClass) {
+            case 'garage':
+              icons.push('🚗'); // Garagentor
+              break;
+            case 'door':
+              icons.push('🚪');
+              break;
+            case 'window':
+              icons.push('🪟');
+              break;
+            case 'shutter':
+              icons.push('🧱');
+              break;
+            case 'blind':
+              icons.push('🪄');
+              break;
+            case 'curtain':
+              icons.push('🧵');
+              break;
+            case 'gate':
+              icons.push('⛩️');
+              break;
+            default:
+              icons.push('🚪');
+          }
+        }
+
+        if (entity.type === 'lock') {
+          icons.push('🔒');
+        }
+
+        if (entity.type === 'humidifier') {
+          icons.push('💧');
+        }
+
+        if (entity.type === 'lawn_mower') {
+          icons.push('🤖');
+        }
+
+      }
+      return icons.length ? icons.join(' ') : '📦';
+    }
+
+    function renderCoverEntity(entity) {
+      const position = Number(entity.position ?? 0);
+      const rawState = String(entity.state || '').toUpperCase();
+      const stateText = translateCoverState(rawState);
+      const isGarage = entity.deviceClass === 'garage';
+
+      const stateClass =
+        rawState === 'OPEN' ? 'open' :
+        rawState === 'CLOSED' ? 'closed' : '';
+
+      return `
+        <div class="dashboard-entity-row-block cover-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-entity-title">
+            ${escapeHtml(entity.name || 'Cover')}
+          </div>
+
+          <div class="cover-status-line">
+            Status
+            <strong class="${stateClass}">
+              ${escapeHtml(stateText)}
+            </strong>
+          </div>
+
+          <div class="cover-buttons-row">
+            <button
+              type="button"
+              class="cover-action-btn"
+              onclick="sendCoverCommand('${entity.id}', 'OPEN')"
+            >
+              ${isGarage ? 'Öffnen' : 'Auf'}
+            </button>
+
+            <button
+              type="button"
+              class="cover-action-btn secondary"
+              onclick="sendCoverCommand('${entity.id}', 'STOP')"
+            >
+              Stop
+            </button>
+
+            <button
+              type="button"
+              class="cover-action-btn"
+              onclick="sendCoverCommand('${entity.id}', 'CLOSE')"
+            >
+              ${isGarage ? 'Schließen' : 'Zu'}
+            </button>
+          </div>
+
+          <div class="dashboard-control-row">
+            <span class="dashboard-label">Position</span>
+            <div class="color-temp-wrap">
               <input
                 type="range"
                 min="0"
-                max="${brightnessMax}"
-                value="${brightness}"
-                class="brightness-slider"
-                data-entity="${entity.id}"
+                max="100"
+                step="1"
+                value="${position}"
+                class="dashboard-range cover-position-range"
+                disabled
               >
+              <span class="color-temp-value">${position} %</span>
             </div>
           </div>
         </div>
       `;
     }
 
-    function renderEntity(entity) {
-      if (entity.type === 'light') {
-        return renderLightEntity(entity);
-      }
+    function renderLockEntity(entity) {
+      const rawStateText = String(entity.state || '-').toUpperCase();
+      const stateText = translateLockState(rawStateText);
+
+      const isUnlocked = rawStateText === 'UNLOCKED';
+      const isLocked = rawStateText === 'LOCKED';
 
       return `
-        <div class="entity-card" id="entity-${entity.id}">
-          <div class="entity-header">
-            <span class="entity-name">${escapeHtml(entity.name || entity.id)}</span>
+        <div class="dashboard-entity-row-block lock-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-entity-title">
+            ${escapeHtml(entity.name || 'Lock')}
           </div>
-          <div class="entity-body">
-            <span class="muted">Typ noch nicht unterstützt: ${escapeHtml(entity.type || '-')}</span>
+
+          <div class="lock-status-line">
+            Status
+            <strong class="${isUnlocked ? 'lock-unlocked' : isLocked ? 'lock-locked' : ''}">
+              ${escapeHtml(stateText)}
+            </strong>
+          </div>
+
+          <div class="lock-buttons-row">
+            <button
+              type="button"
+              class="lock-action-btn"
+              onclick="sendLockCommand('${entity.id}', 'OPEN')"
+            >
+              Öffnen
+            </button>
+
+            <button
+              type="button"
+              class="lock-action-btn ${isLocked ? 'disabled-like' : ''}"
+              onclick="sendLockCommand('${entity.id}', 'LOCK')"
+            >
+              Abschließen
+            </button>
+
+            <button
+              type="button"
+              class="lock-action-btn ${isUnlocked ? 'disabled-like' : ''}"
+              onclick="sendLockCommand('${entity.id}', 'UNLOCK')"
+            >
+              Aufschließen
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHumidifierEntity(entity) {
+      const isOn = String(entity.state) === String(entity.stateOn);
+      const currentHumidity = Number(entity.currentHumidity ?? 0);
+      const targetHumidity = Number(entity.targetHumidity ?? entity.minHumidity ?? 40);
+      const minHumidity = Number(entity.minHumidity ?? 30);
+      const maxHumidity = Number(entity.maxHumidity ?? 80);
+      const deviceTypeLabel = translateHumidifierDeviceClass(entity.deviceClass);
+
+      return `
+        <div class="dashboard-entity-row-block humidifier-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-entity-title">
+            ${escapeHtml(entity.name || deviceTypeLabel)}
+          </div>
+
+          <div class="dashboard-control-row">
+            <span class="dashboard-label">An / Aus</span>
+            <label class="switch">
+              <input
+                type="checkbox"
+                ${isOn ? 'checked' : ''}
+                onchange="setHumidifierState('${entity.id}', this.checked)"
+              >
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="climate-current-line">
+            Istfeuchte <strong>${currentHumidity.toFixed(1)} %</strong>
+          </div>
+
+          <div class="climate-target-panel">
+            <div class="climate-target-label">${escapeHtml(deviceTypeLabel)} Sollwert</div>
+
+            <button
+              type="button"
+              class="climate-target-value-btn"
+              onclick="promptHumidifierTargetHumidity('${entity.id}')"
+              title="Sollfeuchte direkt eingeben"
+            >
+              <span class="climate-target-value">${targetHumidity.toFixed(0)} %</span>
+            </button>
+
+            <div class="humidifier-slider-wrap">
+              <div class="humidifier-slider-bubble hidden"></div>
+
+              <input
+                type="range"
+                min="${minHumidity}"
+                max="${maxHumidity}"
+                step="1"
+                value="${targetHumidity}"
+                class="dashboard-range humidifier-range"
+                oninput="handleHumidifierSliderInput(this)"
+                onmousedown="handleHumidifierSliderStart(this)"
+                onmouseup="handleHumidifierSliderEnd(this)"
+                ontouchstart="handleHumidifierSliderStart(this)"
+                ontouchend="handleHumidifierSliderEnd(this)"
+                onchange="setHumidifierTargetHumidity('${entity.id}', this.value)"
+              >
+            </div>
+            <div class="climate-adjust-row">
+              <button
+                class="climate-adjust-btn"
+                onclick="adjustHumidifierTargetHumidity('${entity.id}', -1)"
+                type="button"
+              >
+                −
+              </button>
+
+              <button
+                class="climate-adjust-btn"
+                onclick="adjustHumidifierTargetHumidity('${entity.id}', 1)"
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLawnMowerEntity(entity) {
+      const rawActivity = String(entity.activity || '-').toLowerCase();
+      const activityText = translateLawnMowerActivity(rawActivity);
+
+      const activityClass =
+        rawActivity === 'mowing' ? 'mower-mowing' :
+        rawActivity === 'paused' ? 'mower-paused' :
+        rawActivity === 'docked' ? 'mower-docked' : '';
+
+      const startClass = rawActivity === 'mowing' ? 'disabled-like' : '';
+      const pauseClass = (rawActivity === 'paused' || rawActivity === 'docked') ? 'disabled-like' : '';
+      const dockClass = rawActivity === 'docked' ? 'disabled-like' : '';
+
+      return `
+        <div class="dashboard-entity-row-block lawn-mower-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-entity-title">
+            ${escapeHtml(entity.name || 'Rasenmäher')}
+          </div>
+
+          <div class="lawn-mower-status-line">
+            Status
+            <strong class="${activityClass}">
+              ${escapeHtml(activityText)}
+            </strong>
+          </div>
+
+          <div class="lawn-mower-buttons-row">
+            <button
+              type="button"
+              class="lawn-mower-action-btn ${startClass}"
+              onclick="sendLawnMowerCommand('${entity.id}', 'start_mowing')"
+            >
+              Start
+            </button>
+
+            <button
+              type="button"
+              class="lawn-mower-action-btn ${pauseClass}"
+              onclick="sendLawnMowerCommand('${entity.id}', 'pause')"
+            >
+              Pause
+            </button>
+
+            <button
+              type="button"
+              class="lawn-mower-action-btn ${dockClass}"
+              onclick="sendLawnMowerCommand('${entity.id}', 'dock')"
+            >
+              Andocken
+            </button>
           </div>
         </div>
       `;
@@ -359,9 +843,46 @@
 
       dashboardGrid.innerHTML = dashboardDevices.map((device) => {
         const entitiesHtml = (device.entities || []).map((entity) => {
-          const isOn = String(entity.value?.state || '').toUpperCase() === 'ON';
+          if (entity.type === 'climate') {
+            return renderClimateEntity(entity);
+          }
+          if (entity.type === 'cover') {
+            return renderCoverEntity(entity);
+          }
+          if (entity.type === 'lock') {
+            return renderLockEntity(entity);
+          }
+          if (entity.type === 'humidifier') {
+            return renderHumidifierEntity(entity);
+          }
+          if (entity.type === 'lawn_mower') {
+            return renderLawnMowerEntity(entity);
+          }
+
+          const isOn = getLightStateValue(entity.value);
           const brightness = entity.value?.brightness ?? 0;
           const brightnessMax = entity.brightnessScale || 255;
+          const hasBrightness = Boolean(entity.brightness);
+          const currentEffect = entity.value?.effect || '';
+          const effectList = Array.isArray(entity.effectList) ? entity.effectList : [];
+          const hasEffects = Boolean(entity.effect) && effectList.length > 0;
+
+          const supportedColorModes = Array.isArray(entity.supportedColorModes)
+            ? entity.supportedColorModes
+            : [];
+          const hasRgbColor = supportedColorModes.includes('rgb');
+          const hasColorTemp = supportedColorModes.includes('color_temp');
+
+          const currentColor = entity.value?.color || {};
+          const currentHexColor = rgbToHex(
+            currentColor.r ?? 255,
+            currentColor.g ?? 255,
+            currentColor.b ?? 255
+          );
+
+          const currentColorTemp = Number(entity.value?.color_temp ?? 3223);
+          const minColorTemp = 2000;
+          const maxColorTemp = 6535;
 
           return `
             <div class="dashboard-entity-row-block" id="entity-${entity.id}">
@@ -372,22 +893,82 @@
               <div class="dashboard-control-row">
                 <span class="dashboard-label">Aus / An</span>
                 <label class="switch">
-                  <input type="checkbox" ${isOn ? 'checked' : ''} disabled>
+                  <input
+                    type="checkbox"
+                    ${isOn ? 'checked' : ''}
+                    onchange="toggleLightEntity('${entity.id}', this.checked)"
+                  >
                   <span class="slider"></span>
                 </label>
               </div>
 
-              <div class="dashboard-control-row">
-                <span class="dashboard-label">Helligkeit</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="${brightnessMax}"
-                  value="${brightness}"
-                  disabled
-                  class="dashboard-range"
-                >
-              </div>
+              ${hasBrightness ? `
+                <div class="dashboard-control-row">
+                  <span class="dashboard-label">Helligkeit</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="${brightnessMax}"
+                    value="${brightness}"
+                    class="dashboard-range"
+                    onchange="setLightBrightness('${entity.id}', this.value)"
+                  >
+                </div>
+              ` : ''}
+
+              ${hasRgbColor ? `
+                <div class="dashboard-control-row color-row">
+                  <span class="dashboard-label">Farbe</span>
+                  <input
+                    type="color"
+                    class="dashboard-color-input"
+                    value="${currentHexColor}"
+                    onchange="setLightColor('${entity.id}', this.value)"
+                  >
+                </div>
+              ` : ''}
+
+              ${hasColorTemp ? `
+                <div class="dashboard-control-row">
+                  <span class="dashboard-label">Farbtemp</span>
+                  <div class="color-temp-wrap">
+                    <input
+                      type="range"
+                      min="${minColorTemp}"
+                      max="${maxColorTemp}"
+                      value="${currentColorTemp}"
+                      class="dashboard-range dashboard-color-temp-range"
+                      onchange="setLightColorTemp('${entity.id}', this.value)"
+                    >
+                    <span class="color-temp-value">${currentColorTemp} K</span>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${hasEffects ? `
+                <div class="dashboard-control-row effect-row">
+                  <span class="dashboard-label">Effekt</span>
+                  <div class="effect-dropdown" data-entity="${entity.id}">
+                    <div class="effect-selected">
+                      <span class="effect-selected-text">${escapeHtml(currentEffect || 'Kein Effekt')}</span>
+                    </div>
+
+                    <div class="effect-options">
+                      <div class="effect-option ${currentEffect === '' ? 'active' : ''}" data-value="">
+                        Kein Effekt
+                      </div>
+                      ${effectList.map((effectName) => `
+                        <div
+                          class="effect-option ${currentEffect === effectName ? 'active' : ''}"
+                          data-value="${escapeHtml(effectName)}"
+                        >
+                          ${escapeHtml(effectName)}
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `;
         }).join('');
@@ -395,7 +976,7 @@
         return `
           <div class="dashboard-device-card" id="device-${device.id}">
             <div class="dashboard-device-header">
-              <div class="dashboard-device-icon">💡</div>
+              <div class="dashboard-device-icon">${getDeviceIcons(device)}</div>
               <div class="dashboard-device-header-text">
                 <div class="dashboard-device-name">${escapeHtml(device.name || device.id)}</div>
                 <div class="dashboard-device-subtitle">
@@ -410,6 +991,14 @@
           </div>
         `;
       }).join('');
+
+      dashboardGrid.querySelectorAll('.climate-temp-range').forEach((slider) => {
+        updateClimateSliderBubble(slider);
+      });
+
+      dashboardGrid.querySelectorAll('.humidifier-range').forEach((slider) => {
+        updateHumidifierSliderBubble(slider);
+      });
     }
 
     async function loadDashboardDevices() {
@@ -424,25 +1013,432 @@
     }
 
     function updateDashboardEntity(update) {
-      const device = dashboardDevices.find(d => d.id === update.deviceId);
-      if (!device) return;
+      let found = false;
 
-      const entityIndex = (device.entities || []).findIndex(
-        entity => entity.id === update.entityId
+      dashboardDevices = dashboardDevices.map((device) => {
+        if (device.id !== update.deviceId) {
+          return device;
+        }
+
+        const updatedEntities = (device.entities || []).map((entity) => {
+          if (entity.id !== update.entityId) {
+            return entity;
+          }
+
+          found = true;
+
+          return {
+            ...entity,
+            ...update.entity,
+            value: update.entity.value,
+            rawState: update.entity.rawState,
+            lastUpdate: update.entity.lastUpdate
+          };
+        });
+
+        return {
+          ...device,
+          entities: updatedEntities
+        };
+      });
+
+      if (found && currentView === 'dashboard') {
+        scheduleDashboardRender();
+      }
+    }
+
+    async function publishMqttCommand(topic, payloadObject) {
+      try {
+        const payload =
+          typeof payloadObject === 'string' || typeof payloadObject === 'number'
+            ? String(payloadObject)
+            : JSON.stringify(payloadObject);
+
+        const response = await fetch('/api/mqtt/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            topic,
+            payload
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          console.error('MQTT publish fehlgeschlagen:', result.error || result);
+        }
+      } catch (error) {
+        console.error('Fehler beim MQTT publish:', error);
+      }
+    }
+
+    function findDashboardEntityById(entityId) {
+      for (const device of dashboardDevices) {
+        const entity = (device.entities || []).find(e => e.id === entityId);
+        if (entity) {
+          return entity;
+        }
+      }
+      return null;
+    }
+
+    async function toggleLightEntity(entityId, isChecked) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      const newState = isChecked ? 'ON' : 'OFF';
+
+      try {
+        await publishMqttCommand(entity.commandTopic, {
+          state: newState
+        });
+      } catch (error) {
+        console.error('Fehler beim Schalten:', error);
+      }
+    }
+
+    async function setLightBrightness(entityId, brightness) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.commandTopic, {
+          state: 'ON',
+          brightness: Number(brightness)
+        });
+      } catch (error) {
+        console.error('Fehler beim Setzen der Helligkeit:', error);
+      }
+    }
+
+    async function setLightEffect(entityId, effect) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      try {
+        const payload = effect
+          ? { state: 'ON', effect }
+          : { state: 'ON', effect: null };
+
+        await publishMqttCommand(entity.commandTopic, payload);
+      } catch (error) {
+        console.error('Fehler beim Setzen des Effekts:', error);
+      }
+    }
+
+    async function setLightColor(entityId, hexColor) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      const hex = String(hexColor || '').replace('#', '');
+      if (hex.length !== 6) return;
+
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+
+      try {
+        await publishMqttCommand(entity.commandTopic, {
+          state: 'ON',
+          color: { r, g, b }
+        });
+      } catch (error) {
+        console.error('Fehler beim Setzen der Farbe:', error);
+      }
+    }
+
+    async function setClimateMode(entityId, mode) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.modeCommandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.modeCommandTopic, mode);
+      } catch (error) {
+        console.error('Fehler beim Setzen des Climate-Modus:', error);
+      }
+    }
+
+    async function setClimateTargetTemperature(entityId, temperature) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.temperatureCommandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.temperatureCommandTopic, Number(temperature));
+      } catch (error) {
+        console.error('Fehler beim Setzen der Solltemperatur:', error);
+      }
+    }
+
+    async function setLightColorTemp(entityId, kelvin) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.commandTopic, {
+          state: 'ON',
+          color_temp: Number(kelvin)
+        });
+      } catch (error) {
+        console.error('Fehler beim Setzen der Farbtemperatur:', error);
+      }
+    }
+
+    async function setHumidifierState(entityId, isOn) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      const payload = isOn
+        ? (entity.payloadOn ?? 'ON')
+        : (entity.payloadOff ?? 'OFF');
+
+      try {
+        await publishMqttCommand(entity.commandTopic, payload);
+      } catch (error) {
+        console.error('Fehler beim Setzen des Humidifier-Status:', error);
+      }
+    }
+
+    async function setHumidifierTargetHumidity(entityId, humidity) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.targetHumidityCommandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.targetHumidityCommandTopic, Number(humidity));
+      } catch (error) {
+        console.error('Fehler beim Setzen der Sollfeuchte:', error);
+      }
+    }
+
+    async function adjustHumidifierTargetHumidity(entityId, delta) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.targetHumidityCommandTopic) return;
+
+      const current = Number(entity.targetHumidity ?? entity.minHumidity ?? 40);
+      const min = Number(entity.minHumidity ?? 30);
+      const max = Number(entity.maxHumidity ?? 80);
+
+      let next = current + Number(delta);
+      next = Math.max(min, Math.min(max, next));
+      next = Math.round(next);
+
+      try {
+        await publishMqttCommand(entity.targetHumidityCommandTopic, next);
+      } catch (error) {
+        console.error('Fehler beim Anpassen der Sollfeuchte:', error);
+      }
+    }
+
+    async function promptHumidifierTargetHumidity(entityId) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.targetHumidityCommandTopic) return;
+
+      const current = Number(entity.targetHumidity ?? entity.minHumidity ?? 40);
+      const min = Number(entity.minHumidity ?? 30);
+      const max = Number(entity.maxHumidity ?? 80);
+
+      const input = window.prompt(
+        `Sollfeuchte eingeben (${min} bis ${max} %):`,
+        current.toFixed(0)
       );
 
-      if (entityIndex === -1) return;
+      if (input === null) return;
 
-      device.entities[entityIndex] = {
-        ...device.entities[entityIndex],
-        ...update.entity
+      let next = Number(String(input).replace(',', '.'));
+      if (Number.isNaN(next)) return;
+
+      next = Math.max(min, Math.min(max, next));
+      next = Math.round(next);
+
+      try {
+        await publishMqttCommand(entity.targetHumidityCommandTopic, next);
+      } catch (error) {
+        console.error('Fehler beim direkten Setzen der Sollfeuchte:', error);
+      }
+    }
+    
+    async function adjustClimateTargetTemperature(entityId, delta) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.temperatureCommandTopic) return;
+
+      const current = Number(entity.targetTemperature ?? entity.minTemp ?? 20);
+      const min = Number(entity.minTemp ?? 6);
+      const max = Number(entity.maxTemp ?? 30);
+      const step = Number(entity.tempStep ?? 0.1);
+
+      let next = current + Number(delta);
+      next = Math.max(min, Math.min(max, next));
+      next = Math.round(next / step) * step;
+
+      try {
+        await publishMqttCommand(entity.temperatureCommandTopic, next);
+      } catch (error) {
+        console.error('Fehler beim Anpassen der Solltemperatur:', error);
+      }
+    }
+
+    async function sendCoverCommand(entityId, action) {
+      console.log("sendCoverCommand", entityId, action);
+
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) {
+        console.warn("Kein commandTopic gefunden", entity);
+        return;
+      }
+
+      let payload = '';
+
+      if (action === 'OPEN') {
+        payload = entity.payloadOpen || 'OPEN';
+      } else if (action === 'CLOSE') {
+        payload = entity.payloadClose || 'CLOSE';
+      } else if (action === 'STOP') {
+        payload = entity.payloadStop || 'STOP';
+      } else {
+        return;
+      }
+
+      console.log("Sende:", entity.commandTopic, payload);
+
+      try {
+        await publishMqttCommand(entity.commandTopic, payload);
+      } catch (error) {
+        console.error('Fehler beim Senden:', error);
+      }
+    }
+
+    async function sendLockCommand(entityId, action) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      let payload = '';
+
+      if (action === 'OPEN') {
+        payload = entity.payloadOpen || 'OPEN';
+      } else if (action === 'LOCK') {
+        payload = entity.payloadLock || 'LOCK';
+      } else if (action === 'UNLOCK') {
+        payload = entity.payloadUnlock || 'UNLOCK';
+      } else {
+        return;
+      }
+
+      try {
+        await publishMqttCommand(entity.commandTopic, payload);
+      } catch (error) {
+        console.error('Fehler beim Senden des Lock-Befehls:', error);
+      }
+    }
+
+    async function sendLawnMowerCommand(entityId, action) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity) return;
+
+      let topic = '';
+      let payload = '';
+
+      if (action === 'start_mowing') {
+        topic = entity.startMowingCommandTopic;
+        payload = 'start_mowing';
+      } else if (action === 'pause') {
+        topic = entity.pauseCommandTopic;
+        payload = 'pause';
+      } else if (action === 'dock') {
+        topic = entity.dockCommandTopic;
+        payload = 'dock';
+      } else {
+        return;
+      }
+
+      if (!topic) return;
+
+      try {
+        await publishMqttCommand(topic, payload);
+      } catch (error) {
+        console.error('Fehler beim Senden des Lawn-Mower-Befehls:', error);
+      }
+    }
+
+    function translateLockState(state) {
+      const raw = String(state || '').toUpperCase();
+
+      const map = {
+        LOCKED: 'Verriegelt',
+        UNLOCKED: 'Entriegelt',
+        LOCKING: 'Verriegelt gerade',
+        UNLOCKING: 'Entriegelt gerade',
+        OPENING: 'Öffnet',
+        CLOSING: 'Schließt',
+        UNLATCHED: 'Offen',
+        UNLATCHING: 'Öffnet gerade',
+        JAMMED: 'Blockiert',
+        BLOCKED: 'Blockiert',
+        MOTOR_BLOCKED: 'Motor blockiert',
+        CALIBRATION: 'Kalibrierung',
+        ERROR: 'Fehler',
+        LOCK_N_GO: 'Lock’n’Go',
+        LOCK_N_GO_WITH_UNLATCH: 'Lock’n’Go mit Öffnen',
+        UNKNOWN: 'Unbekannt'
       };
 
-      renderDashboard();
+      return map[raw] || raw;
+    }
+
+    function translateCoverState(state) {
+      const raw = String(state || '').toUpperCase();
+
+      const map = {
+        OPEN: 'Offen',
+        CLOSED: 'Geschlossen',
+        OPENING: 'Öffnet',
+        CLOSING: 'Schließt',
+        STOPPED: 'Gestoppt'
+      };
+
+      return map[raw] || raw;
+    }
+
+    function translateHumidifierDeviceClass(deviceClass) {
+      const raw = String(deviceClass || '').toLowerCase();
+
+      if (raw === 'humidifier') return 'Luftbefeuchter';
+      if (raw === 'dehumidifier') return 'Luftentfeuchter';
+
+      return 'Feuchteregelung';
+    }
+
+    async function promptClimateTargetTemperature(entityId) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.temperatureCommandTopic) return;
+
+      const current = Number(entity.targetTemperature ?? entity.minTemp ?? 20);
+      const min = Number(entity.minTemp ?? 6);
+      const max = Number(entity.maxTemp ?? 30);
+      const step = Number(entity.tempStep ?? 0.1);
+
+      const input = window.prompt(
+        `Solltemperatur eingeben (${min} bis ${max} °C):`,
+        current.toFixed(1)
+      );
+
+      if (input === null) return;
+
+      let next = Number(String(input).replace(',', '.'));
+      if (Number.isNaN(next)) return;
+
+      next = Math.max(min, Math.min(max, next));
+      next = Math.round(next / step) * step;
+
+      try {
+        await publishMqttCommand(entity.temperatureCommandTopic, next);
+      } catch (error) {
+        console.error('Fehler beim direkten Setzen der Solltemperatur:', error);
+      }
     }
 
     socket.on("entity-update", (data) => {
-      console.log("Browser entity-update angekommen:", data);
       updateDashboardEntity(data);
     });
 
@@ -453,6 +1449,18 @@
       } catch {
         return payload;
       }
+    }
+
+    function translateLawnMowerActivity(activity) {
+      const raw = String(activity || '').toLowerCase();
+
+      const map = {
+        mowing: 'Mäht',
+        paused: 'Pausiert',
+        docked: 'In Station'
+      };
+
+      return map[raw] || raw;
     }
 
     function updateTopicList() {
@@ -643,8 +1651,6 @@
         clientId: mqttClientIdInput.value.trim()
       };
 
-      console.log('Sende Config:', payload);
-
       configMessageEl.textContent = 'Speichere...';
 
       const res = await fetch('/api/config', {
@@ -656,7 +1662,6 @@
       });
 
       const result = await res.json();
-      console.log('Antwort:', result);
 
       if (!res.ok) {
         configMessageEl.textContent = result.error || 'Fehler beim Speichern';
@@ -704,18 +1709,21 @@
       if (paused) return;
 
       totalMessages += 1;
-      totalMessagesEl.textContent = totalMessages;
       messageCountEl.textContent = totalMessages;
-      lastMessageTimeEl.textContent = new Date(data.timestamp).toLocaleTimeString();
 
-      const existing = topics.get(data.topic) || { count: 0, lastTime: '-' };
-      topics.set(data.topic, {
-        count: existing.count + 1,
-        lastTime: new Date(data.timestamp).toLocaleTimeString()
-      });
+      if (currentView === 'live') {
+        totalMessagesEl.textContent = totalMessages;
+        lastMessageTimeEl.textContent = new Date(data.timestamp).toLocaleTimeString();
 
-      updateTopicList();
-      addMessageRow(data);
+        const existing = topics.get(data.topic) || { count: 0, lastTime: '-' };
+        topics.set(data.topic, {
+          count: existing.count + 1,
+          lastTime: new Date(data.timestamp).toLocaleTimeString()
+        });
+
+        updateTopicList();
+        addMessageRow(data);
+      }
     });
 
     socket.on('mqtt-status', (status) => {
@@ -727,10 +1735,16 @@
         statusTextEl.textContent = 'Verbunden';
         statusTextEl.className = 'status connected';
         connectionStateEl.textContent = 'Verbunden';
+        dashboardConnectionDot.classList.remove('disconnected');
+        dashboardConnectionDot.classList.add('connected');
+        dashboardConnectionDot.title = 'Verbunden';
       } else {
         statusTextEl.textContent = 'Getrennt';
         statusTextEl.className = 'status disconnected';
         connectionStateEl.textContent = 'Getrennt';
+        dashboardConnectionDot.classList.remove('connected');
+        dashboardConnectionDot.classList.add('disconnected');
+        dashboardConnectionDot.title = 'Getrennt';
       }
     });
 
@@ -768,66 +1782,51 @@
       setTimeout(() => copyBtn.textContent = 'Kopieren', 1200);
     });
 
-        document.addEventListener('click', async (event) => {
-      const toggle = event.target.closest('.toggle-switch');
-      if (!toggle) return;
+    window.addEventListener('resize', applyInitialMobileSidebarState);
 
-      const entityId = toggle.dataset.entity;
-      const device = dashboardDevices.find(d => (d.entities || []).some(e => e.id === entityId));
-      if (!device) return;
+    document.addEventListener('click', async (e) => {
+      const option = e.target.closest('.effect-option');
+      if (option) {
+        const dropdown = option.closest('.effect-dropdown');
+        const entityId = dropdown.dataset.entity;
+        const value = option.dataset.value;
 
-      const entity = (device.entities || []).find(e => e.id === entityId);
-      if (!entity || !entity.commandTopic) return;
+        const selectedText = dropdown.querySelector('.effect-selected-text');
+        if (selectedText) {
+          selectedText.textContent = option.textContent.trim();
+        }
 
-      const currentState = String(entity.value?.state || '').toUpperCase();
-      const newState = currentState === 'ON' ? 'OFF' : 'ON';
+        dropdown.classList.remove('open');
 
-      try {
-        await fetch('/api/mqtt/publish', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            topic: entity.commandTopic,
-            payload: JSON.stringify({ state: newState })
-          })
-        });
-      } catch (error) {
-        console.error('Fehler beim Schalten:', error);
+        document.querySelectorAll('.effect-option.active')
+          .forEach(el => el.classList.remove('active'));
+        option.classList.add('active');
+
+        await setLightEffect(entityId, value);
+        return;
       }
-    });
 
-    document.addEventListener('change', async (event) => {
-      if (!event.target.classList.contains('brightness-slider')) return;
+      const selected = e.target.closest('.effect-selected');
+      if (selected) {
+        const dropdown = selected.closest('.effect-dropdown');
+        const isOpen = dropdown.classList.contains('open');
 
-      const entityId = event.target.dataset.entity;
-      const brightness = Number(event.target.value);
+        document.querySelectorAll('.effect-dropdown.open')
+          .forEach(d => d.classList.remove('open'));
 
-      const device = dashboardDevices.find(d => (d.entities || []).some(e => e.id === entityId));
-      if (!device) return;
-
-      const entity = (device.entities || []).find(e => e.id === entityId);
-      if (!entity || !entity.commandTopic) return;
-
-      try {
-        await fetch('/api/mqtt/publish', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            topic: entity.commandTopic,
-            payload: JSON.stringify({ brightness })
-          })
-        });
-      } catch (error) {
-        console.error('Fehler beim Setzen der Helligkeit:', error);
+        if (!isOpen) {
+          dropdown.classList.add('open');
+        }
+        return;
       }
+
+      document.querySelectorAll('.effect-dropdown.open')
+        .forEach(d => d.classList.remove('open'));
     });
 
     loadConfig();
-    loadDashboardDevices();
+    applyInitialMobileSidebarState();
+    showView('dashboard');
   </script>
 </body>
 </html>

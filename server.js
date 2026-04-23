@@ -4,6 +4,8 @@ const http = require("http");
 const mqtt = require("mqtt");
 const { Server } = require("socket.io");
 
+const isDev = process.env.DEV_MODE === "true";
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -72,8 +74,6 @@ function isDiscoveryTopic(topic) {
 
 function getEntityTypeFromDiscoveryTopic(topic) {
   const parts = topic.split("/");
-  // Beispiel:
-  // homeassistant/light/bettbeleuchtung/lorawan_1_beleuchtung/config
   return parts[1] || "unknown";
 }
 
@@ -152,10 +152,296 @@ function createLightEntity(topic, payload, deviceId) {
   };
 }
 
+function createClimateEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "climate",
+    name: payload.name || "Thermostat",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    modeStateTopic: payload.mode_state_topic || "",
+    modeCommandTopic: payload.mode_command_topic || "",
+
+    temperatureStateTopic: payload.temperature_state_topic || "",
+    temperatureCommandTopic: payload.temperature_command_topic || "",
+
+    currentTemperatureTopic: payload.current_temperature_topic || "",
+
+    minTemp: typeof payload.min_temp === "number" ? payload.min_temp : 5,
+    maxTemp: typeof payload.max_temp === "number" ? payload.max_temp : 30,
+    tempStep: typeof payload.temp_step === "number" ? payload.temp_step : 0.5,
+    precision: typeof payload.precision === "number" ? payload.precision : 0.1,
+    modes: Array.isArray(payload.modes) ? payload.modes : [],
+
+    mode: null,
+    targetTemperature: null,
+    currentTemperature: null,
+    rawState: {},
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
+function createCoverEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "cover",
+    name: payload.name || "Cover",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    deviceClass: payload.device_class || "",
+    commandTopic: payload.command_topic || "",
+    stateTopic: payload.state_topic || "",
+    positionTopic: payload.position_topic || "",
+
+    deviceClass: payload.device_class || "default",
+
+    payloadOpen: payload.payload_open ?? "OPEN",
+    payloadClose: payload.payload_close ?? "CLOSE",
+    payloadStop: payload.payload_stop ?? "STOP",
+
+    payloadLock: payload.payload_lock ?? "LOCK",
+    payloadUnlock: payload.payload_unlock ?? "UNLOCK",
+
+    state: null,
+    position: null,
+    rawState: {},
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
+function createLockEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "lock",
+    name: payload.name || "Lock",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    commandTopic: payload.command_topic || "",
+    stateTopic: payload.state_topic || "",
+
+    payloadOpen: payload.payload_open ?? "OPEN",
+    payloadLock: payload.payload_lock ?? "LOCK",
+    payloadUnlock: payload.payload_unlock ?? "UNLOCK",
+
+    state: null,
+    rawState: {},
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
+function createHumidifierEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "humidifier",
+    name: payload.name || "Regelung",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    deviceClass: payload.device_class || "humidifier",
+
+    stateTopic: payload.state_topic || "",
+    commandTopic: payload.command_topic || "",
+
+    stateOn: payload.state_on ?? "ON",
+    stateOff: payload.state_off ?? "OFF",
+    payloadOn: payload.payload_on ?? "ON",
+    payloadOff: payload.payload_off ?? "OFF",
+
+    targetHumidityStateTopic: payload.target_humidity_state_topic || "",
+    targetHumidityCommandTopic: payload.target_humidity_command_topic || "",
+
+    currentHumidityTopic: payload.current_humidity_topic || "",
+
+    minHumidity: payload.min_humidity ?? 30,
+    maxHumidity: payload.max_humidity ?? 80,
+
+    state: null,
+    targetHumidity: null,
+    currentHumidity: null,
+
+    rawState: {},
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
+function createLawnMowerEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "lawn_mower",
+    name: payload.name || "Mäher",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    activityStateTopic: payload.activity_state_topic || "",
+    startMowingCommandTopic: payload.start_mowing_command_topic || "",
+    pauseCommandTopic: payload.pause_command_topic || "",
+    dockCommandTopic: payload.dock_command_topic || "",
+
+    activity: null,
+    rawState: {},
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
+  if (entity.type === "light") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    return;
+  }
+
+  if (entity.type === "climate") {
+    if (entity.modeStateTopic) {
+      topicStore[entity.modeStateTopic] = {
+        topicType: "climate-mode-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.modeCommandTopic) {
+      topicStore[entity.modeCommandTopic] = {
+        topicType: "climate-mode-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.temperatureStateTopic) {
+      topicStore[entity.temperatureStateTopic] = {
+        topicType: "climate-target-temperature-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.temperatureCommandTopic) {
+      topicStore[entity.temperatureCommandTopic] = {
+        topicType: "climate-target-temperature-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.currentTemperatureTopic) {
+      topicStore[entity.currentTemperatureTopic] = {
+        topicType: "climate-current-temperature-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
+  if (entity.type === "cover") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "cover-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.positionTopic) {
+      topicStore[entity.positionTopic] = {
+        topicType: "cover-position",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "cover-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
+  if (entity.type === "lock") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "lock-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "lock-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
+if (entity.type === "humidifier") {
   if (entity.stateTopic) {
     topicStore[entity.stateTopic] = {
-      topicType: "state",
+      topicType: "humidifier-state",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.targetHumidityStateTopic) {
+    topicStore[entity.targetHumidityStateTopic] = {
+      topicType: "humidifier-target-humidity-state",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.currentHumidityTopic) {
+    topicStore[entity.currentHumidityTopic] = {
+      topicType: "humidifier-current-humidity",
       deviceId,
       entityId: entity.id,
       entityType: entity.type,
@@ -164,7 +450,16 @@ function registerEntityTopics(entity, deviceId) {
 
   if (entity.commandTopic) {
     topicStore[entity.commandTopic] = {
-      topicType: "command",
+      topicType: "humidifier-command",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.targetHumidityCommandTopic) {
+    topicStore[entity.targetHumidityCommandTopic] = {
+      topicType: "humidifier-target-humidity-command",
       deviceId,
       entityId: entity.id,
       entityType: entity.type,
@@ -172,27 +467,92 @@ function registerEntityTopics(entity, deviceId) {
   }
 }
 
-function handleLightDiscovery(topic, message) {
+if (entity.type === "lawn_mower") {
+  if (entity.activityStateTopic) {
+    topicStore[entity.activityStateTopic] = {
+      topicType: "lawn-mower-activity-state",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.startMowingCommandTopic) {
+    topicStore[entity.startMowingCommandTopic] = {
+      topicType: "lawn-mower-start-command",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.pauseCommandTopic) {
+    topicStore[entity.pauseCommandTopic] = {
+      topicType: "lawn-mower-pause-command",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.dockCommandTopic) {
+    topicStore[entity.dockCommandTopic] = {
+      topicType: "lawn-mower-dock-command",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+}
+
+}
+
+function handleDiscoveryMessage(topic, message) {
   if (!isDiscoveryTopic(topic)) {
     return { handled: false, reason: "not-discovery-topic" };
   }
 
   const entityType = getEntityTypeFromDiscoveryTopic(topic);
-
-  if (entityType !== "light") {
-    return { handled: false, reason: "unsupported-entity-type" };
-  }
-
   const payload = parseJsonMessage(message);
 
   if (!payload) {
     return { handled: false, reason: "invalid-json" };
   }
 
+  // Nur unterstützte Typen überhaupt anlegen
+  if (
+    entityType !== "light" &&
+    entityType !== "climate" &&
+    entityType !== "cover" &&
+    entityType !== "lock" &&
+    entityType !== "humidifier" &&
+    entityType !== "lawn_mower"
+  ) {
+    return { handled: false, reason: "unsupported-entity-type" };
+  }
+
   const deviceId = getDeviceIdFromDiscovery(payload, topic);
   const device = ensureDeviceExists(deviceId, payload);
 
-  const entity = createLightEntity(topic, payload, deviceId);
+  let entity = null;
+
+  if (entityType === "light") {
+    entity = createLightEntity(topic, payload, deviceId);
+  } else if (entityType === "climate") {
+    entity = createClimateEntity(topic, payload, deviceId);
+  } else if (entityType === "cover") {
+    entity = createCoverEntity(topic, payload, deviceId);
+  } else if (entityType === "lock") {
+    entity = createLockEntity(topic, payload, deviceId);
+  } else if (entityType === "humidifier") {
+    entity = createHumidifierEntity(topic, payload, deviceId);
+  } else if (entityType === "lawn_mower") {
+    entity = createLawnMowerEntity(topic, payload, deviceId);
+  }
+
+  if (!entity) {
+    return { handled: false, reason: "entity-not-created" };
+  }
 
   device.entities[entity.id] = entity;
   device.updatedAt = new Date().toISOString();
@@ -202,7 +562,7 @@ function handleLightDiscovery(topic, message) {
 
   return {
     handled: true,
-    type: "light-discovery",
+    type: `${entityType}-discovery`,
     deviceId,
     entityId: entity.id,
   };
@@ -223,10 +583,6 @@ function handleKnownTopicMessage(topic, message) {
     return { handled: false, reason: "topic-not-registered" };
   }
 
-  if (mapping.topicType !== "state") {
-    return { handled: false, reason: "not-a-state-topic" };
-  }
-
   const device = deviceStore[mapping.deviceId];
   if (!device) {
     return { handled: false, reason: "device-not-found" };
@@ -240,8 +596,173 @@ function handleKnownTopicMessage(topic, message) {
   const payloadText = message.toString();
   const parsed = parseMaybeJson(payloadText);
 
-  entity.rawState = parsed;
-  entity.value = parsed;
+  if (entity.type === "light") {
+    if (mapping.topicType !== "state") {
+      return { handled: false, reason: "not-a-light-state-topic" };
+    }
+
+    entity.rawState = parsed;
+    entity.value = parsed;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "state-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+  if (entity.type === "climate") {
+    if (mapping.topicType === "climate-mode-state") {
+      entity.mode = typeof parsed === "string" ? parsed : String(parsed ?? "");
+      entity.rawState = { ...entity.rawState, mode: entity.mode };
+    } else if (mapping.topicType === "climate-target-temperature-state") {
+      entity.targetTemperature = Number(parsed);
+      entity.rawState = {
+        ...entity.rawState,
+        targetTemperature: entity.targetTemperature,
+      };
+    } else if (mapping.topicType === "climate-current-temperature-state") {
+      entity.currentTemperature = Number(parsed);
+      entity.rawState = {
+        ...entity.rawState,
+        currentTemperature: entity.currentTemperature,
+      };
+    } else {
+      return { handled: false, reason: "not-a-climate-state-topic" };
+    }
+
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "climate-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+  if (entity.type === "cover") {
+    if (mapping.topicType === "cover-state") {
+      entity.state = typeof parsed === "string" ? parsed : String(parsed ?? "");
+      entity.rawState = { ...entity.rawState, state: entity.state };
+    } else if (mapping.topicType === "cover-position") {
+      entity.position = Number(parsed);
+      entity.rawState = { ...entity.rawState, position: entity.position };
+    } else {
+      return { handled: false, reason: "not-a-cover-state-topic" };
+    }
+
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "cover-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+  if (entity.type === "lock") {
+    if (mapping.topicType !== "lock-state") {
+      return { handled: false, reason: "not-a-lock-state-topic" };
+    }
+
+    entity.state = typeof parsed === "string" ? parsed : String(parsed ?? "");
+    entity.rawState = { ...entity.rawState, state: entity.state };
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "lock-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+  if (entity.type === "humidifier") {
+    if (mapping.topicType === "humidifier-state") {
+      entity.state = String(parsed);
+      entity.rawState = { ...entity.rawState, state: entity.state };
+    } else if (mapping.topicType === "humidifier-target-humidity-state") {
+      entity.targetHumidity = Number(parsed);
+      entity.rawState = {
+        ...entity.rawState,
+        targetHumidity: entity.targetHumidity,
+      };
+    } else if (mapping.topicType === "humidifier-current-humidity") {
+      entity.currentHumidity = Number(parsed);
+      entity.rawState = {
+        ...entity.rawState,
+        currentHumidity: entity.currentHumidity,
+      };
+    } else {
+      return { handled: false, reason: "not-a-humidifier-state-topic" };
+    }
+
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "humidifier-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+if (entity.type === "lawn_mower") {
+  if (mapping.topicType !== "lawn-mower-activity-state") {
+    return { handled: false, reason: "not-a-lawn-mower-state-topic" };
+  }
+
+  entity.activity = typeof parsed === "string" ? parsed : String(parsed ?? "");
+  entity.rawState = { ...entity.rawState, activity: entity.activity };
   entity.lastUpdate = new Date().toISOString();
   device.updatedAt = new Date().toISOString();
 
@@ -255,10 +776,13 @@ function handleKnownTopicMessage(topic, message) {
 
   return {
     handled: true,
-    type: "state-update",
+    type: "lawn-mower-update",
     deviceId: mapping.deviceId,
     entityId: mapping.entityId,
   };
+}
+
+  return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
 
 function disconnectMqtt() {
@@ -313,7 +837,14 @@ function connectMqtt() {
 
   resetStores();
 
-  const { host, port, topic, username, password, clientId } = mqttConfig;
+  const { host, port, topic, username, password } = mqttConfig;
+  const clientId = isDev
+    ? `${mqttConfig.clientId}_dev_${process.pid}`
+    : `${mqttConfig.clientId}_prod_${process.pid}`
+
+  console.log("Mode:", isDev ? "DEV" : "PROD");
+  console.log("MQTT ClientId:", clientId);
+
   const url = `mqtt://${host}:${port}`;
 
   console.log(`Verbinde zu MQTT Broker: ${url}, Topic: ${topic}`);
@@ -329,14 +860,14 @@ function connectMqtt() {
   mqttClient = mqtt.connect(url, {
     username: username || undefined,
     password: password || undefined,
-    clientId: clientId || undefined,
+    clientId,
     reconnectPeriod: 3000,
   });
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
-    mqttClient.subscribe(topic, (err) => {
+      mqttClient.subscribe(topic, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
@@ -363,21 +894,18 @@ function connectMqtt() {
   });
 
   mqttClient.on("message", (topic, message, packet) => {
-    // 1. Discovery für Light-Entitäten
-    const discoveryResult = handleLightDiscovery(topic, message);
+    const discoveryResult = handleDiscoveryMessage(topic, message);
 
     if (discoveryResult.handled) {
       console.log("Discovery erkannt:", discoveryResult);
     }
 
-    // 2. Falls Topic bereits bekannt ist, State zuordnen
     const stateResult = handleKnownTopicMessage(topic, message);
 
     if (stateResult.handled) {
       console.log("State aktualisiert:", stateResult);
     }
 
-    // 3. Live-Nachrichten wie bisher ans Frontend senden
     io.emit("mqtt-message", {
       topic,
       payload: message.toString(),
@@ -428,6 +956,7 @@ function getDevicesForDashboard() {
       value: entity.value,
       rawState: entity.rawState,
       lastUpdate: entity.lastUpdate,
+
       stateTopic: entity.stateTopic,
       commandTopic: entity.commandTopic,
       brightness: entity.brightness,
@@ -435,6 +964,51 @@ function getDevicesForDashboard() {
       supportedColorModes: entity.supportedColorModes,
       effect: entity.effect,
       effectList: entity.effectList,
+
+      mode: entity.mode,
+      targetTemperature: entity.targetTemperature,
+      currentTemperature: entity.currentTemperature,
+      modeStateTopic: entity.modeStateTopic,
+      modeCommandTopic: entity.modeCommandTopic,
+      temperatureStateTopic: entity.temperatureStateTopic,
+      temperatureCommandTopic: entity.temperatureCommandTopic,
+      currentTemperatureTopic: entity.currentTemperatureTopic,
+      minTemp: entity.minTemp,
+      maxTemp: entity.maxTemp,
+      tempStep: entity.tempStep,
+      precision: entity.precision,
+      modes: entity.modes,
+
+      deviceClass: entity.deviceClass,
+      state: entity.state,
+      position: entity.position,
+      positionTopic: entity.positionTopic,
+      payloadOpen: entity.payloadOpen,
+      payloadClose: entity.payloadClose,
+      payloadStop: entity.payloadStop,
+
+      payloadLock: entity.payloadLock,
+      payloadUnlock: entity.payloadUnlock,
+      state: entity.state,
+
+      stateOn: entity.stateOn,
+      stateOff: entity.stateOff,
+      payloadOn: entity.payloadOn,
+      payloadOff: entity.payloadOff,
+      targetHumidity: entity.targetHumidity,
+      currentHumidity: entity.currentHumidity,
+      targetHumidityStateTopic: entity.targetHumidityStateTopic,
+      targetHumidityCommandTopic: entity.targetHumidityCommandTopic,
+      currentHumidityTopic: entity.currentHumidityTopic,
+      minHumidity: entity.minHumidity,
+      maxHumidity: entity.maxHumidity,
+
+      activity: entity.activity,
+      activityStateTopic: entity.activityStateTopic,
+      startMowingCommandTopic: entity.startMowingCommandTopic,
+      pauseCommandTopic: entity.pauseCommandTopic,
+      dockCommandTopic: entity.dockCommandTopic,
+
     }));
 
     return {
@@ -544,4 +1118,7 @@ io.on("connection", (socket) => {
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Webserver läuft auf http://0.0.0.0:${PORT}`);
+
+  // automatische Verbindung beim Start
+  connectMqtt();
 });
