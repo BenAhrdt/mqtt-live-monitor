@@ -99,6 +99,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.3 Icon
+* (BenAhrdt) icon hinzugefügt
+
 ### V1.1.2 Korrektur im Update Verhalten
 * (BenAhrdt) update skript verändert
 
