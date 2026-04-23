@@ -22,7 +22,7 @@ fi
 
 echo ">> Hole neuesten Stand von GitHub"
 git fetch --all --tags
-git checkout main || git checkout -b main origin/main
+git checkout -f main
 git reset --hard origin/main
 
 echo ">> Stelle config.json wieder her"

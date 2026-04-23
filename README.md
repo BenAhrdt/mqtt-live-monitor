@@ -56,7 +56,7 @@ Sollte noch keine update.sh vorhanden sein, dann folgernde Befehle ausführen:
 cd /opt/mqtt-live-monitor
 cp config.json /root/config.json.backup
 git fetch --all --tags
-git checkout main || git checkout -b main origin/main
+git checkout -f main
 git reset --hard origin/main
 cp /root/config.json.backup config.json
 npm install --omit=dev
@@ -98,6 +98,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+
+### V1.1.2 Korrektur im Update Verhalten
+* (BenAhrdt) update skript verändert
+
 
 ### V1.1.1 Updatefähig
 * (BenAhrdt) Coder updatefägi durch button (erster Test)

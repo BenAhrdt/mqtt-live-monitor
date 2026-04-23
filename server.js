@@ -44,7 +44,7 @@ const io = new Server(server);
 
 app.get('/api/update/check', async (req, res) => {
   const currentVersion = require('./package.json').version;
-  const latestVersion = '1.0.0';//await fetchLatestVersion();
+  const latestVersion = await fetchLatestVersion();
 
   res.json({
     current: currentVersion,
