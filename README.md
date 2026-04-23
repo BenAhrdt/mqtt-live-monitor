@@ -50,7 +50,7 @@ cd /opt/mqtt-live-monitor
 sudo bash update.sh
 ```
 
-Sollte noch kein update.sh vorhanden sein, dann folgernde Befehle ausführen:
+Sollte noch keine update.sh vorhanden sein, dann folgernde Befehle ausführen:
 
 ```bash
 cd /opt/mqtt-live-monitor
