@@ -3,6 +3,8 @@ const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const mqtt = require("mqtt");
+const packageJson = require("./package.json");
+
 const { Server } = require("socket.io");
 
 const isDev = process.env.DEV_MODE === "true";
@@ -19,6 +21,12 @@ const CONFIG_PATH = path.join(__dirname, "config.json");
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/api/version", (req, res) => {
+  res.json({
+    version: packageJson.version,
+  });
+});
 
 let mqttClient = null;
 

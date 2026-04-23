@@ -14,7 +14,7 @@
           <div class="brand-icon">◉</div>
           <div class="brand-text">
             <div class="brand-title">MQTT Live Monitor</div>
-            <div class="brand-subtitle">v1.0.1</div>
+            <div class="brand-subtitle" id="appVersion">v-</div>
           </div>
         </div>
 
@@ -1764,6 +1764,20 @@
       }
     }
 
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+
+        const versionEl = document.getElementById('appVersion');
+        if (versionEl && data.version) {
+          versionEl.textContent = `v${data.version}`;
+        }
+      } catch (err) {
+        console.error("Version konnte nicht geladen werden", err);
+      }
+    }
+
     async function loadConfig() {
       const res = await fetch('/api/config');
       const config = await res.json();
@@ -1989,6 +2003,7 @@
         .forEach(d => d.classList.remove('open'));
     });
 
+    loadVersion();
     loadConfig();
     applyInitialMobileSidebarState();
     showView('dashboard');
