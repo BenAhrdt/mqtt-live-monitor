@@ -273,6 +273,10 @@
                   <input type="checkbox" value="binary_sensor" checked>
                   <span>Binary Sensor</span>
                 </label>
+                <label class="entity-filter-option">
+                  <input type="checkbox" value="switch" checked>
+                  <span>Schalter</span>
+              </label>
               </div>
             </div>
           </div>
@@ -1112,6 +1116,58 @@
       `;
     }
 
+    function renderSwitchEntity(entity) {
+      const isOn = Boolean(entity.value);
+
+      return `
+        <div class="dashboard-entity-row-block switch-entity-block" id="entity-${entity.id}">
+          <div class="sensor-row-line">
+            <span class="sensor-name">
+              ${escapeHtml(entity.name || 'Switch')}
+            </span>
+
+            <label class="switch">
+              <input 
+                type="checkbox" 
+                ${isOn ? 'checked' : ''}
+                onchange="toggleSwitch('${entity.id}', this.checked)"
+              >
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      `;
+    }
+
+    async function toggleSwitch(entityId, isOn) {
+      try {
+        const entity = findEntityById(entityId);
+        if (!entity || !entity.commandTopic) return;
+
+        const payload = isOn ? entity.payloadOn : entity.payloadOff;
+
+        await fetch('/api/mqtt/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: entity.commandTopic,
+            payload
+          })
+        });
+      } catch (err) {
+        console.error('Switch Fehler:', err);
+      }
+    }
+
+    function findEntityById(id) {
+      for (const device of devices) {
+        for (const entity of device.entities) {
+          if (entity.id === id) return entity;
+        }
+      }
+      return null;
+    }
+
     function renderDashboard() {
       const dashboardGrid = document.getElementById('dashboardGrid');
       if (!dashboardGrid) return;
@@ -1151,6 +1207,9 @@
           }
           if (entity.type === 'binary_sensor') {
             return renderBinarySensorEntity(entity);
+          }
+          if (entity.type === 'switch') {
+            return renderSwitchEntity(entity);
           }
 
           const isOn = getLightStateValue(entity.value);
@@ -1993,7 +2052,7 @@
       mqttClientIdInput.value = config.clientId || '';
       discoveryViaPrefixesInput.value = (config.discoveryViaPrefixes || ['lorawan']).join(', ');
       applyEntityTypeSelectionToUi(
-        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor']
+        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sernsor', 'switch']
       );
 
       brokerTextEl.textContent = `${config.host}:${config.port}`;
@@ -2218,7 +2277,7 @@
     applyInitialMobileSidebarState();
     showView('dashboard');
 
-    setInterval(checkForUpdates, 60_000);
+    setInterval(checkForUpdates, 60_000);    
   </script>
 </body>
 </html>

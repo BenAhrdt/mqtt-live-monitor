@@ -108,7 +108,7 @@ let mqttConfig = {
   topic: "#",
   clientId: "LiveMonitor",
   discoveryViaPrefixes: ["lorawan"],
-  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor"],
+  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch"],
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -463,6 +463,32 @@ function createBinarySensorEntity(topic, payload, deviceId) {
   };
 }
 
+function createSwitchEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "switch",
+    name: payload.name || "Switch",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    stateTopic: payload.state_topic || "",
+    commandTopic: payload.command_topic || "",
+
+    stateOn: payload.state_on ?? payload.payload_on ?? "ON",
+    stateOff: payload.state_off ?? payload.payload_off ?? "OFF",
+    payloadOn: payload.payload_on ?? payload.state_on ?? "ON",
+    payloadOff: payload.payload_off ?? payload.state_off ?? "OFF",
+
+    state: null,
+    value: null,
+    rawState: null,
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
@@ -689,6 +715,26 @@ function registerEntityTopics(entity, deviceId) {
     }
   }
 
+  if (entity.type === "switch") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "switch-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "switch-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
 }
 
 function applyPendingStateMessagesForEntity(entity) {
@@ -742,7 +788,8 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "humidifier" &&
     entityType !== "lawn_mower" &&
     entityType !== "sensor" &&
-    entityType !== "binary_sensor"
+    entityType !== "binary_sensor" &&
+    entityType !== "switch"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
@@ -774,6 +821,8 @@ function handleDiscoveryMessage(topic, message) {
     entity = createSensorEntity(topic, payload, deviceId);
   } else if (entityType === "binary_sensor") {
     entity = createBinarySensorEntity(topic, payload, deviceId);
+  } else if (entityType === "switch") {
+    entity = createSwitchEntity(topic, payload, deviceId);
   }
 
   if (!entity) {
@@ -1061,6 +1110,38 @@ function handleKnownTopicMessage(topic, message) {
     return {
       handled: true,
       type: "binary-sensor-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
+  if (entity.type === "switch") {
+    if (mapping.topicType !== "switch-state") {
+      return { handled: false, reason: "not-a-switch-state-topic" };
+    }
+
+    const stateText = String(parsed ?? "").trim();
+    const isOn =
+      stateText === String(entity.stateOn) ||
+      stateText === String(entity.payloadOn);
+
+    entity.state = isOn ? "on" : "off";
+    entity.value = isOn;
+    entity.rawState = parsed;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "switch-update",
       deviceId: mapping.deviceId,
       entityId: mapping.entityId,
     };

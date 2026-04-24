@@ -3,8 +3,8 @@
   "host": "192.168.2.243",
   "port": 1883,
   "topic": "#",
-  "username": "",
-  "password": "",
+  "username": "mqttuser",
+  "password": "MQTTpass1",
   "clientId": "LiveMonitor",
   "discoveryViaPrefixes": [
     "lorawan"
@@ -17,6 +17,7 @@
     "humidifier",
     "lawn_mower",
     "sensor",
-    "binary_sensor"
+    "binary_sensor",
+    "switch"
   ]
 }
