@@ -43,6 +43,12 @@ bash install.sh
 
 ## 🚀 Update
 
+Komforatebl über den Webserver.
+Wird eine neue Version online erkannt, so wird dies angezeigt.
+Durch einen Klick auf den Button und bestätigen, wird ein Update durchgeführt.
+Ein Reload der Seite erfolgt nach dem update. 
+![Update](image.png)
+
 Das Updatescript (sofern schon vorhanden) übernimmt automatisch das update
 
 ```bash
@@ -99,7 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### V1.1.6 Pending States
+### V1.1.8 Roload nach update
+* (BenAhrdt) nach dem update erfolgt ein reload der Seite
+
+### V1.1.7 Pending States
 * (BenAhrdt) Retaindaten von states, die vor der discovery rein kommen, werden beachtet
 
 ### V1.1.6 Nachkommastellen

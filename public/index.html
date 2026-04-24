@@ -1900,6 +1900,10 @@
             await fetch('/api/update/run', { method: 'POST' });
 
             btn.textContent = 'Neustart...';
+
+            setTimeout(() => {
+              window.location.reload();
+            }, 6000);
           };
         }
       } catch (err) {
