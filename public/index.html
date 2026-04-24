@@ -1139,21 +1139,22 @@
       `;
     }
 
+    function parseMqttPayload(value) {
+      if (value === 'true') return true;
+      if (value === 'false') return false;
+      return value;
+    }
+
     async function toggleSwitch(entityId, isOn) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      const payload = isOn
+        ? parseMqttPayload(entity.payloadOn ?? 'ON')
+        : parseMqttPayload(entity.payloadOff ?? 'OFF');
+
       try {
-        const entity = findEntityById(entityId);
-        if (!entity || !entity.commandTopic) return;
-
-        const payload = isOn ? entity.payloadOn : entity.payloadOff;
-
-        await fetch('/api/mqtt/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            topic: entity.commandTopic,
-            payload
-          })
-        });
+        await publishMqttCommand(entity.commandTopic, payload);
       } catch (err) {
         console.error('Switch Fehler:', err);
       }
