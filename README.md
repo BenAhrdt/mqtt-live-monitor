@@ -105,7 +105,7 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### V1.1.8 Roload nach update
+### V1.1.8 Reload nach update
 * (BenAhrdt) nach dem update erfolgt ein reload der Seite
 
 ### V1.1.7 Pending States
