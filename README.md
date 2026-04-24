@@ -105,7 +105,8 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### V1.1.9 Zusätzliche Entitätstypen hinzugefügt
+### V1.1.8 Reload nach update / Zusätzliche Entitätstypen hinzugefügt
+* (BenAhrdt) nach dem update erfolgt ein reload der Seite
 * (BenAhrdt) binary_sensor
 * (BenAhrdt) switch
 * (BenAhrdt) button
@@ -116,10 +117,6 @@ journalctl -u mqtt-live-monitor -f
 * (BenAhrdt) text
 * (BenAhrdt) entitäten können auf dem Dashboard auch durch unterordner und komma getrennt angezeigt werden.
              Bspw. YourIP:Port/dashboard/light,cover,number
-
-
-### V1.1.8 Reload nach update
-* (BenAhrdt) nach dem update erfolgt ein reload der Seite
 
 ### V1.1.7 Pending States
 * (BenAhrdt) Retaindaten von states, die vor der discovery rein kommen, werden beachtet
