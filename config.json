@@ -18,6 +18,7 @@
     "lawn_mower",
     "sensor",
     "binary_sensor",
-    "switch"
+    "switch",
+    "button"
   ]
 }
