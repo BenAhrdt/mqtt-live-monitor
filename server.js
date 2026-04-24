@@ -100,6 +100,7 @@ const deviceStore = {};
  * Topic -> Zuordnung zu Device / Entity
  */
 const topicStore = {};
+const pendingStateMessages = {};
 
 let mqttConfig = {
   webPort: 3000,
@@ -653,6 +654,26 @@ function registerEntityTopics(entity, deviceId) {
   }
 }
 
+function applyPendingStateMessagesForEntity(entity) {
+  const possibleTopics = [
+    entity.stateTopic,
+    entity.positionTopic,
+    entity.modeStateTopic,
+    entity.temperatureStateTopic,
+    entity.currentTemperatureTopic,
+    entity.targetHumidityStateTopic,
+    entity.currentHumidityTopic,
+    entity.activityStateTopic,
+  ].filter(Boolean);
+
+  for (const topic of possibleTopics) {
+    if (pendingStateMessages[topic]) {
+      handleKnownTopicMessage(topic, pendingStateMessages[topic]);
+      delete pendingStateMessages[topic];
+    }
+  }
+}
+
 function handleDiscoveryMessage(topic, message) {
   if (!isDiscoveryTopic(topic)) {
     return { handled: false, reason: "not-discovery-topic" };
@@ -723,6 +744,7 @@ function handleDiscoveryMessage(topic, message) {
   device.updatedAt = new Date().toISOString();
 
   registerEntityTopics(entity, deviceId);
+  applyPendingStateMessagesForEntity(entity);
   emitStores();
 
   return {
@@ -745,7 +767,8 @@ function handleKnownTopicMessage(topic, message) {
   const mapping = topicStore[topic];
 
   if (!mapping) {
-    return { handled: false, reason: "topic-not-registered" };
+    pendingStateMessages[topic] = message;
+    return { handled: false, reason: "topic-not-registered-pending" };
   }
 
   const device = deviceStore[mapping.deviceId];

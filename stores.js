@@ -1,5 +1,6 @@
 const deviceStore = {};
 const topicStore = {};
+const pendingStateMessages = {};
 
 function getDeviceStore() {
   return deviceStore;

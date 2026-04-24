@@ -99,6 +99,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.6 Pending States
+* (BenAhrdt) Retaindaten von states, die vor der discovery rein kommen, werden beachtet
+
 ### V1.1.6 Nachkommastellen
 * (BenAhrdt) Logik für Nachkommastellen eingebaut
 
