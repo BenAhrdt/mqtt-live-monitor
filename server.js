@@ -43,6 +43,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+  // Dashboard mit abhägigkeit der anzuzeigenden entitäten
+  app.get('/dashboard/:types', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+
 app.get('/api/update/check', async (req, res) => {
   const currentVersion = require('./package.json').version;
   const latestVersion = await fetchLatestVersion();
@@ -108,7 +113,7 @@ let mqttConfig = {
   topic: "#",
   clientId: "LiveMonitor",
   discoveryViaPrefixes: ["lorawan"],
-  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number"],
+  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -537,6 +542,26 @@ function createNumberEntity(topic, payload, deviceId) {
   };
 }
 
+function createTextEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "text",
+    name: payload.name || "Text",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    stateTopic: payload.state_topic || "",
+    commandTopic: payload.command_topic || "",
+
+    value: "",
+    rawState: null,
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
@@ -823,6 +848,26 @@ function registerEntityTopics(entity, deviceId) {
     }
   }
 
+  if (entity.type === "text") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "text-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "text-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
 }
 
 function applyPendingStateMessagesForEntity(entity) {
@@ -879,7 +924,8 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "binary_sensor" &&
     entityType !== "switch" &&
     entityType !== "button" &&
-    entityType !== "number"
+    entityType !== "number" &&
+    entityType !== "text"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
@@ -917,6 +963,8 @@ function handleDiscoveryMessage(topic, message) {
     entity = createButtonEntity(topic, payload, deviceId);
   } else if (entityType === "number") {
     entity = createNumberEntity(topic, payload, deviceId);
+  } else if (entityType === "text") {
+    entity = createTextEntity(topic, payload, deviceId);
   }
 
   if (!entity) {
@@ -1294,6 +1342,36 @@ function handleKnownTopicMessage(topic, message) {
     };
   }
 
+  if (entity.type === "text") {
+    if (mapping.topicType !== "text-state") {
+      return { handled: false, reason: "not-a-text-state-topic" };
+    }
+
+    const textValue = parsed === null || parsed === undefined
+      ? ""
+      : String(parsed);
+
+    entity.rawState = parsed;
+    entity.value = textValue;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "text-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
   return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
 
@@ -1601,7 +1679,7 @@ app.post("/api/config", (req, res) => {
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
           ? mqttConfig.enabledEntityTypes
-          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number"]),
+          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"]),
   };
 
   allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];

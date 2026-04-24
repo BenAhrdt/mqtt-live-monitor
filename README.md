@@ -113,6 +113,9 @@ journalctl -u mqtt-live-monitor -f
 * (BenAhrdt) number
 * (BenAhrdt) slider korrigiert
 * (BenAhrdt) bessere Bedienung durch einzelne Entitätsupdates statt dashboard render
+* (BenAhrdt) text
+* (BenAhrdt) entitäten können auf dem Dashboard auch durch unterordner und komma getrennt angezeigt werden.
+             Bspw. YourIP:Port/dashboard/light,cover,number
 
 
 ### V1.1.8 Reload nach update
