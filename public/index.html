@@ -276,6 +276,10 @@
                 <label class="entity-filter-option">
                   <input type="checkbox" value="switch" checked>
                   <span>Schalter</span>
+                </label>
+                <label class="entity-filter-option">
+                  <input type="checkbox" value="button" checked>
+                  <span>Button</span>
               </label>
               </div>
             </div>
@@ -1139,6 +1143,23 @@
       `;
     }
 
+    function renderButtonEntity(entity) {
+      return `
+        <div class="dashboard-entity-row-block button-entity-block" id="entity-${entity.id}">
+          <div class="sensor-row-line">
+            <span class="sensor-name">
+              ${escapeHtml(entity.name || 'Button')}
+            </span>
+
+            <button class="action-btn"
+              onclick="pressButtonEntity('${entity.id}')">
+              Ausführen
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     function parseMqttPayload(value) {
       if (value === 'true') return true;
       if (value === 'false') return false;
@@ -1157,6 +1178,22 @@
         await publishMqttCommand(entity.commandTopic, payload);
       } catch (err) {
         console.error('Switch Fehler:', err);
+      }
+    }
+
+    async function pressButtonEntity(entityId) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      let payload = entity.payloadPress ?? 'PRESS';
+
+      if (payload === 'true') payload = true;
+      if (payload === 'false') payload = false;
+
+      try {
+        await publishMqttCommand(entity.commandTopic, payload);
+      } catch (err) {
+        console.error('Button Fehler:', err);
       }
     }
 
@@ -1211,6 +1248,9 @@
           }
           if (entity.type === 'switch') {
             return renderSwitchEntity(entity);
+          }
+          if (entity.type === 'button') {
+            return renderButtonEntity(entity);
           }
 
           const isOn = getLightStateValue(entity.value);
@@ -2053,7 +2093,7 @@
       mqttClientIdInput.value = config.clientId || '';
       discoveryViaPrefixesInput.value = (config.discoveryViaPrefixes || ['lorawan']).join(', ');
       applyEntityTypeSelectionToUi(
-        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sernsor', 'switch']
+        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sernsor', 'switch', 'button']
       );
 
       brokerTextEl.textContent = `${config.host}:${config.port}`;

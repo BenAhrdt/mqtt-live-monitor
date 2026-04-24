@@ -489,6 +489,26 @@ function createSwitchEntity(topic, payload, deviceId) {
   };
 }
 
+function createButtonEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "button",
+    name: payload.name || "Button",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    commandTopic: payload.command_topic || "",
+    payloadPress: payload.payload_press ?? "PRESS",
+
+    stateTopic: payload.state_topic || "",
+
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
@@ -735,6 +755,26 @@ function registerEntityTopics(entity, deviceId) {
     }
   }
 
+  if (entity.type === "button") {
+  if (entity.commandTopic) {
+    topicStore[entity.commandTopic] = {
+      topicType: "button-command",
+      deviceId,
+      entityId: entity.id,
+      entityType: entity.type,
+    };
+  }
+
+  if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "button-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
 }
 
 function applyPendingStateMessagesForEntity(entity) {
@@ -789,7 +829,8 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "lawn_mower" &&
     entityType !== "sensor" &&
     entityType !== "binary_sensor" &&
-    entityType !== "switch"
+    entityType !== "switch" &&
+    entityType !== "button"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
@@ -823,6 +864,8 @@ function handleDiscoveryMessage(topic, message) {
     entity = createBinarySensorEntity(topic, payload, deviceId);
   } else if (entityType === "switch") {
     entity = createSwitchEntity(topic, payload, deviceId);
+  } else if (entityType === "button") {
+    entity = createButtonEntity(topic, payload, deviceId);
   }
 
   if (!entity) {
@@ -1147,6 +1190,31 @@ function handleKnownTopicMessage(topic, message) {
     };
   }
 
+  if (entity.type === "button") {
+    if (mapping.topicType !== "button-state") {
+      return { handled: false, reason: "not-a-button-state-topic" };
+    }
+
+    entity.rawState = parsed;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "button-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
   return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
 
@@ -1450,7 +1518,7 @@ app.post("/api/config", (req, res) => {
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
           ? mqttConfig.enabledEntityTypes
-          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor"]),
+          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "button"]),
   };
 
   allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];

@@ -1592,3 +1592,15 @@ code {
 .sensor-value.danger {
   color: #f87171; /* rot */
 }
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #334155;
+  color: white;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: #475569;
+}
