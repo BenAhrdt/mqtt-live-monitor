@@ -99,6 +99,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.6 Nachkommastellen
+* (BenAhrdt) Logik für Nachkommastellen eingebaut
+
 ### V1.1.5 Update Test
 * (BenAhrdt) Test für Update Script
 

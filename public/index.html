@@ -1008,12 +1008,24 @@
         return '-';
       }
 
-      const precision = Number(entity.suggestedDisplayPrecision);
       const numericValue = Number(value);
+      const hasSuggestedPrecision =
+        entity.suggestedDisplayPrecision !== null &&
+        entity.suggestedDisplayPrecision !== undefined &&
+        entity.suggestedDisplayPrecision !== '';
 
-      const displayValue = !Number.isNaN(numericValue) && Number.isFinite(precision)
-        ? numericValue.toFixed(precision)
-        : String(value);
+      let displayValue = String(value);
+
+      if (!Number.isNaN(numericValue)) {
+        if (hasSuggestedPrecision) {
+          displayValue = numericValue.toFixed(Number(entity.suggestedDisplayPrecision));
+        } else {
+          displayValue = numericValue.toFixed(3);
+        }
+
+        displayValue = displayValue
+          .replace(/\.?0+$/, '');
+      }
 
       return `${displayValue}${unit ? ' ' + unit : ''}`;
     }
