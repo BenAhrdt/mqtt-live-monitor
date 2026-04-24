@@ -1584,3 +1584,11 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 16px;
 }
+
+.sensor-value.ok {
+  color: #4ade80; /* grün */
+}
+
+.sensor-value.danger {
+  color: #f87171; /* rot */
+}

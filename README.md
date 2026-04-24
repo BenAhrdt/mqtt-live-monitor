@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.9 Zusätzliche Entitätstypen hinzugefügt
+* (BenAhrdt) binary_sensor
+
 ### V1.1.8 Reload nach update
 * (BenAhrdt) nach dem update erfolgt ein reload der Seite
 

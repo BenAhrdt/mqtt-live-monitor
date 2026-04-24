@@ -269,6 +269,10 @@
                   <input type="checkbox" value="sensor" checked>
                   <span>Sensor</span>
                 </label>
+                <label class="entity-filter-option">
+                  <input type="checkbox" value="binary_sensor" checked>
+                  <span>Binary Sensor</span>
+                </label>
               </div>
             </div>
           </div>
@@ -729,6 +733,27 @@
         }
       }
 
+      const binary = entities.find(e => e.type === 'binary_sensor');
+
+      if (binary) {
+        switch ((binary.deviceClass || '').toLowerCase()) {
+          case 'door': return '🚪';
+          case 'window': return '🪟';
+          case 'garage_door': return '🚗';
+          case 'opening': return '🚪';
+
+          case 'motion': return '🏃';
+          case 'presence': return '👤';
+
+          case 'lock': return '🔒';
+
+          case 'smoke': return '💨';
+          case 'moisture': return '💧';
+
+          default: return '📟';
+        }
+      }
+
       return '📦';
     }
 
@@ -1045,6 +1070,48 @@
       `;
     }
 
+    function renderBinarySensorEntity(entity) {
+      const isOn = Boolean(entity.value);
+      const cls = String(entity.deviceClass || '').toLowerCase();
+
+      let text = '';
+      let colorClass = '';
+
+      if (['door', 'window', 'opening', 'garage_door'].includes(cls)) {
+        text = isOn ? 'Offen' : 'Geschlossen';
+        colorClass = isOn ? 'danger' : 'ok';
+      }
+      else if (['motion', 'presence'].includes(cls)) {
+        text = isOn ? 'Bewegung erkannt' : 'Keine Bewegung';
+        colorClass = isOn ? 'danger' : 'ok';
+      }
+      else if (cls === 'lock') {
+        text = isOn ? 'Verriegelt' : 'Entriegelt';
+        colorClass = isOn ? 'ok' : 'danger';
+      }
+      else if (['smoke', 'moisture'].includes(cls)) {
+        text = isOn ? 'Alarm' : 'OK';
+        colorClass = isOn ? 'danger' : 'ok';
+      }
+      else {
+        text = isOn ? 'An' : 'Aus';
+        colorClass = isOn ? 'danger' : 'ok';
+      }
+
+      return `
+        <div class="dashboard-entity-row-block binary-sensor-entity-block" id="entity-${entity.id}">
+          <div class="sensor-row-line">
+            <span class="sensor-name">
+              ${escapeHtml(entity.name || 'Binary Sensor')}
+            </span>
+            <strong class="sensor-value ${colorClass}">
+              ${text}
+            </strong>
+          </div>
+        </div>
+      `;
+    }
+
     function renderDashboard() {
       const dashboardGrid = document.getElementById('dashboardGrid');
       if (!dashboardGrid) return;
@@ -1081,6 +1148,9 @@
           }
           if (entity.type === 'sensor') {
             return renderSensorEntity(entity);
+          }
+          if (entity.type === 'binary_sensor') {
+            return renderBinarySensorEntity(entity);
           }
 
           const isOn = getLightStateValue(entity.value);
