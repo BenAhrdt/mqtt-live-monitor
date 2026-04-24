@@ -109,6 +109,7 @@ journalctl -u mqtt-live-monitor -f
 * (BenAhrdt) binary_sensor
 * (BenAhrdt) switch
 * (BenAhrdt) button
+* (BenAhrdt) alphabetische Sortierung der Geräte
 
 
 ### V1.1.8 Reload nach update

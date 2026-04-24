@@ -1151,8 +1151,8 @@
               ${escapeHtml(entity.name || 'Button')}
             </span>
 
-            <button class="action-btn"
-              onclick="pressButtonEntity('${entity.id}')">
+            <button class="lock-action-btn button-inline-action"
+              onclick="pressButtonEntity('${entity.id}', this)">
               Ausführen
             </button>
           </div>
@@ -1215,7 +1215,14 @@
         return;
       }
 
-      dashboardGrid.innerHTML = dashboardDevices.map((device) => {
+      const sortedDevices = [...dashboardDevices].sort((a, b) => {
+        const nameA = String(a.name || a.id || '').toLowerCase();
+        const nameB = String(b.name || b.id || '').toLowerCase();
+
+        return nameA.localeCompare(nameB, 'de');
+      });
+
+      dashboardGrid.innerHTML = sortedDevices.map((device) => {
         const visibleEntities = (device.entities || []).filter((entity) =>
           isEntityTypeVisible(entity.type)
         );

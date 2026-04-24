@@ -1593,14 +1593,18 @@ code {
   color: #f87171; /* rot */
 }
 
-.action-btn {
+.button-entity-action {
+  margin-left: auto;
   padding: 6px 12px;
-  border-radius: 6px;
-  background: #334155;
-  color: white;
+  border-radius: 8px;
+  background: #1d4ed8;
+  border: 1px solid #60a5fa;
+  color: #ffffff;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.action-btn:hover {
-  background: #475569;
+.button-inline-action {
+  margin-left: auto;
+  padding: 6px 12px;
 }
