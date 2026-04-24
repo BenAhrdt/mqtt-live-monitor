@@ -15,6 +15,7 @@
     "cover",
     "lock",
     "humidifier",
-    "lawn_mower"
+    "lawn_mower",
+    "sensor"
   ]
 }

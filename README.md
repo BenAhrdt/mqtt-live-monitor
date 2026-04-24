@@ -99,6 +99,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.4 Sensor als Entität hinzugefügt
+* (BenAhrdt) Der Entitätstyp sensor, wurde hinzugefügt
+
 ### V1.1.3 Icon
 * (BenAhrdt) icon hinzugefügt
 

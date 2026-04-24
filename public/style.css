@@ -1537,3 +1537,50 @@ code {
 .hidden {
   display: none;
 }
+
+.sensor-row-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.sensor-name {
+  overflow: hidden;
+  text-overflow: unset;
+  white-space: nowrap;
+}
+
+.sensor-value {
+  white-space: nowrap;
+}
+
+.sensor-row-line strong {
+  white-space: nowrap;
+}
+
+.dashboard-device-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sub-icons {
+  display: flex;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+#dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}

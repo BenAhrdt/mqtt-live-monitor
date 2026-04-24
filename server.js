@@ -4,6 +4,7 @@ const fs = require("fs");
 const http = require("http");
 const mqtt = require("mqtt");
 const packageJson = require("./package.json");
+const { exec } = require("child_process");
 
 const { Server } = require("socket.io");
 
@@ -54,6 +55,26 @@ app.get('/api/update/check', async (req, res) => {
   });
 });
 
+app.post("/api/update/run", (req, res) => {
+  console.log("Update per Button angefordert");
+
+  res.json({
+    success: true,
+    message: "Update wird gestartet"
+  });
+
+  setTimeout(() => {
+    exec("bash /opt/mqtt-live-monitor/update.sh", (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+
+      if (err) {
+        console.error("Update fehlgeschlagen:", err.message);
+      }
+    });
+  }, 1000);
+});
+
 const DEFAULT_WEB_PORT = 3000;
 const CONFIG_PATH = path.join(__dirname, "config.json");
 
@@ -86,7 +107,7 @@ let mqttConfig = {
   topic: "#",
   clientId: "LiveMonitor",
   discoveryViaPrefixes: ["lorawan"],
-  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower"],
+  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor"],
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -389,6 +410,33 @@ function createLawnMowerEntity(topic, payload, deviceId) {
   };
 }
 
+function createSensorEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "sensor",
+    name: payload.name || "Sensor",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    stateTopic: payload.state_topic || "",
+    deviceClass: payload.device_class || "",
+    entityCategory: payload.entity_category || "",
+    unit: payload.unit_of_measurement || "",
+    stateClass: payload.state_class || "",
+    suggestedDisplayPrecision:
+      typeof payload.suggested_display_precision === "number"
+        ? payload.suggested_display_precision
+        : null,
+
+    value: null,
+    rawState: null,
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
@@ -508,91 +556,101 @@ function registerEntityTopics(entity, deviceId) {
     }
   }
 
-if (entity.type === "humidifier") {
-  if (entity.stateTopic) {
-    topicStore[entity.stateTopic] = {
-      topicType: "humidifier-state",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
+  if (entity.type === "humidifier") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "humidifier-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.targetHumidityStateTopic) {
+      topicStore[entity.targetHumidityStateTopic] = {
+        topicType: "humidifier-target-humidity-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.currentHumidityTopic) {
+      topicStore[entity.currentHumidityTopic] = {
+        topicType: "humidifier-current-humidity",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "humidifier-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.targetHumidityCommandTopic) {
+      topicStore[entity.targetHumidityCommandTopic] = {
+        topicType: "humidifier-target-humidity-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
   }
 
-  if (entity.targetHumidityStateTopic) {
-    topicStore[entity.targetHumidityStateTopic] = {
-      topicType: "humidifier-target-humidity-state",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
+  if (entity.type === "lawn_mower") {
+    if (entity.activityStateTopic) {
+      topicStore[entity.activityStateTopic] = {
+        topicType: "lawn-mower-activity-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.startMowingCommandTopic) {
+      topicStore[entity.startMowingCommandTopic] = {
+        topicType: "lawn-mower-start-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.pauseCommandTopic) {
+      topicStore[entity.pauseCommandTopic] = {
+        topicType: "lawn-mower-pause-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.dockCommandTopic) {
+      topicStore[entity.dockCommandTopic] = {
+        topicType: "lawn-mower-dock-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
   }
 
-  if (entity.currentHumidityTopic) {
-    topicStore[entity.currentHumidityTopic] = {
-      topicType: "humidifier-current-humidity",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
+  if (entity.type === "sensor") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "sensor-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
   }
-
-  if (entity.commandTopic) {
-    topicStore[entity.commandTopic] = {
-      topicType: "humidifier-command",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-
-  if (entity.targetHumidityCommandTopic) {
-    topicStore[entity.targetHumidityCommandTopic] = {
-      topicType: "humidifier-target-humidity-command",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-}
-
-if (entity.type === "lawn_mower") {
-  if (entity.activityStateTopic) {
-    topicStore[entity.activityStateTopic] = {
-      topicType: "lawn-mower-activity-state",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-
-  if (entity.startMowingCommandTopic) {
-    topicStore[entity.startMowingCommandTopic] = {
-      topicType: "lawn-mower-start-command",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-
-  if (entity.pauseCommandTopic) {
-    topicStore[entity.pauseCommandTopic] = {
-      topicType: "lawn-mower-pause-command",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-
-  if (entity.dockCommandTopic) {
-    topicStore[entity.dockCommandTopic] = {
-      topicType: "lawn-mower-dock-command",
-      deviceId,
-      entityId: entity.id,
-      entityType: entity.type,
-    };
-  }
-}
-
 }
 
 function handleDiscoveryMessage(topic, message) {
@@ -624,7 +682,8 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "cover" &&
     entityType !== "lock" &&
     entityType !== "humidifier" &&
-    entityType !== "lawn_mower"
+    entityType !== "lawn_mower" &&
+    entityType !== "sensor"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
@@ -652,6 +711,8 @@ function handleDiscoveryMessage(topic, message) {
     entity = createHumidifierEntity(topic, payload, deviceId);
   } else if (entityType === "lawn_mower") {
     entity = createLawnMowerEntity(topic, payload, deviceId);
+  } else if (entityType === "sensor") {
+    entity = createSensorEntity(topic, payload, deviceId);
   }
 
   if (!entity) {
@@ -860,31 +921,57 @@ function handleKnownTopicMessage(topic, message) {
     };
   }
 
-if (entity.type === "lawn_mower") {
-  if (mapping.topicType !== "lawn-mower-activity-state") {
-    return { handled: false, reason: "not-a-lawn-mower-state-topic" };
+  if (entity.type === "lawn_mower") {
+    if (mapping.topicType !== "lawn-mower-activity-state") {
+      return { handled: false, reason: "not-a-lawn-mower-state-topic" };
+    }
+
+    entity.activity = typeof parsed === "string" ? parsed : String(parsed ?? "");
+    entity.rawState = { ...entity.rawState, activity: entity.activity };
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "lawn-mower-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
   }
 
-  entity.activity = typeof parsed === "string" ? parsed : String(parsed ?? "");
-  entity.rawState = { ...entity.rawState, activity: entity.activity };
-  entity.lastUpdate = new Date().toISOString();
-  device.updatedAt = new Date().toISOString();
+  if (entity.type === "sensor") {
+    if (mapping.topicType !== "sensor-state") {
+      return { handled: false, reason: "not-a-sensor-state-topic" };
+    }
 
-  emitStores();
+    entity.rawState = parsed;
+    entity.value = parsed;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
 
-  io.emit("entity-update", {
-    deviceId: mapping.deviceId,
-    entityId: mapping.entityId,
-    entity,
-  });
+    emitStores();
 
-  return {
-    handled: true,
-    type: "lawn-mower-update",
-    deviceId: mapping.deviceId,
-    entityId: mapping.entityId,
-  };
-}
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "sensor-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
 
   return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
@@ -1113,6 +1200,11 @@ function getDevicesForDashboard() {
       pauseCommandTopic: entity.pauseCommandTopic,
       dockCommandTopic: entity.dockCommandTopic,
 
+      entityCategory: entity.entityCategory,
+      unit: entity.unit,
+      stateClass: entity.stateClass,
+      suggestedDisplayPrecision: entity.suggestedDisplayPrecision,
+
     }));
 
     return {
@@ -1145,6 +1237,7 @@ app.get("/api/config", (req, res) => {
       "lock",
       "humidifier",
       "lawn_mower",
+      "sensor"
     ],
   });
 });
@@ -1183,7 +1276,7 @@ app.post("/api/config", (req, res) => {
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
           ? mqttConfig.enabledEntityTypes
-          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower"]),
+          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor"]),
   };
 
   allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];

@@ -265,6 +265,10 @@
                   <input type="checkbox" value="lawn_mower" checked>
                   <span>Mähroboter</span>
                 </label>
+                <label class="entity-filter-option">
+                  <input type="checkbox" value="sensor" checked>
+                  <span>Sensor</span>
+                </label>
               </div>
             </div>
           </div>
@@ -336,6 +340,35 @@
     let currentView = 'dashboard';
     let dashboardRenderScheduled = false;
     let activeEntityTypes = new Set();
+
+    function shortenMiddleSmart(text, maxWidthPx) {
+      if (!text) return '';
+
+      const str = String(text);
+      const maxChars = Math.max(12, Math.floor(maxWidthPx / 7));
+
+      if (str.length <= maxChars) return str;
+
+      const available = maxChars - 3;
+      const startLength = Math.ceil(available / 2);
+      const endLength = Math.floor(available / 2);
+
+      return `${str.slice(0, startLength)}...${str.slice(-endLength)}`;
+    }
+
+    function updateSensorNameShortening() {
+      document.querySelectorAll('.sensor-row-line').forEach((row) => {
+        const nameEl = row.querySelector('.sensor-name');
+        const valueEl = row.querySelector('.sensor-value');
+
+        if (!nameEl || !valueEl) return;
+
+        const full = nameEl.dataset.fullname || nameEl.textContent;
+        const availableWidth = row.clientWidth - valueEl.offsetWidth - 20;
+
+        nameEl.textContent = shortenMiddleSmart(full, availableWidth);
+      });
+    }
 
     async function selectAllEntityTypes() {
       entityFilterMenu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
@@ -655,59 +688,48 @@
     }
 
     function getDeviceIcons(device) {
-      const iconSet = new Set();
+      const entities = device.entities || [];
 
-      for (const entity of (device.entities || [])) {
-        if (entity.type === 'light') {
-          iconSet.add('💡');
-        }
+      if (entities.some(e => e.type === 'climate')) return '🌡️';
 
-        if (entity.type === 'climate') {
-          iconSet.add('🌡️');
-        }
+      const garageCover = entities.find(e => e.type === 'cover' && e.deviceClass === 'garage');
+      if (garageCover) return '🚗';
 
-        if (entity.type === 'cover') {
-          switch (entity.deviceClass) {
-            case 'garage':
-              iconSet.add('🚗');
-              break;
-            case 'door':
-              iconSet.add('🚪');
-              break;
-            case 'window':
-              iconSet.add('🪟');
-              break;
-            case 'shutter':
-              iconSet.add('🧱');
-              break;
-            case 'blind':
-              iconSet.add('🪄');
-              break;
-            case 'curtain':
-              iconSet.add('🧵');
-              break;
-            case 'gate':
-              iconSet.add('⛩️');
-              break;
-            default:
-              iconSet.add('🚪');
-          }
-        }
-
-        if (entity.type === 'lock') {
-          iconSet.add('🔒');
-        }
-
-        if (entity.type === 'humidifier') {
-          iconSet.add('💧');
-        }
-
-        if (entity.type === 'lawn_mower') {
-          iconSet.add('🤖');
+      const cover = entities.find(e => e.type === 'cover');
+      if (cover) {
+        switch (cover.deviceClass) {
+          case 'door': return '🚪';
+          case 'window': return '🪟';
+          case 'shutter': return '🧱';
+          case 'blind': return '🪄';
+          case 'curtain': return '🧵';
+          case 'gate': return '⛩️';
+          default: return '🚪';
         }
       }
 
-      return iconSet.size ? Array.from(iconSet).join(' ') : '📦';
+      if (entities.some(e => e.type === 'light')) return '💡';
+      if (entities.some(e => e.type === 'lock')) return '🔒';
+      if (entities.some(e => e.type === 'humidifier')) return '💧';
+      if (entities.some(e => e.type === 'lawn_mower')) return '🤖';
+
+      const sensor = entities.find(e => e.type === 'sensor');
+      if (sensor) {
+        switch (sensor.deviceClass) {
+          case 'temperature': return '🌡️';
+          case 'humidity': return '💧';
+          case 'precipitation': return '🌧️';
+          case 'voltage':
+          case 'battery': return '🔋';
+          case 'power':
+          case 'energy': return '⚡';
+          case 'illuminance': return '☀️';
+          case 'weight': return '⚖️';
+          default: return '📊';
+        }
+      }
+
+      return '📦';
     }
 
     function getViaDeviceClass(viaDevice) {
@@ -978,6 +1000,39 @@
       `;
     }
 
+    function formatSensorValue(entity) {
+      const value = entity.value ?? '-';
+      const unit = entity.unit || '';
+
+      if (value === '-' || value === null || value === undefined) {
+        return '-';
+      }
+
+      const precision = Number(entity.suggestedDisplayPrecision);
+      const numericValue = Number(value);
+
+      const displayValue = !Number.isNaN(numericValue) && Number.isFinite(precision)
+        ? numericValue.toFixed(precision)
+        : String(value);
+
+      return `${displayValue}${unit ? ' ' + unit : ''}`;
+    }
+
+    function renderSensorEntity(entity) {
+      return `
+        <div class="dashboard-entity-row-block sensor-entity-block" id="entity-${entity.id}">
+          <div class="sensor-row-line">
+            <span class="sensor-name" title="${escapeHtml(entity.name || 'Sensor')}">
+              ${escapeHtml(shortenMiddleSmart(entity.name || 'Sensor', 200))}
+            </span>
+            <strong class="sensor-value">
+              ${escapeHtml(formatSensorValue(entity))}
+            </strong>
+          </div>
+        </div>
+      `;
+    }
+
     function renderDashboard() {
       const dashboardGrid = document.getElementById('dashboardGrid');
       if (!dashboardGrid) return;
@@ -1011,6 +1066,9 @@
           }
           if (entity.type === 'lawn_mower') {
             return renderLawnMowerEntity(entity);
+          }
+          if (entity.type === 'sensor') {
+            return renderSensorEntity(entity);
           }
 
           const isOn = getLightStateValue(entity.value);
@@ -1132,10 +1190,14 @@
         }).join('');
 
         const viaClass = getViaDeviceClass(device.viaDevice);
+
         return `
           <div class="dashboard-device-card ${viaClass}" id="device-${device.id}">
             <div class="dashboard-device-header">
-              <div class="dashboard-device-icon">${getDeviceIcons(device)}</div>
+              <div class="dashboard-device-icon">
+                ${getDeviceIcons(device)}
+              </div>
+
               <div class="dashboard-device-header-text">
                 <div class="dashboard-device-name">${escapeHtml(device.name || device.id)}</div>
                 <div class="dashboard-device-subtitle">
@@ -1150,7 +1212,7 @@
           </div>
         `;
       }).join('');
-
+ 
       dashboardGrid.querySelectorAll('.climate-temp-range').forEach((slider) => {
         updateClimateSliderBubble(slider);
       });
@@ -1845,7 +1907,7 @@
       mqttClientIdInput.value = config.clientId || '';
       discoveryViaPrefixesInput.value = (config.discoveryViaPrefixes || ['lorawan']).join(', ');
       applyEntityTypeSelectionToUi(
-        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower']
+        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor']
       );
 
       brokerTextEl.textContent = `${config.host}:${config.port}`;
