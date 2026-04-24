@@ -280,6 +280,10 @@
                 <label class="entity-filter-option">
                   <input type="checkbox" value="button" checked>
                   <span>Button</span>
+                </label>
+                <label class="entity-filter-option">
+                  <input type="checkbox" value="number" checked>
+                  <span>Number</span>
               </label>
               </div>
             </div>
@@ -518,7 +522,7 @@
       const percent = ((value - min) / (max - min)) * 100;
 
       bubble.textContent = `${value.toFixed(0)} %`;
-      bubble.style.left = `calc(${percent}% + (${10 - percent * 0.2}px))`;
+      bubble.style.left = `${percent}%`;
     }
 
     function handleClimateSliderStart(input) {
@@ -556,7 +560,7 @@
       const percent = ((value - min) / (max - min)) * 100;
 
       bubble.textContent = `${value.toFixed(1)} °C`;
-      bubble.style.left = `calc(${percent}% + (${10 - percent * 0.2}px))`;
+      bubble.style.left = `${percent}%`;
     }
 
     function scheduleDashboardRender() {
@@ -646,8 +650,8 @@
               <span class="climate-target-value">${targetTemp.toFixed(1)} °C</span>
             </button>
 
-            <div class="climate-inline-slider-wrap">
-              <div class="climate-slider-bubble hidden"></div>
+            <div class="dashboard-slider-wrap">
+              <div class="dashboard-slider-bubble hidden"></div>
 
               <input
                 type="range"
@@ -656,11 +660,11 @@
                 step="${tempStep}"
                 value="${targetTemp}"
                 class="dashboard-range climate-temp-range"
-                oninput="handleClimateSliderInput(this)"
-                onmousedown="handleClimateSliderStart(this)"
-                onmouseup="handleClimateSliderEnd(this)"
-                ontouchstart="handleClimateSliderStart(this)"
-                ontouchend="handleClimateSliderEnd(this)"
+                oninput="handleDashboardSliderInput(this)"
+                onmousedown="handleDashboardSliderStart(this)"
+                onmouseup="handleDashboardSliderEnd(this)"
+                ontouchstart="handleDashboardSliderStart(this)"
+                ontouchend="handleDashboardSliderEnd(this)"
                 onchange="setClimateTargetTemperature('${entity.id}', this.value)"
               >
             </div>
@@ -938,8 +942,8 @@
               <span class="climate-target-value">${targetHumidity.toFixed(0)} %</span>
             </button>
 
-            <div class="humidifier-slider-wrap">
-              <div class="humidifier-slider-bubble hidden"></div>
+            <div class="dashboard-slider-wrap">
+              <div class="dashboard-slider-bubble hidden"></div>
 
               <input
                 type="range"
@@ -948,11 +952,11 @@
                 step="1"
                 value="${targetHumidity}"
                 class="dashboard-range humidifier-range"
-                oninput="handleHumidifierSliderInput(this)"
-                onmousedown="handleHumidifierSliderStart(this)"
-                onmouseup="handleHumidifierSliderEnd(this)"
-                ontouchstart="handleHumidifierSliderStart(this)"
-                ontouchend="handleHumidifierSliderEnd(this)"
+                oninput="handleDashboardSliderInput(this)"
+                onmousedown="handleDashboardSliderStart(this)"
+                onmouseup="handleDashboardSliderEnd(this)"
+                ontouchstart="handleDashboardSliderStart(this)"
+                ontouchend="handleDashboardSliderEnd(this)"
                 onchange="setHumidifierTargetHumidity('${entity.id}', this.value)"
               >
             </div>
@@ -1160,6 +1164,60 @@
       `;
     }
 
+    function renderNumberEntity(entity) {
+      const rawValue = entity.value ?? '';
+      const value = rawValue === '' || rawValue === null ? '' : Number(rawValue);
+      const hasMinMax = entity.min !== null && entity.min !== undefined &&
+                        entity.max !== null && entity.max !== undefined;
+
+      const min = Number(entity.min);
+      const max = Number(entity.max);
+      const step = Number(entity.step ?? 1);
+      const unit = entity.unit || '';
+
+      return `
+        <div class="dashboard-entity-row-block number-entity-block" id="entity-${entity.id}">
+          <div class="dashboard-control-row">
+            <span class="dashboard-label">${escapeHtml(entity.name || 'Number')}</span>
+
+            <div class="number-control">
+              ${hasMinMax ? `
+                <div class="dashboard-slider-wrap">
+                  <div class="dashboard-slider-bubble hidden"></div>
+                  <input
+                    type="range"
+                    min="${min}"
+                    max="${max}"
+                    step="${step}"
+                    value="${value === '' ? min : value}"
+                    data-unit="${escapeHtml(unit)}"
+                    class="dashboard-range"
+                    oninput="handleDashboardSliderInput(this); this.closest('.number-control').querySelector('.number-input').value = this.value"
+                    onmousedown="handleDashboardSliderStart(this)"
+                    onmouseup="handleDashboardSliderEnd(this)"
+                    ontouchstart="handleDashboardSliderStart(this)"
+                    ontouchend="handleDashboardSliderEnd(this)"
+                    onchange="setNumberEntity('${entity.id}', this.value)"
+                  >
+                </div>
+              ` : ''}
+
+              <input
+                type="number"
+                class="number-input"
+                ${hasMinMax ? `min="${min}" max="${max}"` : ''}
+                step="${step}"
+                value="${value}"
+                onchange="setNumberEntity('${entity.id}', this.value)"
+              >
+
+              ${unit ? `<span class="number-unit">${escapeHtml(unit)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function parseMqttPayload(value) {
       if (value === 'true') return true;
       if (value === 'false') return false;
@@ -1194,6 +1252,17 @@
         await publishMqttCommand(entity.commandTopic, payload);
       } catch (err) {
         console.error('Button Fehler:', err);
+      }
+    }
+
+    async function setNumberEntity(entityId, value) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity || !entity.commandTopic) return;
+
+      try {
+        await publishMqttCommand(entity.commandTopic, Number(value));
+      } catch (err) {
+        console.error('Number Fehler:', err);
       }
     }
 
@@ -1259,6 +1328,9 @@
           if (entity.type === 'button') {
             return renderButtonEntity(entity);
           }
+          if (entity.type === 'number') {
+            return renderNumberEntity(entity);
+          }
 
           const isOn = getLightStateValue(entity.value);
           const brightness = entity.value?.brightness ?? 0;
@@ -1310,14 +1382,25 @@
               ${hasBrightness ? `
                 <div class="dashboard-control-row">
                   <span class="dashboard-label">Helligkeit</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="${brightnessMax}"
-                    value="${brightness}"
-                    class="dashboard-range"
-                    onchange="setLightBrightness('${entity.id}', this.value)"
-                  >
+
+                  <div class="dashboard-slider-wrap">
+                    <div class="dashboard-slider-bubble hidden"></div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="${brightnessMax}"
+                      value="${brightness}"
+                      data-unit=""
+                      class="dashboard-range"
+                      oninput="handleDashboardSliderInput(this)"
+                      onmousedown="handleDashboardSliderStart(this)"
+                      onmouseup="handleDashboardSliderEnd(this)"
+                      ontouchstart="handleDashboardSliderStart(this)"
+                      ontouchend="handleDashboardSliderEnd(this)"
+                      onchange="setLightBrightness('${entity.id}', this.value)"
+                    >
+                  </div>
                 </div>
               ` : ''}
 
@@ -1336,15 +1419,27 @@
               ${hasColorTemp ? `
                 <div class="dashboard-control-row">
                   <span class="dashboard-label">Farbtemp</span>
+
                   <div class="color-temp-wrap">
-                    <input
-                      type="range"
-                      min="${minColorTemp}"
-                      max="${maxColorTemp}"
-                      value="${currentColorTemp}"
-                      class="dashboard-range dashboard-color-temp-range"
-                      onchange="setLightColorTemp('${entity.id}', this.value)"
-                    >
+                    <div class="dashboard-slider-wrap">
+                      <div class="dashboard-slider-bubble hidden"></div>
+
+                      <input
+                        type="range"
+                        min="${minColorTemp}"
+                        max="${maxColorTemp}"
+                        value="${currentColorTemp}"
+                        data-unit="K"
+                        class="dashboard-range dashboard-color-temp-range"
+                        oninput="handleDashboardSliderInput(this)"
+                        onmousedown="handleDashboardSliderStart(this)"
+                        onmouseup="handleDashboardSliderEnd(this)"
+                        ontouchstart="handleDashboardSliderStart(this)"
+                        ontouchend="handleDashboardSliderEnd(this)"
+                        onchange="setLightColorTemp('${entity.id}', this.value)"
+                      >
+                    </div>
+
                     <span class="color-temp-value">${currentColorTemp} K</span>
                   </div>
                 </div>
@@ -1453,8 +1548,37 @@
       });
 
       if (found && currentView === 'dashboard') {
-        scheduleDashboardRender();
+        updateSingleEntity(update);
       }
+    }
+
+    function updateSingleEntity(update) {
+      const oldEl = document.getElementById(`entity-${update.entityId}`);
+
+      if (!oldEl) {
+        scheduleDashboardRender();
+        return;
+      }
+
+      const entity = update.entity;
+      let html = '';
+
+      if (entity.type === 'climate') html = renderClimateEntity(entity);
+      else if (entity.type === 'cover') html = renderCoverEntity(entity);
+      else if (entity.type === 'lock') html = renderLockEntity(entity);
+      else if (entity.type === 'humidifier') html = renderHumidifierEntity(entity);
+      else if (entity.type === 'lawn_mower') html = renderLawnMowerEntity(entity);
+      else if (entity.type === 'sensor') html = renderSensorEntity(entity);
+      else if (entity.type === 'binary_sensor') html = renderBinarySensorEntity(entity);
+      else if (entity.type === 'switch') html = renderSwitchEntity(entity);
+      else if (entity.type === 'button') html = renderButtonEntity(entity);
+      else if (entity.type === 'number') html = renderNumberEntity(entity);
+      else {
+        scheduleDashboardRender();
+        return;
+      }
+
+      oldEl.outerHTML = html;
     }
 
     async function publishMqttCommand(topic, payloadObject) {
@@ -2100,7 +2224,7 @@
       mqttClientIdInput.value = config.clientId || '';
       discoveryViaPrefixesInput.value = (config.discoveryViaPrefixes || ['lorawan']).join(', ');
       applyEntityTypeSelectionToUi(
-        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sernsor', 'switch', 'button']
+        config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sensor', 'switch', 'button', 'number']
       );
 
       brokerTextEl.textContent = `${config.host}:${config.port}`;
@@ -2167,6 +2291,43 @@
       }
 
       configMessageEl.textContent = 'MQTT-Verbindung getrennt';
+    }
+
+    function handleDashboardSliderStart(input) {
+      const wrap = input.closest('.dashboard-slider-wrap');
+      const bubble = wrap?.querySelector('.dashboard-slider-bubble');
+      if (!bubble) return;
+
+      bubble.classList.remove('hidden');
+      updateDashboardSliderBubble(input);
+    }
+
+    function handleDashboardSliderInput(input) {
+      updateDashboardSliderBubble(input);
+    }
+
+    function handleDashboardSliderEnd(input) {
+      const wrap = input.closest('.dashboard-slider-wrap');
+      const bubble = wrap?.querySelector('.dashboard-slider-bubble');
+      if (!bubble) return;
+
+      setTimeout(() => bubble.classList.add('hidden'), 300);
+    }
+
+    function updateDashboardSliderBubble(input) {
+      const wrap = input.closest('.dashboard-slider-wrap');
+      const bubble = wrap?.querySelector('.dashboard-slider-bubble');
+      if (!bubble) return;
+
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const value = Number(input.value);
+      const unit = input.dataset.unit || '';
+
+      const percent = ((value - min) / (max - min)) * 100;
+
+      bubble.textContent = `${value}${unit ? ' ' + unit : ''}`;
+      bubble.style.left = `${percent}%`;
     }
 
     saveConfigBtn.addEventListener('click', saveConfig);

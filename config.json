@@ -10,15 +10,6 @@
     "lorawan"
   ],
   "enabledEntityTypes": [
-    "light",
-    "climate",
-    "cover",
-    "lock",
-    "humidifier",
-    "lawn_mower",
-    "sensor",
-    "binary_sensor",
-    "switch",
-    "button"
+    "light"
   ]
 }

@@ -1272,6 +1272,7 @@ code {
   white-space: nowrap;
   pointer-events: none;
   transition: opacity 0.2s ease;
+  transform: translateX(-50%);
 }
 
 .climate-slider-bubble::after {
@@ -1411,6 +1412,7 @@ code {
   pointer-events: none;
   transition: opacity 0.2s ease;
   z-index: 10;
+  transform: translateX(-50%);
 }
 
 .humidifier-slider-bubble.hidden {
@@ -1607,4 +1609,105 @@ code {
 .button-inline-action {
   margin-left: auto;
   padding: 6px 12px;
+}
+
+.dashboard-slider-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.dashboard-slider-bubble {
+  position: absolute;
+  top: -32px;
+  transform: translateX(-50%);
+  background: #1e88e5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+  transform: translateX(-50%);
+}
+
+.dashboard-slider-bubble.hidden {
+  opacity: 0;
+}
+
+.dashboard-slider-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #1e88e5;
+}
+
+.number-slider-wrap {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.number-slider-wrap .dashboard-slider-wrap {
+  max-width: 220px;
+}
+
+.number-slider-wrap .dashboard-range {
+  width: 100%;
+}
+
+.number-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.number-control .dashboard-slider-wrap {
+  width: 180px;
+}
+
+.number-input {
+  width: 82px;
+  background: #0b1422;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  text-align: right;
+}
+
+.number-unit {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dashboard-slider-wrap {
+  position: relative;
+  width: 170px;
+  flex: 0 0 170px;
+}
+
+.dashboard-slider-wrap .dashboard-range {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .dashboard-slider-wrap {
+    width: 150px;
+    flex-basis: 150px;
+  }
+}
+
+.climate-target-panel .dashboard-slider-wrap {
+  margin: 8px auto 0;
+  width: 320px;
+  flex: 0 0 auto;
 }

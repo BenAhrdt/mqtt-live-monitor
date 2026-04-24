@@ -108,7 +108,7 @@ let mqttConfig = {
   topic: "#",
   clientId: "LiveMonitor",
   discoveryViaPrefixes: ["lorawan"],
-  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch"],
+  enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number"],
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -509,6 +509,34 @@ function createButtonEntity(topic, payload, deviceId) {
   };
 }
 
+function createNumberEntity(topic, payload, deviceId) {
+  const entityId = payload.unique_id || topic;
+
+  return {
+    id: entityId,
+    type: "number",
+    name: payload.name || "Number",
+    uniqueId: payload.unique_id || entityId,
+    discoveryTopic: topic,
+
+    stateTopic: payload.state_topic || "",
+    commandTopic: payload.command_topic || "",
+
+    entityCategory: payload.entity_category || "",
+    unit: payload.unit_of_measurement || "",
+    stateClass: payload.state_class || "",
+
+    min: typeof payload.min === "number" ? payload.min : null,
+    max: typeof payload.max === "number" ? payload.max : null,
+    step: typeof payload.step === "number" ? payload.step : 1,
+
+    value: null,
+    rawState: null,
+    lastUpdate: null,
+    deviceId,
+  };
+}
+
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
@@ -775,6 +803,26 @@ function registerEntityTopics(entity, deviceId) {
     }
   }
 
+  if (entity.type === "number") {
+    if (entity.stateTopic) {
+      topicStore[entity.stateTopic] = {
+        topicType: "number-state",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+
+    if (entity.commandTopic) {
+      topicStore[entity.commandTopic] = {
+        topicType: "number-command",
+        deviceId,
+        entityId: entity.id,
+        entityType: entity.type,
+      };
+    }
+  }
+
 }
 
 function applyPendingStateMessagesForEntity(entity) {
@@ -830,7 +878,8 @@ function handleDiscoveryMessage(topic, message) {
     entityType !== "sensor" &&
     entityType !== "binary_sensor" &&
     entityType !== "switch" &&
-    entityType !== "button"
+    entityType !== "button" &&
+    entityType !== "number"
   ) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
@@ -866,6 +915,8 @@ function handleDiscoveryMessage(topic, message) {
     entity = createSwitchEntity(topic, payload, deviceId);
   } else if (entityType === "button") {
     entity = createButtonEntity(topic, payload, deviceId);
+  } else if (entityType === "number") {
+    entity = createNumberEntity(topic, payload, deviceId);
   }
 
   if (!entity) {
@@ -1215,6 +1266,34 @@ function handleKnownTopicMessage(topic, message) {
     };
   }
 
+  if (entity.type === "number") {
+    if (mapping.topicType !== "number-state") {
+      return { handled: false, reason: "not-a-number-state-topic" };
+    }
+
+    const numericValue = Number(parsed);
+
+    entity.rawState = parsed;
+    entity.value = Number.isNaN(numericValue) ? parsed : numericValue;
+    entity.lastUpdate = new Date().toISOString();
+    device.updatedAt = new Date().toISOString();
+
+    emitStores();
+
+    io.emit("entity-update", {
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+      entity,
+    });
+
+    return {
+      handled: true,
+      type: "number-update",
+      deviceId: mapping.deviceId,
+      entityId: mapping.entityId,
+    };
+  }
+
   return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
 
@@ -1447,6 +1526,10 @@ function getDevicesForDashboard() {
       stateClass: entity.stateClass,
       suggestedDisplayPrecision: entity.suggestedDisplayPrecision,
 
+      min: entity.min,
+      max: entity.max,
+      step: entity.step,
+
     }));
 
     return {
@@ -1518,7 +1601,7 @@ app.post("/api/config", (req, res) => {
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
           ? mqttConfig.enabledEntityTypes
-          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "button"]),
+          : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number"]),
   };
 
   allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];

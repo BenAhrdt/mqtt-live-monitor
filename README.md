@@ -110,6 +110,9 @@ journalctl -u mqtt-live-monitor -f
 * (BenAhrdt) switch
 * (BenAhrdt) button
 * (BenAhrdt) alphabetische Sortierung der Geräte
+* (BenAhrdt) number
+* (BenAhrdt) slider korrigiert
+* (BenAhrdt) bessere Bedienung durch einzelne Entitätsupdates statt dashboard render
 
 
 ### V1.1.8 Reload nach update
