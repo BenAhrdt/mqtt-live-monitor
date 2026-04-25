@@ -81,7 +81,14 @@ app.post("/api/update/run", (req, res) => {
 });
 
 const DEFAULT_WEB_PORT = 3000;
-const CONFIG_PATH = path.join(__dirname, "config.json");
+const CONFIG_DEFAULT_PATH = path.join(__dirname, "config.json");
+const CONFIG_DEV_PATH = path.join(__dirname, "config-dev.json");
+
+const CONFIG_PATH = fs.existsSync(CONFIG_DEV_PATH)
+  ? CONFIG_DEV_PATH
+  : CONFIG_DEFAULT_PATH;
+
+console.log("Verwende Config:", path.basename(CONFIG_PATH));
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
