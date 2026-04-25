@@ -618,20 +618,14 @@
 
     async function saveEntityTypeFilterToBackend() {
       try {
-        const currentConfigRes = await fetch('/api/config');
-        const currentConfig = await currentConfigRes.json();
-
         const enabledEntityTypes = Array.from(
           entityFilterMenu.querySelectorAll('input[type="checkbox"]:checked')
         ).map((input) => input.value);
 
-        await fetch('/api/config', {
+        await fetch('/api/entity-types', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...currentConfig,
-            enabledEntityTypes
-          })
+          body: JSON.stringify({ enabledEntityTypes })
         });
       } catch (err) {
         console.error('Fehler beim Speichern des Entitätstyps:', err);
@@ -2317,8 +2311,10 @@
       mqttHostInput.value = config.host || '';
       mqttPortInput.value = config.port || 1883;
       mqttTopicInput.value = config.topic || '#';
-      mqttUsernameInput.value = config.username || '';
-      mqttPasswordInput.value = config.password || '';
+      mqttUsernameInput.value = '';
+      mqttPasswordInput.value = '';
+      mqttUsernameInput.placeholder = config.authConfigured ? 'gespeichert' : 'optional';
+      mqttPasswordInput.placeholder = config.authConfigured ? 'gespeichert' : 'optional';
       mqttClientIdInput.value = config.clientId || '';
       discoveryPrefixes = config.discoveryViaPrefixes || [];
       renderDiscoveryPrefixes();
@@ -2601,7 +2597,11 @@
      * **********************************************************
      * *********************************************************/
     async function saveDiscoveryPrefixes() {
-      await saveConfig();
+      await fetch('/api/discovery-prefixes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discoveryViaPrefixes: discoveryPrefixes })
+      });
     }
 
     function addPrefix() {

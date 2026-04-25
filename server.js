@@ -969,12 +969,6 @@ function handleDiscoveryMessage(topic, message) {
     return { handled: false, reason: "unsupported-entity-type" };
   }
 
-  const isEntityTypeAllowed = (mqttConfig.enabledEntityTypes || []).includes(entityType);
-
-  if (!isEntityTypeAllowed) {
-    return { handled: false, reason: "entity-type-filtered" };
-  }
-
   const deviceId = getDeviceIdFromDiscovery(payload, topic);
   const device = ensureDeviceExists(deviceId, payload);
 
@@ -1662,29 +1656,25 @@ function getDevicesForDashboard() {
   });
 }
 
-app.get("/api/config", (req, res) => {
-  res.json({
+function getPublicConfig() {
+  return {
     webPort: mqttConfig.webPort,
     host: mqttConfig.host,
     port: mqttConfig.port,
     topic: mqttConfig.topic,
-    username: mqttConfig.username,
-    password: mqttConfig.password,
     clientId: mqttConfig.clientId,
-    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes || [{"value":"lorawan","enabled":true}, {"value":"zigbee","enabled":false}],
-    enabledEntityTypes: mqttConfig.enabledEntityTypes || [
-      "light",
-      "climate",
-      "cover",
-      "lock",
-      "humidifier",
-      "lawn_mower",
-      "sensor"
-    ],
-  });
+    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
+    enabledEntityTypes: mqttConfig.enabledEntityTypes,
+    authConfigured: Boolean(mqttConfig.username || mqttConfig.password)
+  };
+}
+
+app.get("/api/config", (req, res) => {
+  res.json(getPublicConfig());
 });
 
 app.post("/api/config", (req, res) => {
+  const oldConfig = { ...mqttConfig };
   const {
   webPort,
   host,
@@ -1708,9 +1698,16 @@ app.post("/api/config", (req, res) => {
     host: String(host).trim(),
     port: Number(port),
     topic: String(topic).trim(),
-    username: String(username || "").trim(),
-    password: String(password || ""),
-    clientId: String(clientId || "").trim(),
+    username: username === undefined || username === ''
+      ? mqttConfig.username
+      : String(username).trim(),
+
+    password: password === undefined || password === ''
+      ? mqttConfig.password
+      : String(password),
+    clientId: clientId === undefined || clientId === ''
+      ? mqttConfig.clientId
+      : String(clientId).trim(),
     discoveryViaPrefixes: normalizeDiscoveryPrefixes(discoveryViaPrefixes),
     enabledEntityTypes: Array.isArray(enabledEntityTypes)
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
@@ -1723,12 +1720,72 @@ app.post("/api/config", (req, res) => {
   .filter(p => p.enabled)
   .map(p => p.value);
 
+  const brokerChanged =
+    oldConfig.host !== mqttConfig.host ||
+    oldConfig.port !== mqttConfig.port ||
+    oldConfig.topic !== mqttConfig.topic ||
+    oldConfig.username !== mqttConfig.username ||
+    oldConfig.password !== mqttConfig.password ||
+    oldConfig.clientId !== mqttConfig.clientId;
+
   saveConfigToFile();
+
+  if (brokerChanged) {
+    connectMqtt();
+  }
+
+  res.json({
+    success: true,
+    config: {
+      webPort: mqttConfig.webPort,
+      host: mqttConfig.host,
+      port: mqttConfig.port,
+      topic: mqttConfig.topic,
+      clientId: mqttConfig.clientId,
+      discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
+      enabledEntityTypes: mqttConfig.enabledEntityTypes,
+      authConfigured: Boolean(mqttConfig.username || mqttConfig.password)
+    }
+  });
+});
+
+app.post("/api/entity-types", (req, res) => {
+  const { enabledEntityTypes } = req.body;
+
+  if (!Array.isArray(enabledEntityTypes)) {
+    return res.status(400).json({
+      error: "enabledEntityTypes muss ein Array sein",
+    });
+  }
+
+  mqttConfig.enabledEntityTypes = enabledEntityTypes
+    .map(v => String(v).trim())
+    .filter(v => v !== "");
+
+  saveConfigToFile();
+
+  res.json({
+    success: true,
+    enabledEntityTypes: mqttConfig.enabledEntityTypes,
+  });
+});
+
+app.post("/api/discovery-prefixes", (req, res) => {
+  const { discoveryViaPrefixes } = req.body;
+
+  mqttConfig.discoveryViaPrefixes = normalizeDiscoveryPrefixes(discoveryViaPrefixes);
+
+  allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
+    .filter(p => p.enabled)
+    .map(p => p.value);
+
+  saveConfigToFile();
+
   connectMqtt();
 
   res.json({
     success: true,
-    config: mqttConfig,
+    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
   });
 });
 

@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "DEV_MODE=true nodemon server.js",
+    "dev": "DEV_MODE=true nodemon --ignore config.json --ignore config-dev.json server.js",
     "start": "node server.js"
   },
   "keywords": [],

@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.10 passwort verbergen
+* (BenAhrdt) verbesserte Passwortbehandlung
+
 ### V1.1.9 Verbesserungen in der UI / Konfiguration
 * (BenAhrdt) Einstellungssteite für Device Prefixe aktiviert
 
