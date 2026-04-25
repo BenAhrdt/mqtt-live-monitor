@@ -307,6 +307,19 @@
 
           <div id="discoveryPrefixList"></div>
         </div>
+
+        <div class="card panel">
+          <div class="panel-header">
+            <h2>Dashboards</h2>
+          </div>
+
+          <div class="prefix-add-row">
+            <input id="newDashboardNameInput" placeholder="z. B. Schlafzimmer">
+            <button id="addDashboardBtn" class="btn primary">Dashboard hinzufügen</button>
+          </div>
+
+          <div id="customDashboardList"></div>
+        </div>
       </section>
     </main>
   </div>
@@ -371,6 +384,8 @@
     const topics = new Map();
     let dashboardDevices = [];
     let currentView = 'dashboard';
+    let customDashboards = [];
+    let activeCustomDashboardId = null;
     let dashboardRenderScheduled = false;
     let activeEntityTypes = new Set();
 
@@ -449,6 +464,10 @@
       if (viewName === 'dashboard') {
         dashboardView.style.display = 'block';
         showDashboardBtn.classList.add('active');
+
+        const isUrlDashboard = window.location.pathname.startsWith('/dashboard/');
+        entityFilterDropdown.style.display = isUrlDashboard ? 'none' : 'block';
+
         loadDashboardDevices();
         return;
       }
@@ -462,6 +481,12 @@
       if (viewName === 'settings') {
         settingsView.style.display = 'block';
         showSettingsBtn.classList.add('active');
+
+        loadDashboardDevices().then(() => {
+          renderCustomDashboards();
+        });
+
+        return;
       }
     }
 
@@ -1358,16 +1383,321 @@
       return null;
     }
 
+    function getCustomDashboardIdFromUrl() {
+      const match = window.location.pathname.match(/^\/dashboard\/custom\/(.+)$/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function slugifyDashboardName(name) {
+      return String(name || '')
+        .trim()
+        .toLowerCase()
+        .replaceAll('ä', 'ae')
+        .replaceAll('ö', 'oe')
+        .replaceAll('ü', 'ue')
+        .replaceAll('ß', 'ss')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function renderCustomDashboards() {
+      const list = document.getElementById('customDashboardList');
+      if (!list) return;
+
+      const openDashboardIds = new Set(
+        Array.from(list.querySelectorAll('.dashboard-config-block[open]'))
+          .map(el => el.dataset.dashboardId)
+          .filter(Boolean)
+      );
+      const openDeviceKeys = new Set(
+        Array.from(list.querySelectorAll('.custom-dashboard-device-card[open]'))
+          .map(el => el.dataset.deviceKey)
+          .filter(Boolean)
+      );
+
+      list.innerHTML = '';
+
+      if (!customDashboards.length) {
+        list.innerHTML = '<div class="empty-state">Noch keine Dashboards angelegt</div>';
+        return;
+      }
+
+      customDashboards.forEach((dashboard, index) => {
+        const row = document.createElement('div');
+        row.className = 'prefix-row';
+
+        const isOpen = openDashboardIds.has(dashboard.id);
+
+        row.innerHTML = `
+          <details class="dashboard-config-block" data-dashboard-id="${escapeHtml(dashboard.id)}" ${isOpen ? 'open' : ''}>
+            <summary class="dashboard-config-header">
+              <div>
+                <strong>${escapeHtml(dashboard.name)}</strong><br>
+                <small class="muted">/dashboard/custom/${escapeHtml(dashboard.id)}</small>
+              </div>
+
+              <div class="prefix-actions">
+                <button class="btn secondary" onclick="event.preventDefault(); openCustomDashboard('${escapeHtml(dashboard.id)}')">
+                  Öffnen
+                </button>
+
+                <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
+                  Entfernen
+                </button>
+              </div>
+            </summary>
+
+            <div class="dashboard-device-selector" id="devices-${escapeHtml(dashboard.id)}">
+              ${renderDashboardDeviceSelector(dashboard, openDeviceKeys)}
+            </div>
+          </details>
+        `;
+
+        list.appendChild(row);
+      });
+    }
+
+    async function saveCustomDashboards() {
+      await fetch('/api/custom-dashboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customDashboards })
+      });
+    }
+
+    function addCustomDashboard() {
+      const input = document.getElementById('newDashboardNameInput');
+      const name = input.value.trim();
+
+      if (!name) return;
+
+      const id = slugifyDashboardName(name);
+
+      if (!id) return;
+
+      if (customDashboards.some(d => d.id === id)) {
+        alert('Dashboard existiert bereits');
+        return;
+      }
+
+      customDashboards.push({
+        id,
+        name,
+        devices: []
+      });
+
+      input.value = '';
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
+    function removeCustomDashboard(index) {
+      customDashboards.splice(index, 1);
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
+    function openCustomDashboard(id) {
+      window.location.href = `/dashboard/custom/${encodeURIComponent(id)}`;
+    }
+
+    function renderCustomDashboardDeviceCard(dashboard, device, openDeviceKeys = new Set()) {
+      const deviceKey = `${dashboard.id}::${device.id}`;
+      const isOpen = openDeviceKeys.has(deviceKey);
+      const safeDashboardId = escapeHtml(dashboard.id);
+      const safeDeviceId = escapeHtml(device.id);
+
+      return `
+        <details class="custom-dashboard-device-card" data-device-key="${escapeHtml(deviceKey)}" ${isOpen ? 'open' : ''}>
+          <summary>
+            <span>
+              <strong>${escapeHtml(device.name || device.id)}</strong>
+              <small class="muted">${escapeHtml(device.id)}</small>
+            </span>
+
+            <button
+              type="button"
+              class="btn danger small-btn"
+              onclick="event.preventDefault(); removeDeviceFromCustomDashboard('${safeDashboardId}', '${safeDeviceId}')"
+            >
+              Entfernen
+            </button>
+          </summary>
+
+          <div class="custom-dashboard-entities">
+            ${renderEntitySelector(dashboard, device)}
+          </div>
+        </details>
+      `;
+    }
+
+    function renderDashboardDeviceSelector(dashboard, openDeviceKeys = new Set()) {
+      if (!dashboardDevices || !dashboardDevices.length) {
+        return '<div class="muted">Keine Geräte verfügbar</div>';
+      }
+
+      const selectedDeviceIds = new Set((dashboard.devices || []).map(d => d.deviceId));
+
+      const availableDevices = dashboardDevices.filter(device =>
+        !selectedDeviceIds.has(device.id)
+      );
+
+      return `
+        <div class="custom-dashboard-add-device">
+          <select id="deviceSelect-${dashboard.id}">
+            <option value="">Gerät auswählen...</option>
+            ${availableDevices.map(device => `
+              <option value="${escapeHtml(device.id)}">
+                ${escapeHtml(device.name || device.id)}
+              </option>
+            `).join('')}
+          </select>
+
+          <button class="btn primary" onclick="addDeviceToCustomDashboard('${dashboard.id}')">
+            Gerät hinzufügen
+          </button>
+        </div>
+
+        <div class="custom-dashboard-device-list">
+          ${(dashboard.devices || []).map(deviceConfig => {
+            const device = dashboardDevices.find(d => d.id === deviceConfig.deviceId);
+
+            if (!device) {
+              return `
+                <div class="custom-dashboard-device-card">
+                  <div class="muted">Gerät nicht gefunden: ${escapeHtml(deviceConfig.deviceId)}</div>
+                </div>
+              `;
+            }
+
+            return renderCustomDashboardDeviceCard(dashboard, device, openDeviceKeys);
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderEntitySelector(dashboard, device) {
+      const dashboardDevice = dashboard.devices.find(d => d.deviceId === device.id);
+      const selectedEntities = dashboardDevice?.entityIds || [];
+
+      if (!device.entities || !device.entities.length) {
+        return '<div class="muted">Keine Entitäten vorhanden</div>';
+      }
+
+      return (device.entities || []).map(entity => {
+        const checked = selectedEntities.includes(entity.id);
+
+        return `
+          <label class="custom-entity-checkbox">
+            <input type="checkbox"
+              ${checked ? 'checked' : ''}
+              onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
+            >
+            <span>${escapeHtml(entity.name || entity.id)}</span>
+            <small>${escapeHtml(entity.type)}</small>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function addDeviceToCustomDashboard(dashboardId) {
+      const dashboard = customDashboards.find(d => d.id === dashboardId);
+      if (!dashboard) return;
+
+      const select = document.getElementById(`deviceSelect-${dashboardId}`);
+      const deviceId = select?.value;
+
+      if (!deviceId) return;
+
+      if (!Array.isArray(dashboard.devices)) {
+        dashboard.devices = [];
+      }
+
+      if (dashboard.devices.some(d => d.deviceId === deviceId)) {
+        return;
+      }
+
+      const device = dashboardDevices.find(d => d.id === deviceId);
+
+      dashboard.devices.push({
+        deviceId,
+        entityIds: device?.entities?.map(entity => entity.id) || []
+      });
+
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
+    function removeDeviceFromCustomDashboard(dashboardId, deviceId) {
+      const dashboard = customDashboards.find(d => d.id === dashboardId);
+      if (!dashboard) return;
+
+      dashboard.devices = (dashboard.devices || []).filter(d => d.deviceId !== deviceId);
+
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
+    function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
+      const dashboard = customDashboards.find(d => d.id === dashboardId);
+      if (!dashboard) return;
+
+      const device = dashboard.devices.find(d => d.deviceId === deviceId);
+      if (!device) return;
+
+      if (enabled) {
+        if (!device.entityIds.includes(entityId)) {
+          device.entityIds.push(entityId);
+        }
+      } else {
+        device.entityIds = device.entityIds.filter(id => id !== entityId);
+      }
+
+      saveCustomDashboards();
+    }
+
     function renderDashboard() {
       const dashboardGrid = document.getElementById('dashboardGrid');
       if (!dashboardGrid) return;
+      const dashboardTitleEl = dashboardView.querySelector('h1');
+      dashboardTitleEl.textContent = 'Dashboard';
 
       if (!dashboardDevices.length) {
         dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
         return;
       }
+      let devicesToRender = dashboardDevices;
 
-      const sortedDevices = [...dashboardDevices].sort((a, b) => {
+      if (activeCustomDashboardId) {
+        const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+
+        if (!customDashboard) {
+          dashboardGrid.innerHTML = '<div class="empty-cell">Custom Dashboard nicht gefunden</div>';
+          return;
+        }
+
+        dashboardTitleEl.textContent = `Dashboard: ${customDashboard.name}`;
+
+        devicesToRender = dashboardDevices
+
+        devicesToRender = dashboardDevices
+          .map(device => {
+            const dashboardDevice = customDashboard.devices.find(d => d.deviceId === device.id);
+
+            if (!dashboardDevice) {
+              return null;
+            }
+
+            return {
+              ...device,
+              entities: (device.entities || []).filter(entity =>
+                dashboardDevice.entityIds.includes(entity.id)
+              )
+            };
+          })
+          .filter(Boolean);
+      }
+      const sortedDevices = [...devicesToRender].sort((a, b) => {
         const nameA = String(a.name || a.id || '').toLowerCase();
         const nameB = String(b.name || b.id || '').toLowerCase();
 
@@ -1375,9 +1705,11 @@
       });
 
       dashboardGrid.innerHTML = sortedDevices.map((device) => {
-        const visibleEntities = (device.entities || []).filter((entity) =>
-          isEntityTypeVisible(entity.type)
-        );
+        const visibleEntities = activeCustomDashboardId
+          ? (device.entities || [])
+          : (device.entities || []).filter((entity) =>
+              isEntityTypeVisible(entity.type)
+            );
 
         if (!visibleEntities.length) {
           return '';
@@ -2317,6 +2649,9 @@
       mqttPasswordInput.placeholder = config.authConfigured ? 'gespeichert' : 'optional';
       mqttClientIdInput.value = config.clientId || '';
       discoveryPrefixes = config.discoveryViaPrefixes || [];
+      customDashboards = config.customDashboards || [];
+      renderCustomDashboards();
+      activeCustomDashboardId = getCustomDashboardIdFromUrl();
       renderDiscoveryPrefixes();
       applyEntityTypeSelectionToUi(
         config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sensor', 'switch', 'button', 'number', 'text']
@@ -2461,6 +2796,14 @@
       e.stopPropagation();
       entityFilterDropdown.classList.toggle('open');
     });
+
+    document.getElementById('addDashboardBtn')
+      .addEventListener('click', addCustomDashboard);
+
+    document.getElementById('newDashboardNameInput')
+      .addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') addCustomDashboard();
+      });
 
     entityFilterMenu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
       input.addEventListener('change', async () => {

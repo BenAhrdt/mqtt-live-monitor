@@ -43,10 +43,14 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-  // Dashboard mit abhägigkeit der anzuzeigenden entitäten
-  app.get('/dashboard/:types', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  });
+// Routen zu Dashboards
+app.get('/dashboard/custom/:dashboardId', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/dashboard/:types', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 app.get('/api/update/check', async (req, res) => {
   const currentVersion = require('./package.json').version;
@@ -121,6 +125,7 @@ let mqttConfig = {
   clientId: "LiveMonitor",
   discoveryViaPrefixes: ["lorawan"],
   enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
+  customDashboards: [],
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -1665,7 +1670,8 @@ function getPublicConfig() {
     clientId: mqttConfig.clientId,
     discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
     enabledEntityTypes: mqttConfig.enabledEntityTypes,
-    authConfigured: Boolean(mqttConfig.username || mqttConfig.password)
+    authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
+    customDashboards: mqttConfig.customDashboards || []
   };
 }
 
@@ -1786,6 +1792,36 @@ app.post("/api/discovery-prefixes", (req, res) => {
   res.json({
     success: true,
     discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
+  });
+});
+
+app.post("/api/custom-dashboards", (req, res) => {
+  const { customDashboards } = req.body;
+
+  if (!Array.isArray(customDashboards)) {
+    return res.status(400).json({
+      error: "customDashboards muss ein Array sein",
+    });
+  }
+
+  mqttConfig.customDashboards = customDashboards.map(dashboard => ({
+    id: String(dashboard.id || "").trim(),
+    name: String(dashboard.name || "").trim(),
+    devices: Array.isArray(dashboard.devices)
+      ? dashboard.devices.map(device => ({
+          deviceId: String(device.deviceId || "").trim(),
+          entityIds: Array.isArray(device.entityIds)
+            ? device.entityIds.map(id => String(id).trim()).filter(Boolean)
+            : []
+        })).filter(device => device.deviceId)
+      : []
+  })).filter(dashboard => dashboard.id && dashboard.name);
+
+  saveConfigToFile();
+
+  res.json({
+    success: true,
+    customDashboards: mqttConfig.customDashboards,
   });
 });
 
