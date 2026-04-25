@@ -156,7 +156,7 @@ function loadConfigFromFile() {
 
     allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];
   } catch (error) {
-    console.error("Fehler beim Laden von config.json:", error.message);
+    console.error(`Fehler beim Laden von ${path.basename(CONFIG_PATH)}:`, error.message);
   }
 }
 
@@ -164,7 +164,7 @@ function saveConfigToFile() {
   try {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(mqttConfig, null, 2), "utf8");
   } catch (error) {
-    console.error("Fehler beim Speichern von config.json:", error.message);
+    console.error(`Fehler beim Speichern von ${path.basename(CONFIG_PATH)}:`, error.message);
   }
 }
 
