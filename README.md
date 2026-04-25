@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.1.9 Verbesserungen in der UI / Konfiguration
+* (BenAhrdt) Einstellungssteite für Device Prefixe aktiviert
+
 ### V1.1.8 Reload nach update / Zusätzliche Entitätstypen hinzugefügt
 * (BenAhrdt) nach dem update erfolgt ein reload der Seite
 * (BenAhrdt) binary_sensor

@@ -149,12 +149,12 @@ function loadConfigFromFile() {
     mqttConfig = {
       ...mqttConfig,
       ...parsed,
-      discoveryViaPrefixes: Array.isArray(parsed.discoveryViaPrefixes) && parsed.discoveryViaPrefixes.length
-        ? parsed.discoveryViaPrefixes.map(v => String(v).trim()).filter(v => v !== "")
-        : ["lorawan"],
+      discoveryViaPrefixes: normalizeDiscoveryPrefixes(parsed.discoveryViaPrefixes),
     };
 
-    allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];
+    allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
+      .filter(p => p.enabled)
+      .map(p => p.value);
   } catch (error) {
     console.error(`Fehler beim Laden von ${path.basename(CONFIG_PATH)}:`, error.message);
   }
@@ -162,10 +162,42 @@ function loadConfigFromFile() {
 
 function saveConfigToFile() {
   try {
+    mqttConfig.discoveryViaPrefixes = normalizeDiscoveryPrefixes(
+      mqttConfig.discoveryViaPrefixes
+    );
+
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(mqttConfig, null, 2), "utf8");
   } catch (error) {
     console.error(`Fehler beim Speichern von ${path.basename(CONFIG_PATH)}:`, error.message);
   }
+}
+
+function normalizeDiscoveryPrefixes(prefixes) {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) {
+    return [{ value: "lorawan", enabled: true }];
+  }
+
+  return prefixes
+    .map(p => {
+      // alter String
+      if (typeof p === "string") {
+        return {
+          value: p.trim(),
+          enabled: true
+        };
+      }
+
+      // neues Objekt
+      if (typeof p === "object" && p !== null) {
+        return {
+          value: String(p.value || "").trim(),
+          enabled: p.enabled !== false
+        };
+      }
+
+      return null;
+    })
+    .filter(p => p && p.value !== "");
 }
 
 function emitStatus(status) {
@@ -912,7 +944,7 @@ function handleDiscoveryMessage(topic, message) {
   const viaDevice = String(payload?.device?.via_device || "").toLowerCase();
 
   const isAllowed = allowedDiscoveryViaDevicePrefixes.some(prefix =>
-    viaDevice.startsWith(prefix.toLowerCase())
+    viaDevice.startsWith(String(prefix).toLowerCase())
   );
 
   if (!isAllowed) {
@@ -1639,7 +1671,7 @@ app.get("/api/config", (req, res) => {
     username: mqttConfig.username,
     password: mqttConfig.password,
     clientId: mqttConfig.clientId,
-    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes || ["lorawan"],
+    discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes || [{"value":"lorawan","enabled":true}, {"value":"zigbee","enabled":false}],
     enabledEntityTypes: mqttConfig.enabledEntityTypes || [
       "light",
       "climate",
@@ -1679,9 +1711,7 @@ app.post("/api/config", (req, res) => {
     username: String(username || "").trim(),
     password: String(password || ""),
     clientId: String(clientId || "").trim(),
-    discoveryViaPrefixes: Array.isArray(discoveryViaPrefixes) && discoveryViaPrefixes.length
-      ? discoveryViaPrefixes.map(v => String(v).trim()).filter(v => v !== "")
-      : ["lorawan"],
+    discoveryViaPrefixes: normalizeDiscoveryPrefixes(discoveryViaPrefixes),
     enabledEntityTypes: Array.isArray(enabledEntityTypes)
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
@@ -1689,7 +1719,9 @@ app.post("/api/config", (req, res) => {
           : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"]),
   };
 
-  allowedDiscoveryViaDevicePrefixes = [...mqttConfig.discoveryViaPrefixes];
+  allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
+  .filter(p => p.enabled)
+  .map(p => p.value);
 
   saveConfigToFile();
   connectMqtt();

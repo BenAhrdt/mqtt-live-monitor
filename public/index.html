@@ -32,9 +32,7 @@
       <nav class="nav">
         <button class="nav-btn active" id="showDashboardBtn"><span>Dashboard</span></button>
         <button class="nav-btn" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
-        <button class="nav-item"><span>Topics</span></button>
-        <button class="nav-item"><span>Statistiken</span></button>
-        <button class="nav-item"><span>Einstellungen</span></button>
+        <button class="nav-btn" id="showSettingsBtn"><span>Einstellungen</span></button>
       </nav>
 
       <div class="sidebar-section">
@@ -58,19 +56,11 @@
         <label class="form-label">Client ID</label>
         <input id="mqttClientId" type="text" placeholder="LiveMonitor">
 
-        <label class="form-label">Discovery Prefixe</label>
-        <input id="discoveryViaPrefixes" type="text" placeholder="z. B. lorawan, mybridge">
-
         <div class="button-group-vertical">
           <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
           <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
         </div>
         <div id="configMessage" class="config-message"></div>
-      </div>
-
-      <div class="sidebar-section">
-        <h3>Filter</h3>
-        <input id="topicFilter" type="text" placeholder="Topic filtern, z. B. chirpstack">
       </div>
 
       <div class="sidebar-section connection-box">
@@ -148,10 +138,13 @@
           <div class="card panel large-panel">
             <div class="panel-header">
               <h2>Live Nachrichten</h2>
-              <label class="checkbox">
-                <input type="checkbox" id="autoScroll" checked>
-                Auto-Scroll
-              </label>
+                <div class="live-filter">
+                  <input
+                    type="text"
+                    placeholder="Topic filtern... z.B. lorawan"
+                    id="liveFilterInput"
+                  >
+              </div>
             </div>
 
             <div class="table-wrap">
@@ -214,7 +207,6 @@
           </div>
         </section>
       </section>
-
       <section id="dashboardView">
         <header class="topbar dashboard-topbar">
           <div class="dashboard-title-wrap">
@@ -295,6 +287,27 @@
         </header>
         <div id="dashboardGrid"></div>
       </section>
+      <section id="settingsView" style="display:none;">
+        <div class="topbar">
+          <div>
+            <h1>Einstellungen</h1>
+            <p class="subtitle">Konfiguration des Systems</p>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <div class="panel-header">
+            <h2>Discovery Prefixe</h2>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <input id="newDiscoveryPrefixInput" placeholder="z. B. lorawan">
+            <button id="addDiscoveryPrefixBtn" class="btn primary">Hinzufügen</button>
+          </div>
+
+          <div id="discoveryPrefixList"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -305,8 +318,8 @@
     socket.on("connect", () => {
       // console.log("Browser Socket verbunden:", socket.id);
     });
-
-    const topicFilterInput = document.getElementById('topicFilter');
+    let discoveryPrefixes = [];
+    const topicFilterInput = document.getElementById('liveFilterInput');
     const messageTable = document.getElementById('messageTable');
     const detailsTopicEl = document.getElementById('detailsTopic');
     const decodedDataBoxEl = document.getElementById('decodedDataBox');
@@ -314,7 +327,6 @@
     const clearBtn = document.getElementById('clearBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const copyBtn = document.getElementById('copyBtn');
-    const autoScrollCheckbox = document.getElementById('autoScroll');
 
     const mqttHostInput = document.getElementById('mqttHost');
     const mqttPortInput = document.getElementById('mqttPort');
@@ -322,7 +334,6 @@
     const mqttUsernameInput = document.getElementById('mqttUsername');
     const mqttPasswordInput = document.getElementById('mqttPassword');
     const mqttClientIdInput = document.getElementById('mqttClientId');
-    const discoveryViaPrefixesInput = document.getElementById('discoveryViaPrefixes');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const configMessageEl = document.getElementById('configMessage');
     const disconnectBtn = document.getElementById('disconnectBtn');
@@ -344,6 +355,8 @@
     const showDashboardBtn = document.getElementById('showDashboardBtn');
     const liveMonitorView = document.getElementById('liveMonitorView');
     const dashboardView = document.getElementById('dashboardView');
+    const showSettingsBtn = document.getElementById('showSettingsBtn');
+    const settingsView = document.getElementById('settingsView');
     const appLayout = document.getElementById('appLayout');
     const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
     const entityFilterDropdown = document.getElementById('entityFilterDropdown');
@@ -425,19 +438,31 @@
     function showView(viewName) {
       currentView = viewName;
 
+      liveMonitorView.style.display = 'none';
+      dashboardView.style.display = 'none';
+      settingsView.style.display = 'none';
+
+      showDashboardBtn.classList.remove('active');
+      showLiveMonitorBtn.classList.remove('active');
+      showSettingsBtn.classList.remove('active');
+
       if (viewName === 'dashboard') {
-        liveMonitorView.style.display = 'none';
         dashboardView.style.display = 'block';
-        showLiveMonitorBtn.classList.remove('active');
         showDashboardBtn.classList.add('active');
         loadDashboardDevices();
         return;
       }
 
-      liveMonitorView.style.display = 'block';
-      dashboardView.style.display = 'none';
-      showDashboardBtn.classList.remove('active');
-      showLiveMonitorBtn.classList.add('active');
+      if (viewName === 'live') {
+        liveMonitorView.style.display = 'block';
+        showLiveMonitorBtn.classList.add('active');
+        return;
+      }
+
+      if (viewName === 'settings') {
+        settingsView.style.display = 'block';
+        showSettingsBtn.classList.add('active');
+      }
     }
 
     function escapeHtml(text) {
@@ -707,6 +732,34 @@
       `;
     }
 
+    function renderDiscoveryPrefixes() {
+      const list = document.getElementById('discoveryPrefixList');
+      if (!list) return;
+
+      list.innerHTML = '';
+
+      discoveryPrefixes.forEach((p, index) => {
+        const row = document.createElement('div');
+        row.className = 'prefix-row';
+
+        row.innerHTML = `
+          <span>${p.value}</span>
+
+          <div class="prefix-actions">
+            <button class="btn secondary" onclick="togglePrefix(${index})">
+              ${p.enabled ? 'Aktiv' : 'Inaktiv'}
+            </button>
+
+            <button class="btn danger" onclick="removePrefix(${index})">
+              Entfernen
+            </button>
+          </div>
+        `;
+
+        list.appendChild(row);
+      });
+    }
+
     function getDeviceIcons(device) {
       const entities = device.entities || [];
 
@@ -733,22 +786,6 @@
       if (entities.some(e => e.type === 'humidifier')) return '💧';
       if (entities.some(e => e.type === 'lawn_mower')) return '🤖';
 
-      const sensor = entities.find(e => e.type === 'sensor');
-      if (sensor) {
-        switch (sensor.deviceClass) {
-          case 'temperature': return '🌡️';
-          case 'humidity': return '💧';
-          case 'precipitation': return '🌧️';
-          case 'voltage':
-          case 'battery': return '🔋';
-          case 'power':
-          case 'energy': return '⚡';
-          case 'illuminance': return '☀️';
-          case 'weight': return '⚖️';
-          default: return '📊';
-        }
-      }
-
       const binary = entities.find(e => e.type === 'binary_sensor');
 
       if (binary) {
@@ -767,6 +804,22 @@
           case 'moisture': return '💧';
 
           default: return '📟';
+        }
+      }
+
+      const sensor = entities.find(e => e.type === 'sensor');
+      if (sensor) {
+        switch (sensor.deviceClass) {
+          case 'temperature': return '🌡️';
+          case 'humidity': return '💧';
+          case 'precipitation': return '🌧️';
+          case 'voltage':
+          case 'battery': return '🔋';
+          case 'power':
+          case 'energy': return '⚡';
+          case 'illuminance': return '☀️';
+          case 'weight': return '⚖️';
+          default: return '📊';
         }
       }
 
@@ -1513,6 +1566,8 @@
         }).join('');
 
         const viaClass = getViaDeviceClass(device.viaDevice);
+        const via = String(device.viaDevice || '').toLowerCase();
+        const isZigbee = via.includes('zigbee');
 
         return `
           <div class="dashboard-device-card ${viaClass}" id="device-${device.id}">
@@ -1527,6 +1582,12 @@
                   Entitäten: ${escapeHtml(device.entityCount || 0)}
                 </div>
               </div>
+
+              ${isZigbee ? `
+                <div class="zigbee-badge">
+                  <img src="/icons/Zigbee2MqttLogo.png" alt="Zigbee2MQTT">
+                </div>
+              ` : ''}
             </div>
 
             <div class="dashboard-device-body">
@@ -2202,9 +2263,7 @@
         messageTable.removeChild(messageTable.lastChild);
       }
 
-      if (autoScrollCheckbox.checked) {
-        tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+      // tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     async function loadVersion() {
@@ -2261,7 +2320,8 @@
       mqttUsernameInput.value = config.username || '';
       mqttPasswordInput.value = config.password || '';
       mqttClientIdInput.value = config.clientId || '';
-      discoveryViaPrefixesInput.value = (config.discoveryViaPrefixes || ['lorawan']).join(', ');
+      discoveryPrefixes = config.discoveryViaPrefixes || [];
+      renderDiscoveryPrefixes();
       applyEntityTypeSelectionToUi(
         config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sensor', 'switch', 'button', 'number', 'text']
       );
@@ -2284,10 +2344,7 @@
         username: mqttUsernameInput.value.trim(),
         password: mqttPasswordInput.value,
         clientId: mqttClientIdInput.value.trim(),
-        discoveryViaPrefixes: discoveryViaPrefixesInput.value
-          .split(',')
-          .map(v => v.trim())
-          .filter(v => v !== ''),
+        discoveryViaPrefixes: discoveryPrefixes,
         enabledEntityTypes: Array.from(
           entityFilterMenu.querySelectorAll('input[type="checkbox"]:checked')
         ).map((input) => input.value)
@@ -2394,6 +2451,10 @@
 
     showDashboardBtn.addEventListener('click', () => {
       showView('dashboard');
+    });
+
+    showSettingsBtn.addEventListener('click', () => {
+      showView('settings');
     });
 
     sidebarToggleBtn.addEventListener('click', () => {
@@ -2534,6 +2595,56 @@
       document.querySelectorAll('.effect-dropdown.open')
         .forEach(d => d.classList.remove('open'));
     });
+
+    // Einstellungen
+    /************************************************************
+     * **********************************************************
+     * *********************************************************/
+    async function saveDiscoveryPrefixes() {
+      await saveConfig();
+    }
+
+    function addPrefix() {
+      const input = document.getElementById('newDiscoveryPrefixInput');
+      const value = input.value.trim();
+
+      if (!value) return;
+
+      if (discoveryPrefixes.some(p => p.value.toLowerCase() === value.toLowerCase())) {
+        alert('Prefix existiert bereits');
+        return;
+      }
+
+      discoveryPrefixes.push({ value, enabled: true });
+      input.value = '';
+
+      renderDiscoveryPrefixes();
+      saveDiscoveryPrefixes();
+    }
+
+    function togglePrefix(index) {
+      discoveryPrefixes[index].enabled = !discoveryPrefixes[index].enabled;
+      renderDiscoveryPrefixes();
+      saveDiscoveryPrefixes();
+    }
+
+    function removePrefix(index) {
+      discoveryPrefixes.splice(index, 1);
+      renderDiscoveryPrefixes();
+      saveDiscoveryPrefixes();
+    }
+
+    document.getElementById('addDiscoveryPrefixBtn')
+      .addEventListener('click', addPrefix);
+
+    document.getElementById('newDiscoveryPrefixInput')
+      .addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') addPrefix();
+      });
+
+    /************************************************************
+     * **********************************************************
+     * *********************************************************/
 
     loadConfig();
     loadVersion();
