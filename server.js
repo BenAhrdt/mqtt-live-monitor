@@ -609,21 +609,21 @@ function createTextEntity(topic, payload, deviceId) {
 function registerEntityTopics(entity, deviceId) {
   if (entity.type === "light") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     return;
@@ -631,284 +631,284 @@ function registerEntityTopics(entity, deviceId) {
 
   if (entity.type === "climate") {
     if (entity.modeStateTopic) {
-      topicStore[entity.modeStateTopic] = {
+      addTopicMapping(entity.modeStateTopic, {
         topicType: "climate-mode-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.modeCommandTopic) {
-      topicStore[entity.modeCommandTopic] = {
+      addTopicMapping(entity.modeCommandTopic, {
         topicType: "climate-mode-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.temperatureStateTopic) {
-      topicStore[entity.temperatureStateTopic] = {
+      addTopicMapping(entity.temperatureStateTopic, {
         topicType: "climate-target-temperature-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.temperatureCommandTopic) {
-      topicStore[entity.temperatureCommandTopic] = {
+      addTopicMapping(entity.temperatureCommandTopic, {
         topicType: "climate-target-temperature-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.currentTemperatureTopic) {
-      topicStore[entity.currentTemperatureTopic] = {
+      addTopicMapping(entity.currentTemperatureTopic, {
         topicType: "climate-current-temperature-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "cover") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "cover-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.positionTopic) {
-      topicStore[entity.positionTopic] = {
+      addTopicMapping(entity.positionTopic, {
         topicType: "cover-position",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "cover-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "lock") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "lock-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "lock-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "humidifier") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "humidifier-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.targetHumidityStateTopic) {
-      topicStore[entity.targetHumidityStateTopic] = {
+      addTopicMapping(entity.targetHumidityStateTopic, {
         topicType: "humidifier-target-humidity-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.currentHumidityTopic) {
-      topicStore[entity.currentHumidityTopic] = {
+      addTopicMapping(entity.currentHumidityTopic, {
         topicType: "humidifier-current-humidity",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "humidifier-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.targetHumidityCommandTopic) {
-      topicStore[entity.targetHumidityCommandTopic] = {
+      addTopicMapping(entity.targetHumidityCommandTopic, {
         topicType: "humidifier-target-humidity-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "lawn_mower") {
     if (entity.activityStateTopic) {
-      topicStore[entity.activityStateTopic] = {
+      addTopicMapping(entity.activityStateTopic, {
         topicType: "lawn-mower-activity-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.startMowingCommandTopic) {
-      topicStore[entity.startMowingCommandTopic] = {
+      addTopicMapping(entity.startMowingCommandTopic, {
         topicType: "lawn-mower-start-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.pauseCommandTopic) {
-      topicStore[entity.pauseCommandTopic] = {
+      addTopicMapping(entity.pauseCommandTopic, {
         topicType: "lawn-mower-pause-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.dockCommandTopic) {
-      topicStore[entity.dockCommandTopic] = {
+      addTopicMapping(entity.dockCommandTopic, {
         topicType: "lawn-mower-dock-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "sensor") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "sensor-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "binary_sensor") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "binary-sensor-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "switch") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "switch-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "switch-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "button") {
   if (entity.commandTopic) {
-    topicStore[entity.commandTopic] = {
+    addTopicMapping(entity.commandTopic, {
       topicType: "button-command",
       deviceId,
       entityId: entity.id,
       entityType: entity.type,
-    };
+    });
   }
 
   if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "button-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "number") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "number-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "number-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
   if (entity.type === "text") {
     if (entity.stateTopic) {
-      topicStore[entity.stateTopic] = {
+      addTopicMapping(entity.stateTopic, {
         topicType: "text-state",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
 
     if (entity.commandTopic) {
-      topicStore[entity.commandTopic] = {
+      addTopicMapping(entity.commandTopic, {
         topicType: "text-command",
         deviceId,
         entityId: entity.id,
         entityType: entity.type,
-      };
+      });
     }
   }
 
@@ -922,6 +922,7 @@ function applyPendingStateMessagesForEntity(entity) {
     entity.temperatureStateTopic,
     entity.currentTemperatureTopic,
     entity.targetHumidityStateTopic,
+    entity.targetHumidityCommandTopic,
     entity.currentHumidityTopic,
     entity.activityStateTopic,
   ].filter(Boolean);
@@ -1032,15 +1033,42 @@ function parseMaybeJson(payloadText) {
   }
 }
 
-function handleKnownTopicMessage(topic, message) {
-  const mapping = topicStore[topic];
+function addTopicMapping(topic, mapping) {
+  if (!topic) return;
 
-  if (!mapping) {
+  if (!topicStore[topic]) {
+    topicStore[topic] = [];
+  }
+
+  topicStore[topic].push(mapping);
+}
+
+function handleKnownTopicMessage(topic, message) {
+  const mappings = topicStore[topic];
+
+  if (!Array.isArray(mappings) || mappings.length === 0) {
     pendingStateMessages[topic] = message;
     return { handled: false, reason: "topic-not-registered-pending" };
   }
 
+  let handledAny = false;
+  let lastResult = { handled: false, reason: "no-mapping-handled" };
+
+  for (const mapping of mappings) {
+    const result = handleKnownTopicMapping(topic, message, mapping);
+
+    if (result.handled) {
+      handledAny = true;
+      lastResult = result;
+    }
+  }
+
+  return handledAny ? lastResult : { handled: false, reason: "no-mapping-handled" };
+}
+
+function handleKnownTopicMapping(topic, message, mapping) {
   const device = deviceStore[mapping.deviceId];
+
   if (!device) {
     return { handled: false, reason: "device-not-found" };
   }

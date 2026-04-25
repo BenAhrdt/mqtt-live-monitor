@@ -30,7 +30,13 @@
       </div>
 
       <nav class="nav">
-        <button class="nav-btn active" id="showDashboardBtn"><span>Dashboard</span></button>
+        <button class="nav-btn active" id="showDashboardBtn"><span>Home</span></button>
+        <div id="customDashboardsNav" class="nav-dashboard-group hidden">
+          <button class="nav-btn" id="toggleCustomDashboardsBtn" type="button">
+            <span>Dashboards ▾</span>
+          </button>
+          <div id="customDashboardsNavList" class="nav-dashboard-list"></div>
+        </div>
         <button class="nav-btn" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
         <button class="nav-btn" id="showSettingsBtn"><span>Einstellungen</span></button>
       </nav>
@@ -377,6 +383,9 @@
     const entityFilterMenu = document.getElementById('entityFilterMenu');
     const selectAllEntitiesBtn = document.getElementById('selectAllEntitiesBtn');
     const deselectAllEntitiesBtn = document.getElementById('deselectAllEntitiesBtn');
+    const customDashboardsNav = document.getElementById('customDashboardsNav');
+    const customDashboardsNavList = document.getElementById('customDashboardsNavList');
+    const toggleCustomDashboardsBtn = document.getElementById('toggleCustomDashboardsBtn');
 
     let paused = false;
     let totalMessages = 0;
@@ -388,6 +397,16 @@
     let activeCustomDashboardId = null;
     let dashboardRenderScheduled = false;
     let activeEntityTypes = new Set();
+
+    let customDashboardsMenuOpen = false;
+
+    if (toggleCustomDashboardsBtn) {
+      toggleCustomDashboardsBtn.addEventListener('click', () => {
+        customDashboardsMenuOpen = !customDashboardsMenuOpen;
+
+        customDashboardsNavList.style.display = customDashboardsMenuOpen ? 'block' : 'none';
+      });
+    }
 
     function shortenMiddleSmart(text, maxWidthPx) {
       if (!text) return '';
@@ -700,7 +719,10 @@
 
             <div class="dashboard-slider-wrap">
               <div class="dashboard-slider-bubble hidden"></div>
-
+              <div class="slider-minmax">
+                <span>${minTemp}</span>
+                <span>${maxTemp}</span>
+              </div>
               <input
                 type="range"
                 min="${minTemp}"
@@ -789,7 +811,7 @@
 
       const cover = entities.find(e => e.type === 'cover');
       if (cover) {
-        switch (cover.deviceClass) {
+        switch ((cover.deviceClass || '').toLowerCase()) {
           case 'door': return '🚪';
           case 'window': return '🪟';
           case 'shutter': return '🧱';
@@ -805,41 +827,35 @@
       if (entities.some(e => e.type === 'humidifier')) return '💧';
       if (entities.some(e => e.type === 'lawn_mower')) return '🤖';
 
-      const binary = entities.find(e => e.type === 'binary_sensor');
+      const binarySensors = entities.filter(e => e.type === 'binary_sensor');
 
-      if (binary) {
-        switch ((binary.deviceClass || '').toLowerCase()) {
-          case 'door': return '🚪';
-          case 'window': return '🪟';
-          case 'garage_door': return '🚗';
-          case 'opening': return '🚪';
+      if (binarySensors.length) {
+        if (binarySensors.some(e => ['door', 'opening'].includes((e.deviceClass || '').toLowerCase()))) return '🚪';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'window')) return '🪟';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'garage_door')) return '🚗';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'motion')) return '🏃';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'presence')) return '👤';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'lock')) return '🔒';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'smoke')) return '💨';
+        if (binarySensors.some(e => (e.deviceClass || '').toLowerCase() === 'moisture')) return '💧';
 
-          case 'motion': return '🏃';
-          case 'presence': return '👤';
-
-          case 'lock': return '🔒';
-
-          case 'smoke': return '💨';
-          case 'moisture': return '💧';
-
-          default: return '📟';
-        }
+        return '📟';
       }
 
-      const sensor = entities.find(e => e.type === 'sensor');
-      if (sensor) {
-        switch (sensor.deviceClass) {
-          case 'temperature': return '🌡️';
-          case 'humidity': return '💧';
-          case 'precipitation': return '🌧️';
-          case 'voltage':
-          case 'battery': return '🔋';
-          case 'power':
-          case 'energy': return '⚡';
-          case 'illuminance': return '☀️';
-          case 'weight': return '⚖️';
-          default: return '📊';
-        }
+      const sensors = entities.filter(e => e.type === 'sensor');
+
+      if (sensors.length) {
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'temperature')) return '🌡️';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'humidity')) return '💧';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'battery')) return '🔋';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'voltage')) return '🔋';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'power')) return '⚡';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'energy')) return '⚡';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'illuminance')) return '☀️';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'precipitation')) return '🌧️';
+        if (sensors.some(e => (e.deviceClass || '').toLowerCase() === 'weight')) return '⚖️';
+
+        return '📊';
       }
 
       return '📦';
@@ -911,6 +927,10 @@
           <div class="dashboard-control-row">
             <span class="dashboard-label">Position</span>
             <div class="color-temp-wrap">
+              <div class="slider-minmax">
+                <span>0</span>
+                <span>100</span>
+              </div>
               <input
                 type="range"
                 min="0"
@@ -1020,7 +1040,10 @@
 
             <div class="dashboard-slider-wrap">
               <div class="dashboard-slider-bubble hidden"></div>
-
+              <div class="slider-minmax">
+                <span>${minHumidity}</span>
+                <span>${maxHumidity}</span>
+              </div>
               <input
                 type="range"
                 min="${minHumidity}"
@@ -1260,6 +1283,10 @@
               ${hasMinMax ? `
                 <div class="dashboard-slider-wrap">
                   <div class="dashboard-slider-bubble hidden"></div>
+                  <div class="slider-minmax">
+                    <span>${min}</span>
+                    <span>${max}</span>
+                  </div>
                   <input
                     type="range"
                     min="${min}"
@@ -1399,7 +1426,7 @@
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
     }
-
+    
     function renderCustomDashboards() {
       const list = document.getElementById('customDashboardList');
       if (!list) return;
@@ -1488,12 +1515,14 @@
 
       input.value = '';
       renderCustomDashboards();
+      renderCustomDashboardsNav();
       saveCustomDashboards();
     }
 
     function removeCustomDashboard(index) {
       customDashboards.splice(index, 1);
       renderCustomDashboards();
+      renderCustomDashboardsNav();
       saveCustomDashboards();
     }
 
@@ -1529,6 +1558,32 @@
           </div>
         </details>
       `;
+    }
+
+    function renderCustomDashboardsNav() {
+      if (!customDashboardsNav || !customDashboardsNavList) return;
+
+      if (!customDashboards.length) {
+        customDashboardsNav.classList.add('hidden');
+        customDashboardsNavList.innerHTML = '';
+        return;
+      }
+
+      customDashboardsNav.classList.remove('hidden');
+
+      customDashboardsNavList.innerHTML = customDashboards.map((dashboard) => {
+        const isActive = activeCustomDashboardId === dashboard.id;
+
+        return `
+          <button
+            type="button"
+            class="nav-dashboard-item ${isActive ? 'active' : ''}"
+            onclick="window.location.href='/dashboard/custom/${encodeURIComponent(dashboard.id)}'"
+          >
+            ${escapeHtml(dashboard.name)}
+          </button>
+        `;
+      }).join('');
     }
 
     function renderDashboardDeviceSelector(dashboard, openDeviceKeys = new Set()) {
@@ -1803,7 +1858,10 @@
 
                   <div class="dashboard-slider-wrap">
                     <div class="dashboard-slider-bubble hidden"></div>
-
+                    <div class="slider-minmax">
+                      <span>0</span>
+                      <span>${brightnessMax}</span>
+                    </div>
                     <input
                       type="range"
                       min="0"
@@ -1841,7 +1899,10 @@
                   <div class="color-temp-wrap">
                     <div class="dashboard-slider-wrap">
                       <div class="dashboard-slider-bubble hidden"></div>
-
+                      <div class="slider-minmax">
+                        <span>${minColorTemp}</span>
+                        <span>${maxColorTemp}</span>
+                      </div>
                       <input
                         type="range"
                         min="${minColorTemp}"
@@ -1944,6 +2005,19 @@
     }
 
     function updateDashboardEntity(update) {
+      if (activeCustomDashboardId) {
+        const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+
+        const isInCustomDashboard = customDashboard?.devices?.some(device =>
+          device.deviceId === update.deviceId &&
+          device.entityIds.includes(update.entityId)
+        );
+
+        if (!isInCustomDashboard) {
+          return;
+        }
+      }
+
       let found = false;
 
       dashboardDevices = dashboardDevices.map((device) => {
@@ -2651,6 +2725,7 @@
       discoveryPrefixes = config.discoveryViaPrefixes || [];
       customDashboards = config.customDashboards || [];
       renderCustomDashboards();
+      renderCustomDashboardsNav();
       activeCustomDashboardId = getCustomDashboardIdFromUrl();
       renderDiscoveryPrefixes();
       applyEntityTypeSelectionToUi(
@@ -2781,7 +2856,7 @@
     });
 
     showDashboardBtn.addEventListener('click', () => {
-      showView('dashboard');
+      window.location.href = '/';
     });
 
     showSettingsBtn.addEventListener('click', () => {

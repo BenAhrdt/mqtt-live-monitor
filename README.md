@@ -105,7 +105,7 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit Eigene Dashboards
+### V1.1.11 Eigene Dashboards
 * (BenAhrdt) Anlegen von Dashboards mit eigens ausgewählten Geräten / Entitäten
 
 ### V1.1.10 passwort verbergen

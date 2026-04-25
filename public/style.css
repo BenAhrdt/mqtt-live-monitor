@@ -1723,7 +1723,7 @@ code {
 
 .climate-target-panel .dashboard-slider-wrap {
   margin: 8px auto 0;
-  width: 320px;
+  width: 90%;
   flex: 0 0 auto;
 }
 
@@ -1932,4 +1932,43 @@ code {
 
 .dashboard-config-block[open] .dashboard-config-header {
   margin-bottom: 12px;
+}
+
+.nav-dashboard-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-dashboard-list {
+  display: none;
+  padding-left: 12px;
+  margin-top: -4px;
+}
+
+.nav-dashboard-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.nav-dashboard-item:hover,
+.nav-dashboard-item.active {
+  background: rgba(83, 126, 255, 0.14);
+  opacity: 1;
+}
+
+.slider-minmax {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 3px;
+  opacity: 0.75;
 }
