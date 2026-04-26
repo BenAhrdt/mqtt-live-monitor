@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit Smarte Funktionen
+* (BenAhrdt) Drag & Drop für Reihenfolge in de Custom Dashboards
+
 ### V1.1.11 Eigene Dashboards
 * (BenAhrdt) Anlegen von Dashboards mit eigens ausgewählten Geräten / Entitäten
 

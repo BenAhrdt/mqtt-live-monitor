@@ -479,10 +479,15 @@
       showDashboardBtn.classList.remove('active');
       showLiveMonitorBtn.classList.remove('active');
       showSettingsBtn.classList.remove('active');
+      toggleCustomDashboardsBtn?.classList.remove('active');
 
       if (viewName === 'dashboard') {
         dashboardView.style.display = 'block';
-        showDashboardBtn.classList.add('active');
+        if (activeCustomDashboardId) {
+          toggleCustomDashboardsBtn?.classList.add('active');
+        } else {
+          showDashboardBtn.classList.add('active');
+        }
 
         const isUrlDashboard = window.location.pathname.startsWith('/dashboard/');
         entityFilterDropdown.style.display = isUrlDashboard ? 'none' : 'block';
@@ -1586,6 +1591,81 @@
       }).join('');
     }
 
+    let draggedDashboardDeviceId = null;
+
+    function setupDashboardDragAndDrop() {
+      if (!activeCustomDashboardId) return;
+
+      const cards = document.querySelectorAll('.dashboard-device-card');
+      const handles = document.querySelectorAll('.drag-handle[draggable="true"]');
+
+      handles.forEach((handle) => {
+        handle.addEventListener('dragstart', (e) => {
+          draggedDashboardDeviceId = handle.dataset.deviceId;
+
+          const card = handle.closest('.dashboard-device-card');
+          card?.classList.add('dragging');
+
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', draggedDashboardDeviceId);
+        });
+
+        handle.addEventListener('dragend', () => {
+          document.querySelectorAll('.dashboard-device-card.dragging')
+            .forEach(card => card.classList.remove('dragging'));
+
+          document.querySelectorAll('.dashboard-device-card.drag-over')
+            .forEach(card => card.classList.remove('drag-over'));
+
+          draggedDashboardDeviceId = null;
+        });
+      });
+
+      cards.forEach((card) => {
+        card.addEventListener('dragover', (e) => {
+          e.preventDefault();
+
+          if (!draggedDashboardDeviceId) return;
+
+          card.classList.add('drag-over');
+          e.dataTransfer.dropEffect = 'move';
+        });
+
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('drag-over');
+        });
+
+        card.addEventListener('drop', (e) => {
+          e.preventDefault();
+
+          const targetDeviceId = card.dataset.deviceId;
+
+          document.querySelectorAll('.dashboard-device-card.drag-over')
+            .forEach(card => card.classList.remove('drag-over'));
+
+          if (!draggedDashboardDeviceId || draggedDashboardDeviceId === targetDeviceId) return;
+
+          moveCustomDashboardDevice(draggedDashboardDeviceId, targetDeviceId);
+        });
+      });
+    }
+
+    function moveCustomDashboardDevice(draggedId, targetId) {
+      const dashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+      if (!dashboard) return;
+
+      const fromIndex = dashboard.devices.findIndex(d => d.deviceId === draggedId);
+      const toIndex = dashboard.devices.findIndex(d => d.deviceId === targetId);
+
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+      const [moved] = dashboard.devices.splice(fromIndex, 1);
+      dashboard.devices.splice(toIndex, 0, moved);
+
+      renderDashboard();
+      saveCustomDashboards();
+    }
+
     function renderDashboardDeviceSelector(dashboard, openDeviceKeys = new Set()) {
       if (!dashboardDevices || !dashboardDevices.length) {
         return '<div class="muted">Keine Geräte verfügbar</div>';
@@ -1733,31 +1813,33 @@
 
         dashboardTitleEl.textContent = `Dashboard: ${customDashboard.name}`;
 
-        devicesToRender = dashboardDevices
+      devicesToRender = (customDashboard.devices || [])
+        .map((dashboardDevice) => {
+          const device = dashboardDevices.find(d => d.id === dashboardDevice.deviceId);
 
-        devicesToRender = dashboardDevices
-          .map(device => {
-            const dashboardDevice = customDashboard.devices.find(d => d.deviceId === device.id);
+          if (!device) {
+            return null;
+          }
 
-            if (!dashboardDevice) {
-              return null;
-            }
-
-            return {
-              ...device,
-              entities: (device.entities || []).filter(entity =>
-                dashboardDevice.entityIds.includes(entity.id)
-              )
-            };
-          })
-          .filter(Boolean);
+          return {
+            ...device,
+            entities: (device.entities || []).filter(entity =>
+              dashboardDevice.entityIds.includes(entity.id)
+            )
+          };
+        })
+        .filter(Boolean);
       }
-      const sortedDevices = [...devicesToRender].sort((a, b) => {
-        const nameA = String(a.name || a.id || '').toLowerCase();
-        const nameB = String(b.name || b.id || '').toLowerCase();
+      let sortedDevices = [...devicesToRender];
 
-        return nameA.localeCompare(nameB, 'de');
-      });
+      if (!activeCustomDashboardId) {
+        sortedDevices = sortedDevices.sort((a, b) => {
+          const nameA = String(a.name || a.id || '').toLowerCase();
+          const nameB = String(b.name || b.id || '').toLowerCase();
+
+          return nameA.localeCompare(nameB, 'de');
+        });
+      }
 
       dashboardGrid.innerHTML = sortedDevices.map((device) => {
         const visibleEntities = activeCustomDashboardId
@@ -1957,8 +2039,14 @@
         const isZigbee = via.includes('zigbee');
 
         return `
-          <div class="dashboard-device-card ${viaClass}" id="device-${device.id}">
+          <div
+            class="dashboard-device-card ${viaClass}"
+            id="device-${device.id}"
+            data-device-id="${escapeHtml(device.id)}"
+            draggable="false"
+          >
             <div class="dashboard-device-header">
+              ${activeCustomDashboardId ? `<div class="drag-handle" draggable="true" data-device-id="${escapeHtml(device.id)}" title="Verschieben">☰</div>` : ''}
               <div class="dashboard-device-icon">
                 ${getDeviceIcons(device)}
               </div>
@@ -1991,6 +2079,12 @@
       dashboardGrid.querySelectorAll('.humidifier-range').forEach((slider) => {
         updateHumidifierSliderBubble(slider);
       });
+
+      dashboardGrid.querySelectorAll('.humidifier-range').forEach((slider) => {
+        updateHumidifierSliderBubble(slider);
+      });
+
+      setupDashboardDragAndDrop();
     }
 
     async function loadDashboardDevices() {
@@ -2726,7 +2820,6 @@
       customDashboards = config.customDashboards || [];
       renderCustomDashboards();
       renderCustomDashboardsNav();
-      activeCustomDashboardId = getCustomDashboardIdFromUrl();
       renderDiscoveryPrefixes();
       applyEntityTypeSelectionToUi(
         config.enabledEntityTypes || ['light', 'climate', 'cover', 'lock', 'humidifier', 'lawn_mower', 'sensor', 'binary_sensor', 'switch', 'button', 'number', 'text']
@@ -3063,6 +3156,8 @@
     /************************************************************
      * **********************************************************
      * *********************************************************/
+
+    activeCustomDashboardId = getCustomDashboardIdFromUrl();
 
     loadConfig();
     loadVersion();

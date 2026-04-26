@@ -1972,3 +1972,44 @@ code {
   margin-bottom: 3px;
   opacity: 0.75;
 }
+
+.dashboard-device-card[draggable="true"] {
+  cursor: grab;
+}
+
+.dashboard-device-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.dashboard-device-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+}
+
+.drag-handle {
+  font-size: 18px;
+  opacity: 0.75;
+  cursor: grab;
+  user-select: none;
+}
+
+.dashboard-device-card.dragging .drag-handle {
+  cursor: grabbing;
+}
+
+.drag-handle {
+  font-size: 18px;
+  opacity: 0.8;
+  cursor: grab;
+  user-select: none;
+  padding: 4px 6px;
+}
+
+.dashboard-device-card.dragging {
+  opacity: 0.45;
+}
+
+.dashboard-device-card.drag-over {
+  outline: 2px dashed rgba(96, 165, 250, 0.9);
+  outline-offset: 4px;
+}
