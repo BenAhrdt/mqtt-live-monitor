@@ -105,7 +105,8 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit Smarte Funktionen
+### V1.2.0 Smarte Funktionen
+* (BenAhrdt) Auslagerung der Funktionen in einzelne Dateien
 * (BenAhrdt) Brokerkonfiguration in Einstellungen gebracht
 * (BenAhrdt) Einführung der friendlyNames für Geräte und Entitäten
 * (BenAhrdt) Drag & Drop für Reihenfolge in de Custom Dashboards
