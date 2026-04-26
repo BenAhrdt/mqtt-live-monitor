@@ -224,6 +224,13 @@
           </div>
 
           <div class="dashboard-header-actions">
+            <button
+              type="button"
+              class="btn secondary hidden"
+              id="dashboardEditModeBtn"
+            >
+              Bearbeiten
+            </button>
             <div class="entity-filter-dropdown" id="entityFilterDropdown">
               <button type="button" class="entity-filter-btn" id="entityFilterBtn">
                 Entitätstypen
@@ -387,6 +394,8 @@
     const customDashboardsNavList = document.getElementById('customDashboardsNavList');
     const toggleCustomDashboardsBtn = document.getElementById('toggleCustomDashboardsBtn');
 
+    const dashboardEditModeBtn = document.getElementById('dashboardEditModeBtn');
+
     let paused = false;
     let totalMessages = 0;
     let selectedPayload = '';
@@ -397,6 +406,8 @@
     let activeCustomDashboardId = null;
     let dashboardRenderScheduled = false;
     let activeEntityTypes = new Set();
+
+    let dashboardEditMode = false;
 
     let customDashboardsMenuOpen = false;
 
@@ -491,6 +502,13 @@
 
         const isUrlDashboard = window.location.pathname.startsWith('/dashboard/');
         entityFilterDropdown.style.display = isUrlDashboard ? 'none' : 'block';
+
+        if (activeCustomDashboardId) {
+          dashboardEditModeBtn.classList.remove('hidden');
+        } else {
+          dashboardEditModeBtn.classList.add('hidden');
+          dashboardEditMode = false; // zurücksetzen
+        }
 
         loadDashboardDevices();
         return;
@@ -1594,7 +1612,7 @@
     let draggedDashboardDeviceId = null;
 
     function setupDashboardDragAndDrop() {
-      if (!activeCustomDashboardId) return;
+      if (!activeCustomDashboardId || !dashboardEditMode) return;
 
       const cards = document.querySelectorAll('.dashboard-device-card');
       const handles = document.querySelectorAll('.drag-handle[draggable="true"]');
@@ -2046,7 +2064,7 @@
             draggable="false"
           >
             <div class="dashboard-device-header">
-              ${activeCustomDashboardId ? `<div class="drag-handle" draggable="true" data-device-id="${escapeHtml(device.id)}" title="Verschieben">☰</div>` : ''}
+              ${activeCustomDashboardId && dashboardEditMode ? `<div class="drag-handle" draggable="true" data-device-id="${escapeHtml(device.id)}" title="Verschieben">☰</div>` : ''}
               <div class="dashboard-device-icon">
                 ${getDeviceIcons(device)}
               </div>
@@ -2963,6 +2981,16 @@
     entityFilterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       entityFilterDropdown.classList.toggle('open');
+    });
+
+    dashboardEditModeBtn.addEventListener('click', () => {
+      dashboardEditMode = !dashboardEditMode;
+
+      dashboardEditModeBtn.textContent = dashboardEditMode
+        ? 'Fertig'
+        : 'Bearbeiten';
+
+      renderDashboard();
     });
 
     document.getElementById('addDashboardBtn')
