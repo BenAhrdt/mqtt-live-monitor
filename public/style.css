@@ -2028,3 +2028,77 @@ code {
 .custom-dashboard-add-device .btn {
   flex: 0 0 auto;
 }
+
+.sensor-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sensor-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rename-btn {
+  flex-shrink: 0;
+}
+
+.custom-entity-checkbox {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.custom-entity-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.custom-entity-actions small {
+  white-space: nowrap;
+}
+
+.rename-btn {
+  flex-shrink: 0;
+}
+
+.custom-entity-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.custom-entity-name-wrap > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-device-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-device-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.custom-device-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.custom-device-name-wrap strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

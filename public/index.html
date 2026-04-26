@@ -351,6 +351,11 @@
       // console.log("Browser Socket verbunden:", socket.id);
     });
     let discoveryPrefixes = [];
+    let friendlyNames = {
+      devices: {},
+      entities: {}
+    };
+
     const topicFilterInput = document.getElementById('liveFilterInput');
     const messageTable = document.getElementById('messageTable');
     const detailsTopicEl = document.getElementById('detailsTopic');
@@ -427,6 +432,22 @@
 
         customDashboardsNavList.style.display = customDashboardsMenuOpen ? 'block' : 'none';
       });
+    }
+
+    function getEntityDisplayName(entity) {
+      return String(
+        friendlyNames.entities[entity.id] ||
+        entity.name ||
+        entity.id
+      );
+    }
+
+    function getDeviceDisplayName(device) {
+      return String(
+        friendlyNames.devices[device.id] ||
+        device.name ||
+        device.id
+      );
     }
 
     function shortenMiddleSmart(text, maxWidthPx) {
@@ -1203,9 +1224,23 @@
       return `
         <div class="dashboard-entity-row-block sensor-entity-block" id="entity-${entity.id}">
           <div class="sensor-row-line">
-            <span class="sensor-name" title="${escapeHtml(entity.name || 'Sensor')}">
-              ${escapeHtml(shortenMiddleSmart(entity.name || 'Sensor', 200))}
-            </span>
+            <div class="sensor-name-wrap">
+              <span class="sensor-name" title="${escapeHtml(getEntityDisplayName(entity))}">
+                ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity), 200))}
+              </span>
+
+              ${activeCustomDashboardId && dashboardEditMode ? `
+                <button
+                  type="button"
+                  class="btn secondary small-btn rename-btn"
+                  onclick="renameEntity('${entity.id}')"
+                  title="Entität umbenennen"
+                >
+                  ✏️
+                </button>
+              ` : ''}
+            </div>
+
             <strong class="sensor-value">
               ${escapeHtml(formatSensorValue(entity))}
             </strong>
@@ -1519,8 +1554,8 @@
 
       [...dashboardDevices]
         .sort((a, b) => {
-          const nameA = String(a.name || a.id).toLowerCase();
-          const nameB = String(b.name || b.id).toLowerCase();
+          const nameA = getDeviceDisplayName(a).toLowerCase();
+          const nameB = getDeviceDisplayName(b).toLowerCase();
 
           return nameA.localeCompare(nameB, 'de');
         })
@@ -1624,6 +1659,64 @@
       }
     }
 
+    async function saveFriendlyNames() {
+      try {
+        await fetch('/api/friendly-names', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ friendlyNames })
+        });
+      } catch (err) {
+        console.error('FriendlyNames speichern fehlgeschlagen:', err);
+      }
+    }
+
+    async function renameDevice(deviceId) {
+      const device = dashboardDevices.find(d => d.id === deviceId);
+      if (!device) return;
+
+      const current = getDeviceDisplayName(device);
+
+      const newName = prompt('Neuer Gerätename:', current);
+      if (newName === null) return;
+
+      const trimmed = newName.trim();
+
+      if (!trimmed) {
+        delete friendlyNames.devices[deviceId];
+      } else {
+        friendlyNames.devices[deviceId] = trimmed;
+      }
+
+      await saveFriendlyNames();
+
+      renderDashboard();
+      renderCustomDashboards();
+    }
+
+    async function renameEntity(entityId) {
+      const entity = findDashboardEntityById(entityId);
+      if (!entity) return;
+
+      const current = getEntityDisplayName(entity);
+
+      const newName = prompt('Neuer Entitätsname:', current);
+      if (newName === null) return;
+
+      const trimmed = newName.trim();
+
+      if (!trimmed) {
+        delete friendlyNames.entities[entityId];
+      } else {
+        friendlyNames.entities[entityId] = trimmed;
+      }
+
+      await saveFriendlyNames();
+
+      renderDashboard();
+      renderCustomDashboards();
+    }
+
     function addCustomDashboard() {
       const input = document.getElementById('newDashboardNameInput');
       const name = input.value.trim();
@@ -1670,11 +1763,23 @@
 
       return `
         <details class="custom-dashboard-device-card" data-device-key="${escapeHtml(deviceKey)}" ${isOpen ? 'open' : ''}>
-          <summary>
-            <span>
-              <strong>${escapeHtml(device.name || device.id)}</strong>
+          <summary class="custom-device-summary">
+            <div class="custom-device-left">
+              <div class="custom-device-name-wrap">
+                <strong>${escapeHtml(getDeviceDisplayName(device))}</strong>
+
+                <button
+                  type="button"
+                  class="btn secondary small-btn rename-btn"
+                  onclick="event.preventDefault(); renameDevice('${safeDeviceId}')"
+                  title="Gerät umbenennen"
+                >
+                  ✏️
+                </button>
+              </div>
+
               <small class="muted">${escapeHtml(device.id)}</small>
-            </span>
+            </div>
 
             <button
               type="button"
@@ -1803,8 +1908,8 @@
       const availableDevices = dashboardDevices
         .filter(device => !selectedDeviceIds.has(device.id))
         .sort((a, b) => {
-          const nameA = String(a.name || a.id).toLowerCase();
-          const nameB = String(b.name || b.id).toLowerCase();
+          const nameA = getDeviceDisplayName(a).toLowerCase();
+          const nameB = getDeviceDisplayName(b).toLowerCase();
           return nameA.localeCompare(nameB, 'de');
         });
 
@@ -1814,7 +1919,11 @@
             <option value="">Gerät auswählen...</option>
             ${availableDevices.map(device => `
               <option value="${escapeHtml(device.id)}">
-                ${escapeHtml(device.name || device.id)}
+                ${escapeHtml(
+                  friendlyNames.devices[device.id] ||
+                  device.name ||
+                  device.id
+                )}
               </option>
             `).join('')}
           </select>
@@ -1865,7 +1974,20 @@
               ${checked ? 'checked' : ''}
               onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
             >
-            <span>${escapeHtml(entity.name || entity.id)}</span>
+
+            <span class="custom-entity-name-wrap">
+              <span>${escapeHtml(getEntityDisplayName(entity))}</span>
+
+              <button
+                type="button"
+                class="btn secondary small-btn rename-btn"
+                onclick="event.preventDefault(); renameEntity('${escapeHtml(entity.id)}')"
+                title="Entität umbenennen"
+              >
+                ✏️
+              </button>
+            </span>
+
             <small>${escapeHtml(entity.type)}</small>
           </label>
         `;
@@ -1971,8 +2093,8 @@
 
       if (!activeCustomDashboardId) {
         sortedDevices = sortedDevices.sort((a, b) => {
-          const nameA = String(a.name || a.id || '').toLowerCase();
-          const nameB = String(b.name || b.id || '').toLowerCase();
+          const nameA = getDeviceDisplayName(a).toLowerCase();
+          const nameB = getDeviceDisplayName(b).toLowerCase();
 
           return nameA.localeCompare(nameB, 'de');
         });
@@ -2189,11 +2311,27 @@
               </div>
 
               <div class="dashboard-device-header-text">
-                <div class="dashboard-device-name">${escapeHtml(device.name || device.id)}</div>
+                <div class="dashboard-device-name">
+                  ${escapeHtml(
+                    friendlyNames.devices[device.id] ||
+                    device.name ||
+                    device.id
+                  )}
+                </div>
                 <div class="dashboard-device-subtitle">
                   Entitäten: ${escapeHtml(device.entityCount || 0)}
                 </div>
               </div>
+
+              ${activeCustomDashboardId && dashboardEditMode ? `
+                <button
+                  class="btn secondary small-btn"
+                  onclick="renameDevice('${device.id}')"
+                  title="Umbenennen"
+                >
+                  ✏️
+                </button>
+              ` : ''}
 
               ${isZigbee ? `
                 <div class="zigbee-badge">
@@ -2955,6 +3093,10 @@
       mqttClientIdInput.value = config.clientId || '';
       discoveryPrefixes = config.discoveryViaPrefixes || [];
       customDashboards = config.customDashboards || [];
+      friendlyNames = config.friendlyNames || {
+        devices: {},
+        entities: {}
+      };
       renderCustomDashboards();
       renderCustomDashboardsNav();
       renderDiscoveryPrefixes();

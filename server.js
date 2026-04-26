@@ -126,6 +126,10 @@ let mqttConfig = {
   discoveryViaPrefixes: ["lorawan"],
   enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
   customDashboards: [],
+  friendlyNames: {
+    devices: {},
+    entities: {}
+  },
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -1699,7 +1703,8 @@ function getPublicConfig() {
     discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
     enabledEntityTypes: mqttConfig.enabledEntityTypes,
     authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
-    customDashboards: mqttConfig.customDashboards || []
+    customDashboards: mqttConfig.customDashboards || [],
+    friendlyNames: mqttConfig.friendlyNames || { devices: {}, entities: {} },
   };
 }
 
@@ -1728,10 +1733,13 @@ app.post("/api/config", (req, res) => {
   }
 
   mqttConfig = {
+    ...mqttConfig,
+
     webPort: Number(webPort) || mqttConfig.webPort || 3000,
     host: String(host).trim(),
     port: Number(port),
     topic: String(topic).trim(),
+
     username: username === undefined || username === ''
       ? mqttConfig.username
       : String(username).trim(),
@@ -1739,10 +1747,13 @@ app.post("/api/config", (req, res) => {
     password: password === undefined || password === ''
       ? mqttConfig.password
       : String(password),
+
     clientId: clientId === undefined || clientId === ''
       ? mqttConfig.clientId
       : String(clientId).trim(),
+
     discoveryViaPrefixes: normalizeDiscoveryPrefixes(discoveryViaPrefixes),
+
     enabledEntityTypes: Array.isArray(enabledEntityTypes)
       ? enabledEntityTypes.map(v => String(v).trim()).filter(v => v !== "")
       : (Array.isArray(mqttConfig.enabledEntityTypes)
@@ -1886,6 +1897,26 @@ app.post("/api/mqtt/publish", (req, res) => {
     res.json({
       success: true,
     });
+  });
+});
+
+app.post("/api/friendly-names", (req, res) => {
+  const { friendlyNames } = req.body;
+
+  mqttConfig.friendlyNames = {
+    devices: friendlyNames?.devices && typeof friendlyNames.devices === "object"
+      ? friendlyNames.devices
+      : {},
+    entities: friendlyNames?.entities && typeof friendlyNames.entities === "object"
+      ? friendlyNames.entities
+      : {},
+  };
+
+  saveConfigToFile();
+
+  res.json({
+    success: true,
+    friendlyNames: mqttConfig.friendlyNames,
   });
 });
 
