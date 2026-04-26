@@ -30,7 +30,7 @@
       </div>
 
       <nav class="nav">
-        <button class="nav-btn active" id="showDashboardBtn"><span>Home</span></button>
+        <button class="nav-btn active" id="showHomeBtn"><span>Home</span></button>
         <div id="customDashboardsNav" class="nav-dashboard-group hidden">
           <button class="nav-btn" id="toggleCustomDashboardsBtn" type="button">
             <span>Dashboards ▾</span>
@@ -70,10 +70,11 @@
             <p class="subtitle">MQTT-Nachrichten in Echtzeit</p>
           </div>
 
-          <div class="topbar-actions">
-            <button id="pauseBtn" class="btn secondary">Pause</button>
-            <button id="clearBtn" class="btn danger">Leeren</button>
-          </div>
+        <div class="topbar-actions">
+        <button id="reconnectBtn" class="btn secondary">Reconnect</button>
+        <button id="pauseBtn" class="btn secondary">Pause</button>
+        <button id="clearBtn" class="btn danger">Leeren</button>
+      </div>
         </header>
 
         <section class="cards">
@@ -122,6 +123,17 @@
                     placeholder="Topic filtern... z.B. lorawan"
                     id="liveFilterInput"
                   >
+                  <div class="live-limit-inline">
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value="2500"
+                      title="Max. gespeicherte Nachrichten"
+                      id="liveMessageLimitInput"
+                    >
+                    <span class="live-limit-label">max. Nachrichten</span>
+                  </div>
               </div>
             </div>
 

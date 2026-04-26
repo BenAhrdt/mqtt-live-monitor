@@ -23,6 +23,8 @@ let friendlyNames = {
     devices: {},
     entities: {}
 };
+let liveMessages = [];
+let liveMessageLimit = Number(localStorage.getItem('liveMessageLimit') || 2500);
 
 const topicFilterInput = document.getElementById('liveFilterInput');
 const messageTable = document.getElementById('messageTable');
@@ -32,6 +34,7 @@ const detailsBox = document.getElementById('detailsBox');
 const clearBtn = document.getElementById('clearBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const copyBtn = document.getElementById('copyBtn');
+const liveMessageLimitInput = document.getElementById('liveMessageLimitInput');
 
 const mqttHostInput = document.getElementById('mqttHost');
 const mqttPortInput = document.getElementById('mqttPort');
@@ -55,7 +58,7 @@ const connectionMessageEl = document.getElementById('connectionMessage');
 const dashboardConnectionDot = document.getElementById('dashboardConnectionDot');
 
 const showLiveMonitorBtn = document.getElementById('showLiveMonitorBtn');
-const showDashboardBtn = document.getElementById('showDashboardBtn');
+const showHomeBtn = document.getElementById('showHomeBtn');
 const liveMonitorView = document.getElementById('liveMonitorView');
 const dashboardView = document.getElementById('dashboardView');
 const showSettingsBtn = document.getElementById('showSettingsBtn');
@@ -78,7 +81,7 @@ const importDashboardsBtn = document.getElementById('importDashboardsBtn');
 const importDashboardsFile = document.getElementById('importDashboardsFile');
 
 let paused = false;
-let totalMessages = 0;
+let totalMessages = Number(sessionStorage.getItem('totalMessages') || 0);
 let selectedPayload = '';
 const topics = new Map();
 let dashboardDevices = [];
@@ -122,6 +125,7 @@ const dashboardRenderer = createDashboardRenderer({
     updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input)
 });
 
+liveMessageLimitInput.value = liveMessageLimit;
 
 function getEntityDisplayName(entity) {
     return String(
@@ -181,6 +185,24 @@ deselectAllEntitiesBtn.addEventListener('click', (e) => {
     deselectAllEntityTypes();
 });
 
+liveMessageLimitInput.addEventListener('change', () => {
+    const nextLimit = Number(liveMessageLimitInput.value);
+
+    if (!Number.isFinite(nextLimit) || nextLimit < 100) {
+        liveMessageLimitInput.value = liveMessageLimit;
+        return;
+    }
+
+    liveMessageLimit = nextLimit;
+    localStorage.setItem('liveMessageLimit', String(liveMessageLimit));
+
+    while (liveMessages.length > liveMessageLimit) {
+        liveMessages.pop();
+    }
+
+    renderLiveMessages();
+});
+
 function applyInitialMobileSidebarState() {
     appLayout.classList.add('sidebar-collapsed');
 }
@@ -192,7 +214,7 @@ function showView(viewName) {
     dashboardView.style.display = 'none';
     settingsView.style.display = 'none';
 
-    showDashboardBtn.classList.remove('active');
+    showHomeBtn.classList.remove('active');
     showLiveMonitorBtn.classList.remove('active');
     showSettingsBtn.classList.remove('active');
     toggleCustomDashboardsBtn?.classList.remove('active');
@@ -202,7 +224,7 @@ function showView(viewName) {
     if (activeCustomDashboardId) {
         toggleCustomDashboardsBtn?.classList.add('active');
     } else {
-        showDashboardBtn.classList.add('active');
+        showHomeBtn.classList.add('active');
     }
 
     const isUrlDashboard = window.location.pathname.startsWith('/dashboard/');
@@ -220,9 +242,14 @@ function showView(viewName) {
     }
 
     if (viewName === 'live') {
-    liveMonitorView.style.display = 'block';
-    showLiveMonitorBtn.classList.add('active');
-    return;
+        liveMonitorView.style.display = 'block';
+        showLiveMonitorBtn.classList.add('active');
+
+        totalMessagesEl.textContent = totalMessages;
+        updateTopicList();
+        renderLiveMessages();
+
+        return;
     }
 
     if (viewName === 'settings') {
@@ -942,14 +969,15 @@ function updateSingleEntity(update) {
     const oldEl = document.getElementById(`entity-${update.entityId}`);
 
     if (!oldEl) {
-    scheduleDashboardRender();
-    return;
+        scheduleDashboardRender();
+        return;
     }
 
     const entity = update.entity;
     let html = '';
 
     if (entity.type === 'climate') html = dashboardRenderer.renderClimateEntity(entity);
+    else if (entity.type === 'light') html = dashboardRenderer.renderLightEntity(entity);
     else if (entity.type === 'cover') html = dashboardRenderer.renderCoverEntity(entity);
     else if (entity.type === 'lock') html = dashboardRenderer.renderLockEntity(entity);
     else if (entity.type === 'humidifier') html = dashboardRenderer.renderHumidifierEntity(entity);
@@ -959,9 +987,10 @@ function updateSingleEntity(update) {
     else if (entity.type === 'switch') html = dashboardRenderer.renderSwitchEntity(entity);
     else if (entity.type === 'button') html = dashboardRenderer.renderButtonEntity(entity);
     else if (entity.type === 'number') html = dashboardRenderer.renderNumberEntity(entity);
+    else if (entity.type === 'text') html = dashboardRenderer.renderTextEntity(entity);
     else {
-    scheduleDashboardRender();
-    return;
+        scheduleDashboardRender();
+        return;
     }
 
     oldEl.outerHTML = html;
@@ -1349,6 +1378,25 @@ function updateTopicList() {
     `).join('');
 }
 
+function renderLiveMessages() {
+    messageTable.innerHTML = '';
+
+    const filter = topicFilterInput.value.trim().toLowerCase();
+
+    liveMessages
+        .filter(msg => msg.topic.toLowerCase().includes(filter))
+        .slice(0, 100)
+        .forEach(addMessageRow);
+
+    if (!messageTable.children.length) {
+        messageTable.innerHTML = `
+            <tr>
+                <td colspan="3" class="empty-cell">Keine passenden Nachrichten</td>
+            </tr>
+        `;
+    }
+}
+
 function addMessageRow(data) {
     const filter = topicFilterInput.value.trim().toLowerCase();
     if (filter && !data.topic.toLowerCase().includes(filter)) {
@@ -1370,7 +1418,10 @@ function addMessageRow(data) {
     tr.innerHTML = `
     <td>${new Date(data.timestamp).toLocaleTimeString()}</td>
     <td class="topic-cell">${escapeHtml(data.topic)}</td>
-    <td><code>${escapeHtml(shortPayload)}</code></td>
+    <td>
+        <code>${escapeHtml(shortPayload)}</code>
+        ${data.retain ? '<span class="badge">retained</span>' : ''}
+    </td>
     `;
 
     tr.addEventListener('click', () => {
@@ -1520,7 +1571,7 @@ async function loadConfig() {
     const urlEntityTypes = getEntityTypesFromUrl();
 
     if (urlEntityTypes) {
-    applyEntityTypeSelectionToUi(urlEntityTypes);
+        applyEntityTypeSelectionToUi(urlEntityTypes);
     }
 
     brokerTextEl.textContent = `${config.host}:${config.port}`;
@@ -1565,13 +1616,19 @@ function updateDashboardSliderBubble(input) {
 }
 
 function getEntityTypesFromUrl() {
-    const match = window.location.pathname.match(/^\/dashboard\/(.+)$/);
+    const path = window.location.pathname;
+
+    if (path.startsWith('/dashboard/custom/')) {
+        return null;
+    }
+
+    const match = path.match(/^\/dashboard\/(.+)$/);
     if (!match) return null;
 
     return match[1]
-    .split(',')
-    .map(v => v.trim())
-    .filter(Boolean);
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean);
 }
 
 showLiveMonitorBtn.addEventListener('click', () => {
@@ -1595,8 +1652,13 @@ importDashboardsFile.addEventListener('change', async () => {
     }
 });
 
-showDashboardBtn.addEventListener('click', () => {
-    window.location.href = '/';
+showHomeBtn.addEventListener('click', () => {
+    activeCustomDashboardId = null;
+    dashboardEditMode = false;
+
+    history.pushState(null, '', '/');
+
+    showView('dashboard');
 });
 
 showSettingsBtn.addEventListener('click', () => {
@@ -1638,13 +1700,18 @@ entityFilterMenu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
 });
 
 socket.on('mqtt-message', (data) => {
+    liveMessages.unshift(data);
+
+    while (liveMessages.length > liveMessageLimit) {
+        liveMessages.pop();
+    }
+
     if (paused) return;
 
     totalMessages += 1;
     messageCountEl.textContent = totalMessages;
+    sessionStorage.setItem('totalMessages', String(totalMessages));
 
-    if (currentView === 'live') {
-    totalMessagesEl.textContent = totalMessages;
     lastMessageTimeEl.textContent = new Date(data.timestamp).toLocaleTimeString();
 
     const existing = topics.get(data.topic) || { count: 0, lastTime: '-' };
@@ -1653,8 +1720,10 @@ socket.on('mqtt-message', (data) => {
         lastTime: new Date(data.timestamp).toLocaleTimeString()
     });
 
-    updateTopicList();
-    addMessageRow(data);
+    if (currentView === 'live') {
+        totalMessagesEl.textContent = totalMessages;
+        updateTopicList();
+        renderLiveMessages();
     }
 });
 
@@ -1681,16 +1750,54 @@ socket.on('mqtt-status', (status) => {
     }
 });
 
+reconnectBtn.addEventListener('click', async () => {
+    totalMessages = 0;
+    sessionStorage.setItem('totalMessages', '0');
+    messageCountEl.textContent = '0';
+    totalMessagesEl.textContent = '0';
+
+    reconnectBtn.disabled = true;
+    reconnectBtn.textContent = 'Reconnect...';
+
+    try {
+        await fetch('/api/reconnect', { method: 'POST' });
+
+        reconnectBtn.textContent = 'Gestartet';
+
+        setTimeout(() => {
+            reconnectBtn.textContent = 'Reconnect';
+            reconnectBtn.disabled = false;
+        }, 1500);
+    } catch (err) {
+        console.error('Reconnect fehlgeschlagen:', err);
+        reconnectBtn.textContent = 'Fehler';
+
+        setTimeout(() => {
+            reconnectBtn.textContent = 'Reconnect';
+            reconnectBtn.disabled = false;
+        }, 2000);
+    }
+});
+
+pauseBtn.addEventListener('click', () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Fortsetzen' : 'Pause';
+
+    if (!paused) {
+        updateTopicList();
+        renderLiveMessages();
+    }
+});
+
 topicFilterInput.addEventListener('input', () => {
     updateTopicList();
-    messageTable.innerHTML = `
-    <tr>
-        <td colspan="3" class="empty-cell">Filter geändert. Neue Nachrichten werden passend angezeigt.</td>
-    </tr>
-    `;
+    renderLiveMessages();
 });
 
 clearBtn.addEventListener('click', () => {
+    liveMessages = [];
+    topics.clear();
+    
     messageTable.innerHTML = `
     <tr>
         <td colspan="3" class="empty-cell">Noch keine Nachrichten</td>
@@ -1701,11 +1808,6 @@ clearBtn.addEventListener('click', () => {
     decodedDataBoxEl.className = 'decoded-data-empty';
     decodedDataBoxEl.textContent = 'Keine decodierten Daten vorhanden.';
     selectedPayload = '';
-});
-
-pauseBtn.addEventListener('click', () => {
-    paused = !paused;
-    pauseBtn.textContent = paused ? 'Fortsetzen' : 'Pause';
 });
 
 copyBtn.addEventListener('click', async () => {
@@ -1880,5 +1982,7 @@ loadVersion();
 checkForUpdates();
 applyInitialMobileSidebarState();
 showView('dashboard');
+messageCountEl.textContent = totalMessages;
+totalMessagesEl.textContent = totalMessages;
 
 setInterval(checkForUpdates, 60_000);

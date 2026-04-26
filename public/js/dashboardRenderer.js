@@ -1322,6 +1322,7 @@ export function createDashboardRenderer(deps) {
         renderTextEntity,
         renderClimateEntity,
         renderDiscoveryPrefixes,
+        renderLightEntity,
         renderCoverEntity,
         renderLockEntity,
         renderHumidifierEntity,

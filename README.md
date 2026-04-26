@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.2 Bessere Live Message Anzeige
+* (BenAhrdt) Live FMonitor speichert nun eine Anzahl x (konfigurierbar) Werte im Backend zur besseren Anzeige im Filterfrontend
+
 ### V1.2.1 Merge Import
 * (BenAhrdt) Bearbeiten korrigiert, Merge bei Import
 

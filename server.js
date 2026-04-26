@@ -1872,6 +1872,15 @@ app.post("/api/disconnect", (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/reconnect", (req, res) => {
+  connectMqtt();
+
+  res.json({
+    success: true,
+    message: "MQTT reconnect gestartet"
+  });
+});
+
 app.post("/api/mqtt/publish", (req, res) => {
   const { topic, payload } = req.body;
 
