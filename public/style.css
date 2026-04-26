@@ -2013,3 +2013,18 @@ code {
   outline: 2px dashed rgba(96, 165, 250, 0.9);
   outline-offset: 4px;
 }
+
+.custom-dashboard-add-device {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.custom-dashboard-add-device select {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.custom-dashboard-add-device .btn {
+  flex: 0 0 auto;
+}

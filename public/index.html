@@ -331,6 +331,12 @@
             <button id="addDashboardBtn" class="btn primary">Dashboard hinzufügen</button>
           </div>
 
+          <div class="prefix-actions" style="margin:12px 0;">
+            <button id="exportDashboardsBtn" class="btn secondary" type="button">Exportieren</button>
+            <button id="importDashboardsBtn" class="btn secondary" type="button">Importieren</button>
+            <input id="importDashboardsFile" type="file" accept="application/json" style="display:none;">
+          </div>
+
           <div id="customDashboardList"></div>
         </div>
       </section>
@@ -395,6 +401,10 @@
     const toggleCustomDashboardsBtn = document.getElementById('toggleCustomDashboardsBtn');
 
     const dashboardEditModeBtn = document.getElementById('dashboardEditModeBtn');
+
+    const exportDashboardsBtn = document.getElementById('exportDashboardsBtn');
+    const importDashboardsBtn = document.getElementById('importDashboardsBtn');
+    const importDashboardsFile = document.getElementById('importDashboardsFile');
 
     let paused = false;
     let totalMessages = 0;
@@ -1450,6 +1460,97 @@
         .replace(/^-+|-+$/g, '');
     }
     
+    function exportCustomDashboards() {
+      const data = {
+        exportedAt: new Date().toISOString(),
+        customDashboards
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+
+      a.href = url;
+      a.download = `mqtt-live-monitor-dashboards-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+    async function importCustomDashboardsFromFile(file) {
+      if (!file) return;
+
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      const importedDashboards = Array.isArray(data)
+        ? data
+        : data.customDashboards;
+
+      if (!Array.isArray(importedDashboards)) {
+        alert('Ungültige Dashboard-Datei');
+        return;
+      }
+
+      if (!confirm('Aktuelle Dashboard-Konfiguration ersetzen?')) {
+        return;
+      }
+
+      customDashboards = importedDashboards;
+      renderCustomDashboards();
+      renderCustomDashboardsNav();
+      await saveCustomDashboards();
+
+      alert('Dashboards importiert');
+    }
+
+    function addAllDevicesToCustomDashboard(dashboardId) {
+      const dashboard = customDashboards.find(d => d.id === dashboardId);
+      if (!dashboard) return;
+
+      if (!Array.isArray(dashboard.devices)) {
+        dashboard.devices = [];
+      }
+
+      const existingIds = new Set(dashboard.devices.map(d => d.deviceId));
+
+      [...dashboardDevices]
+        .sort((a, b) => {
+          const nameA = String(a.name || a.id).toLowerCase();
+          const nameB = String(b.name || b.id).toLowerCase();
+
+          return nameA.localeCompare(nameB, 'de');
+        })
+        .forEach((device) => {
+        if (existingIds.has(device.id)) return;
+
+        dashboard.devices.push({
+          deviceId: device.id,
+          entityIds: device.entities?.map(entity => entity.id) || []
+        });
+      });
+
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
+    function removeAllDevicesFromCustomDashboard(dashboardId) {
+      const dashboard = customDashboards.find(d => d.id === dashboardId);
+      if (!dashboard) return;
+
+      if (!confirm('Wirklich alle Geräte aus diesem Dashboard entfernen?')) {
+        return;
+      }
+
+      dashboard.devices = [];
+
+      renderCustomDashboards();
+      saveCustomDashboards();
+    }
+
     function renderCustomDashboards() {
       const list = document.getElementById('customDashboardList');
       if (!list) return;
@@ -1508,11 +1609,19 @@
     }
 
     async function saveCustomDashboards() {
-      await fetch('/api/custom-dashboards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customDashboards })
-      });
+      try {
+        const res = await fetch('/api/custom-dashboards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customDashboards })
+        });
+
+        if (!res.ok) {
+          console.error('Dashboard speichern fehlgeschlagen');
+        }
+      } catch (err) {
+        console.error('Dashboard speichern fehlgeschlagen:', err);
+      }
     }
 
     function addCustomDashboard() {
@@ -1691,9 +1800,13 @@
 
       const selectedDeviceIds = new Set((dashboard.devices || []).map(d => d.deviceId));
 
-      const availableDevices = dashboardDevices.filter(device =>
-        !selectedDeviceIds.has(device.id)
-      );
+      const availableDevices = dashboardDevices
+        .filter(device => !selectedDeviceIds.has(device.id))
+        .sort((a, b) => {
+          const nameA = String(a.name || a.id).toLowerCase();
+          const nameB = String(b.name || b.id).toLowerCase();
+          return nameA.localeCompare(nameB, 'de');
+        });
 
       return `
         <div class="custom-dashboard-add-device">
@@ -1708,6 +1821,12 @@
 
           <button class="btn primary" onclick="addDeviceToCustomDashboard('${dashboard.id}')">
             Gerät hinzufügen
+          </button>
+          <button class="btn secondary" onclick="addAllDevicesToCustomDashboard('${dashboard.id}')">
+            Alle hinzufügen
+          </button>
+          <button class="btn danger" onclick="removeAllDevicesFromCustomDashboard('${dashboard.id}')">
+            Alle entfernen
           </button>
         </div>
 
@@ -2964,6 +3083,23 @@
 
     showLiveMonitorBtn.addEventListener('click', () => {
       showView('live');
+    });
+
+    exportDashboardsBtn.addEventListener('click', exportCustomDashboards);
+
+    importDashboardsBtn.addEventListener('click', () => {
+      importDashboardsFile.click();
+    });
+
+    importDashboardsFile.addEventListener('change', async () => {
+      try {
+        await importCustomDashboardsFromFile(importDashboardsFile.files[0]);
+      } catch (err) {
+        alert('Import fehlgeschlagen');
+        console.error(err);
+      } finally {
+        importDashboardsFile.value = '';
+      }
     });
 
     showDashboardBtn.addEventListener('click', () => {
