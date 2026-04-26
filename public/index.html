@@ -41,34 +41,6 @@
         <button class="nav-btn" id="showSettingsBtn"><span>Einstellungen</span></button>
       </nav>
 
-      <div class="sidebar-section">
-        <h3>Broker Konfiguration</h3>
-
-        <label class="form-label">Host</label>
-        <input id="mqttHost" type="text" placeholder="z. B. 192.168.2.243">
-
-        <label class="form-label">Port</label>
-        <input id="mqttPort" type="number" placeholder="1883">
-
-        <label class="form-label">Topic</label>
-        <input id="mqttTopic" type="text" placeholder="#">
-
-        <label class="form-label">Username</label>
-        <input id="mqttUsername" type="text" placeholder="optional">
-
-        <label class="form-label">Passwort</label>
-        <input id="mqttPassword" type="password" placeholder="optional">
-
-        <label class="form-label">Client ID</label>
-        <input id="mqttClientId" type="text" placeholder="LiveMonitor">
-
-        <div class="button-group-vertical">
-          <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
-          <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
-        </div>
-        <div id="configMessage" class="config-message"></div>
-      </div>
-
       <div class="sidebar-section connection-box">
         <h3>Verbindung</h3>
         <div class="meta-row">
@@ -306,6 +278,51 @@
             <h1>Einstellungen</h1>
             <p class="subtitle">Konfiguration des Systems</p>
           </div>
+        </div>
+
+        <div class="card panel">
+          <div class="panel-header">
+            <h2>Broker Konfiguration</h2>
+          </div>
+
+          <div class="broker-grid">
+            <div>
+              <label class="form-label">Host</label>
+              <input id="mqttHost" type="text" placeholder="z. B. 192.168.2.243">
+            </div>
+
+            <div>
+              <label class="form-label">Port</label>
+              <input id="mqttPort" type="number" placeholder="1883">
+            </div>
+
+            <div>
+              <label class="form-label">Topic</label>
+              <input id="mqttTopic" type="text" placeholder="#">
+            </div>
+
+            <div>
+              <label class="form-label">Client ID</label>
+              <input id="mqttClientId" type="text" placeholder="LiveMonitor">
+            </div>
+
+            <div>
+              <label class="form-label">Username</label>
+              <input id="mqttUsername" type="text" placeholder="optional">
+            </div>
+
+            <div>
+              <label class="form-label">Passwort</label>
+              <input id="mqttPassword" type="password" placeholder="optional">
+            </div>
+          </div>
+
+          <div class="settings-broker-buttons">
+            <button id="saveConfigBtn" class="btn primary full-width">Verbinden</button>
+            <button id="disconnectBtn" class="btn danger full-width">Trennen</button>
+          </div>
+
+          <div id="configMessage" class="config-message"></div>
         </div>
 
         <div class="card panel">
@@ -3147,7 +3164,9 @@
 
       brokerTextEl.textContent = `${result.config.host}:${result.config.port}`;
       topicTextEl.textContent = result.config.topic;
-      configMessageEl.textContent = 'Konfiguration gespeichert, verbinde neu...';
+      configMessageEl.textContent = result.reconnected
+        ? 'Konfiguration gespeichert, verbinde neu...'
+        : 'Konfiguration gespeichert';
 
       if (currentView === 'dashboard') {
         setTimeout(() => {
@@ -3319,6 +3338,7 @@
         dashboardConnectionDot.classList.remove('disconnected');
         dashboardConnectionDot.classList.add('connected');
         dashboardConnectionDot.title = 'Verbunden';
+        configMessageEl.textContent = 'Verbunden';
       } else {
         statusTextEl.textContent = 'Getrennt';
         statusTextEl.className = 'status disconnected';

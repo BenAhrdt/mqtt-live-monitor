@@ -1775,12 +1775,15 @@ app.post("/api/config", (req, res) => {
 
   saveConfigToFile();
 
-  if (brokerChanged) {
+  const shouldReconnect = brokerChanged || !mqttClient;
+
+  if (shouldReconnect) {
     connectMqtt();
   }
 
   res.json({
     success: true,
+    reconnected: shouldReconnect,
     config: {
       webPort: mqttConfig.webPort,
       host: mqttConfig.host,

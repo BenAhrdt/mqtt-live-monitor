@@ -2102,3 +2102,42 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.broker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-broker-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;   /* 👉 mittig */
+  max-width: 420px;
+  margin: 0 auto;            /* 👉 Block selbst mittig */
+}
+
+.settings-broker-buttons .btn {
+  flex: 1;
+  max-width: 200px;          /* 👉 verhindert dass sie zu breit werden */
+}
+
+.broker-grid input {
+  width: 100%;
+  background: #07111f;
+  border: 1px solid #243854;
+  color: #fff;
+  border-radius: 10px;
+  padding: 11px 12px;
+  outline: none;
+}
+
+.broker-grid input:focus {
+  border-color: #3b82f6;
+}
+
+.broker-grid .form-label {
+  display: block;
+  margin-bottom: 6px;
+}
