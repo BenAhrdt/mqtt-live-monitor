@@ -22,5 +22,13 @@
     "button",
     "number",
     "text"
-  ]
+  ],
+  "customDashboards": [
+    {
+    }
+  ],
+  "friendlyNames": {
+    "devices": {},
+    "entities": {}
+  }
 }
