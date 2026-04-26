@@ -465,12 +465,13 @@ function getCustomDashboardIdFromUrl() {
 
 function exportCustomDashboards() {
     const data = {
-    exportedAt: new Date().toISOString(),
-    customDashboards
+        exportedAt: new Date().toISOString(),
+        customDashboards,
+        friendlyNames
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: 'application/json'
+        type: 'application/json'
     });
 
     const url = URL.createObjectURL(blob);
@@ -490,24 +491,105 @@ async function importCustomDashboardsFromFile(file) {
     const data = JSON.parse(text);
 
     const importedDashboards = Array.isArray(data)
-    ? data
-    : data.customDashboards;
+        ? data
+        : data.customDashboards;
+
+    const importedFriendlyNames = data.friendlyNames || {
+        devices: {},
+        entities: {}
+    };
 
     if (!Array.isArray(importedDashboards)) {
-    alert('Ungültige Dashboard-Datei');
-    return;
+        alert('Ungültige Dashboard-Datei');
+        return;
     }
 
-    if (!confirm('Aktuelle Dashboard-Konfiguration ersetzen?')) {
-    return;
+    if (!confirm('Dashboard-Konfiguration importieren und mit bestehender Konfiguration zusammenführen?')) {
+        return;
     }
 
-    customDashboards = importedDashboards;
+    const dashboardMap = new Map(
+        customDashboards.map(dashboard => [dashboard.id, dashboard])
+    );
+
+    importedDashboards.forEach((importedDashboard) => {
+        const id = String(importedDashboard.id || '').trim();
+        const name = String(importedDashboard.name || '').trim();
+
+        if (!id || !name) return;
+
+        const existingDashboard = dashboardMap.get(id);
+
+        if (!existingDashboard) {
+            dashboardMap.set(id, {
+                id,
+                name,
+                devices: Array.isArray(importedDashboard.devices)
+                    ? importedDashboard.devices
+                    : []
+            });
+            return;
+        }
+
+        existingDashboard.name = name;
+
+        if (!Array.isArray(existingDashboard.devices)) {
+            existingDashboard.devices = [];
+        }
+
+        const deviceMap = new Map(
+            existingDashboard.devices.map(device => [device.deviceId, device])
+        );
+
+        (importedDashboard.devices || []).forEach((importedDevice) => {
+            const deviceId = String(importedDevice.deviceId || '').trim();
+            if (!deviceId) return;
+
+            const importedEntityIds = Array.isArray(importedDevice.entityIds)
+                ? importedDevice.entityIds.map(id => String(id).trim()).filter(Boolean)
+                : [];
+
+            const existingDevice = deviceMap.get(deviceId);
+
+            if (!existingDevice) {
+                deviceMap.set(deviceId, {
+                    deviceId,
+                    entityIds: importedEntityIds
+                });
+                return;
+            }
+
+            const mergedEntityIds = new Set([
+                ...(existingDevice.entityIds || []),
+                ...importedEntityIds
+            ]);
+
+            existingDevice.entityIds = Array.from(mergedEntityIds);
+        });
+
+        existingDashboard.devices = Array.from(deviceMap.values());
+    });
+
+    customDashboards = Array.from(dashboardMap.values());
+
+    friendlyNames = {
+        devices: {
+            ...(friendlyNames.devices || {}),
+            ...(importedFriendlyNames.devices || {})
+        },
+        entities: {
+            ...(friendlyNames.entities || {}),
+            ...(importedFriendlyNames.entities || {})
+        }
+    };
+
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
-    await saveCustomDashboards();
 
-    alert('Dashboards importiert');
+    await saveCustomDashboards();
+    await saveFriendlyNames();
+
+    alert('Dashboards und Friendly Names importiert');
 }
 
 function addAllDevicesToCustomDashboard(dashboardId) {

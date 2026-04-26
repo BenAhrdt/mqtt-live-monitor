@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.1 Merge Import
+* (BenAhrdt) Bearbeiten korrigiert, Merge bei Import
+
 ### V1.2.0 Smarte Funktionen
 * (BenAhrdt) Auslagerung der Funktionen in einzelne Dateien
 * (BenAhrdt) Brokerkonfiguration in Einstellungen gebracht

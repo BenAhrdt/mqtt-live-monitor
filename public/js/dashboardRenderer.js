@@ -161,10 +161,13 @@ export function createDashboardRenderer(deps) {
         return `
         <div class="dashboard-entity-row-block binary-sensor-entity-block" id="entity-${entity.id}">
             <div class="sensor-row-line">
-            <span class="sensor-name">
-                ${escapeHtml(getEntityDisplayName(entity))}
-            </span>
-            ${renderRenameEntityButton(entity.id)}
+            <div class="sensor-name-wrap">
+                <span class="sensor-name">
+                    ${escapeHtml(getEntityDisplayName(entity))}
+                </span>
+                ${renderRenameEntityButton(entity.id)}
+            </div>
+
             <strong class="sensor-value ${colorClass}">
                 ${text}
             </strong>
