@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.8 Check für Release
+* (BenAhrdt) Leerer commit für Tagging
+
 ### V1.2.7 Button für Dashboards
 * (BenAhrdt) Config.json korrigiert
 * (BenAhrdt) nicht verwendetes emiit auskommentiert
