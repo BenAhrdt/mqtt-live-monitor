@@ -1062,8 +1062,10 @@ function handleDiscoveryMessage(topic, message) {
   device.updatedAt = new Date().toISOString();
 
   registerEntityTopics(entity, deviceId);
-  applyPendingStateMessagesForEntity(entity);
-  emitStores();
+  setTimeout(() => {
+    applyPendingStateMessagesForEntity(entity);
+    emitStores();
+  }, 0);
 
   return {
     handled: true,

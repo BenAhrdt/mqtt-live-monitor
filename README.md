@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.5 Apply Pending messages in den nächsten Event-Loop gelegt.
+* (BenAhrdt) verzögerung eingebaut (0ms), damit apply pending Messages erst im nächsten EventLoop erledigt wird
+
 ### V1.2.4 Pending states löschen
 * (BenAhrdt) Alle Pending states, die älter als 5min sind, oder wenn es mehr als 1000 sind, werden gelöscht.
 
