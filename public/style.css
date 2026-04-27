@@ -2171,3 +2171,30 @@ code {
   font-size: 13px;
   color: var(--muted);
 }
+
+.dashboard-tabs {
+  margin-top: 6px;
+}
+
+.dashboard-tab {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  padding: 4px 10px;
+  margin-right: 6px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.dashboard-tab:hover {
+  background: #1e293b;
+  color: white;
+}
+
+.dashboard-tab.active {
+  background: #3f97cb;
+  color: white;
+  border-color: #3f97cb;
+}

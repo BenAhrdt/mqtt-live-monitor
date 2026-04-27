@@ -1142,7 +1142,38 @@ export function createDashboardRenderer(deps) {
         }).join('');
     }
 
+    function renderDashboardTabs() {
+        const container = document.getElementById('dashboardTabs');
+        if (!container) return;
+
+        const customDashboards = getCustomDashboards();
+        const activeId = getActiveCustomDashboardId();
+
+        const isHomeActive = window.location.pathname === '/';
+
+        let html = `
+            <button
+            class="dashboard-tab ${isHomeActive ? 'active' : ''}"
+            onclick="window.location.href='/'"
+            >
+            Home
+            </button>
+        `;
+
+        html += customDashboards.map(d => `
+            <button
+            class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
+            onclick="window.location.href='/dashboard/custom/${encodeURIComponent(d.id)}'"
+            >
+            ${escapeHtml(d.name)}
+            </button>
+        `).join('');
+
+        container.innerHTML = html;
+    }
+
     function renderDashboard() {
+        renderDashboardTabs();
         const customDashboards = getCustomDashboards();
         const dashboardDevices = getDashboardDevices();
         const friendlyNames = getFriendlyNames();

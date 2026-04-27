@@ -105,9 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.2.7 Button für Dashboards
 * (BenAhrdt) Config.json korrigiert
 * (BenAhrdt) nicht verwendetes emiit auskommentiert
+* (BenAhrdt) Button zu custom Dashboards hinzugefügt
 
 ### V1.2.6 Pending logging
 * (BenAhrdt) logging für topics die aufgrund von discovery aus dem pending gelöscht wurden
