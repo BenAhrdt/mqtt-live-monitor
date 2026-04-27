@@ -127,6 +127,10 @@ const dashboardRenderer = createDashboardRenderer({
 
 liveMessageLimitInput.value = liveMessageLimit;
 
+socket.on("debug-log", (data) => {
+  console.log("[SERVER]", data.timestamp, data.message);
+});
+
 function getEntityDisplayName(entity) {
     return String(
     friendlyNames.entities[entity.id] ||

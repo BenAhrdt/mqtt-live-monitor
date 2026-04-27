@@ -117,6 +117,50 @@ const deviceStore = {};
  */
 const topicStore = {};
 const pendingStateMessages = {};
+const MAX_PENDING = 1000;
+const PENDING_TTL = 5 * 60 * 1000; // 5 Minuten
+
+function cleanupPending() {
+  const before = Object.keys(pendingStateMessages).length;
+  const now = Date.now();
+  let deleted = 0;
+
+  for (const [topic, entry] of Object.entries(pendingStateMessages)) {
+    if (now - entry.ts > PENDING_TTL) {
+      delete pendingStateMessages[topic];
+      deleted++;
+    }
+  }
+
+  while (Object.keys(pendingStateMessages).length > MAX_PENDING) {
+    const firstKey = Object.keys(pendingStateMessages)[0];
+    delete pendingStateMessages[firstKey];
+    deleted++;
+  }
+
+  const after = Object.keys(pendingStateMessages).length;
+
+  if (deleted > 0) {
+    BrowserLog(`Cleanup: ${deleted} Einträge aus pending gelöscht`);
+  }
+
+  BrowserLog(`Pending aktuell: ${after}`);
+}
+
+setInterval(cleanupPending, 60000);
+
+
+function BrowserLog(...args) {
+  const message = args.map(a =>
+    typeof a === "object" ? JSON.stringify(a) : String(a)
+  ).join(" ");
+
+  io.emit("debug-log", {
+    message,
+    timestamp: new Date().toISOString()
+  });
+}
+
 
 let mqttConfig = {
   webPort: 3000,
@@ -933,7 +977,7 @@ function applyPendingStateMessagesForEntity(entity) {
 
   for (const topic of possibleTopics) {
     if (pendingStateMessages[topic]) {
-      handleKnownTopicMessage(topic, pendingStateMessages[topic]);
+      handleKnownTopicMessage(topic, pendingStateMessages[topic].message);
       delete pendingStateMessages[topic];
     }
   }
@@ -1048,10 +1092,16 @@ function addTopicMapping(topic, mapping) {
 }
 
 function handleKnownTopicMessage(topic, message) {
+  if (isDiscoveryTopic(topic)) {
+    return { handled: false, reason: "ignore-discovery-topic" };
+  }
   const mappings = topicStore[topic];
 
   if (!Array.isArray(mappings) || mappings.length === 0) {
-    pendingStateMessages[topic] = message;
+    pendingStateMessages[topic] = {
+      message,
+      ts: Date.now()
+    };
     return { handled: false, reason: "topic-not-registered-pending" };
   }
 
@@ -1554,16 +1604,20 @@ function connectMqtt() {
   });
 
   mqttClient.on("message", (topic, message, packet) => {
-    const discoveryResult = handleDiscoveryMessage(topic, message);
+    const isDiscovery = isDiscoveryTopic(topic);
 
-    if (discoveryResult.handled) {
-      console.log("Discovery erkannt:", discoveryResult);
-    }
+    if (isDiscovery) {
+      const discoveryResult = handleDiscoveryMessage(topic, message);
 
-    const stateResult = handleKnownTopicMessage(topic, message);
+      if (discoveryResult.handled) {
+        console.log("Discovery erkannt:", discoveryResult);
+      }
+    } else {
+      const stateResult = handleKnownTopicMessage(topic, message);
 
-    if (stateResult.handled) {
-      console.log("State aktualisiert:", stateResult);
+      if (stateResult.handled) {
+        console.log("State aktualisiert:", stateResult);
+      }
     }
 
     io.emit("mqtt-message", {
@@ -1938,6 +1992,10 @@ app.get("/api/device-store", (req, res) => {
 
 app.get("/api/topic-store", (req, res) => {
   res.json(topicStore);
+});
+
+app.get("/api/pending", (req, res) => {
+  res.json(pendingStateMessages);
 });
 
 app.get("/api/devices", (req, res) => {

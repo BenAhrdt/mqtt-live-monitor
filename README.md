@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.4 Pending states löschen
+* (BenAhrdt) Alle Pending states, die älter als 5min sind, oder wenn es mehr als 1000 sind, werden gelöscht.
+
 ### V1.2.3 Namensdarstellung umbenannte Geräte erweitert
 * (BenAhrdt) Darstellen von originalnamen bei umbenannten Geräten.
 
