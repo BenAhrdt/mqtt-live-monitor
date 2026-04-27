@@ -105,6 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Config.json korrigiert
+* (BenAhrdt) nicht verwendetes emiit auskommentiert
+
 ### V1.2.6 Pending logging
 * (BenAhrdt) logging für topics die aufgrund von discovery aus dem pending gelöscht wurden
 

@@ -259,8 +259,8 @@ function emitStatus(status) {
 }
 
 function emitStores() {
-  io.emit("device-store", deviceStore);
-  io.emit("topic-store", topicStore);
+  // io.emit("device-store", deviceStore);
+  // io.emit("topic-store", topicStore);
 }
 
 function resetStores() {

@@ -23,10 +23,7 @@
     "number",
     "text"
   ],
-  "customDashboards": [
-    {
-    }
-  ],
+  "customDashboards": [],
   "friendlyNames": {
     "devices": {},
     "entities": {}
