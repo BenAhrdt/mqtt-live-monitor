@@ -70,15 +70,20 @@ export function createDashboardRenderer(deps) {
         <div class="custom-dashboard-add-device">
             <select id="deviceSelect-${dashboard.id}">
             <option value="">Gerät auswählen...</option>
-            ${availableDevices.map(device => `
-                <option value="${escapeHtml(device.id)}">
-                ${escapeHtml(
-                    friendlyNames.devices[device.id] ||
-                    device.name ||
-                    device.id
-                )}
-                </option>
-            `).join('')}
+                ${availableDevices.map(device => {
+                    const friendly = friendlyNames.devices[device.id];
+                    const original = device.name || device.id;
+
+                    const label = friendly && friendly !== original
+                        ? `${friendly} (${original})`
+                        : original;
+
+                    return `
+                        <option value="${escapeHtml(device.id)}">
+                            ${escapeHtml(label)}
+                        </option>
+                    `;
+                }).join('')}
             </select>
 
             <button class="btn primary" onclick="addDeviceToCustomDashboard('${dashboard.id}')">

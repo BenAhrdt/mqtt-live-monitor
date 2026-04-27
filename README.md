@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.3 Namensdarstellung umbenannte Geräte erweitert
+* (BenAhrdt) Darstellen von originalnamen bei umbenannten Geräten.
+
 ### V1.2.2 Bessere Live Message Anzeige
 * (BenAhrdt) Live Monitor speichert nun eine Anzahl x (konfigurierbar) Werte im Backend zur besseren Anzeige im Filter-Frontend
 
