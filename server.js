@@ -977,7 +977,9 @@ function applyPendingStateMessagesForEntity(entity) {
 
   for (const topic of possibleTopics) {
     if (pendingStateMessages[topic]) {
-      handleKnownTopicMessage(topic, pendingStateMessages[topic].message);
+      const message = pendingStateMessages[topic].message;
+      handleKnownTopicMessage(topic, message);
+      BrowserLog(`Topic: ${topic} aus dem Pending entfernt. Message: ${message}`)
       delete pendingStateMessages[topic];
     }
   }

@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.2.6 Pending logging
+* (BenAhrdt) logging für topics die aufgrund von discovery aus dem pending gelöscht wurden
+
 ### V1.2.5 Apply Pending messages in den nächsten Event-Loop gelegt.
 * (BenAhrdt) verzögerung eingebaut (0ms), damit apply pending Messages erst im nächsten EventLoop erledigt wird
 
