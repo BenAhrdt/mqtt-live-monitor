@@ -39,18 +39,12 @@ let allowedDiscoveryViaDevicePrefixes = [
   "lorawan"
 ];
 
+let pendingRetryInterval = null;
+let pendingRetryTimeout = null;
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
-// Routen zu Dashboards
-app.get('/dashboard/custom/:dashboardId', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/dashboard/:types', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 app.get('/api/update/check', async (req, res) => {
   const currentVersion = require('./package.json').version;
@@ -970,7 +964,6 @@ function applyPendingStateMessagesForEntity(entity) {
     entity.temperatureStateTopic,
     entity.currentTemperatureTopic,
     entity.targetHumidityStateTopic,
-    entity.targetHumidityCommandTopic,
     entity.currentHumidityTopic,
     entity.activityStateTopic,
   ].filter(Boolean);
@@ -983,6 +976,30 @@ function applyPendingStateMessagesForEntity(entity) {
       delete pendingStateMessages[topic];
     }
   }
+}
+
+function triggerPendingRetry() {
+  // läuft schon → nichts tun
+  if (pendingRetryInterval) return;
+
+  pendingRetryInterval = setInterval(() => {
+    const keys = Object.keys(pendingStateMessages);
+    if (!keys.length) return;
+
+    for (const topic of keys) {
+      const entry = pendingStateMessages[topic];
+      handleKnownTopicMessage(topic, entry.message);
+    }
+  }, 500); // etwas schneller als 1s → fühlt sich besser an
+
+  // nach 10 Sekunden automatisch stoppen
+  pendingRetryTimeout = setTimeout(() => {
+    clearInterval(pendingRetryInterval);
+    pendingRetryInterval = null;
+
+    clearTimeout(pendingRetryTimeout);
+    pendingRetryTimeout = null;
+  }, 10000);
 }
 
 function handleDiscoveryMessage(topic, message) {
@@ -1106,6 +1123,7 @@ function handleKnownTopicMessage(topic, message) {
       message,
       ts: Date.now()
     };
+    triggerPendingRetry();
     return { handled: false, reason: "topic-not-registered-pending" };
   }
 
@@ -2005,6 +2023,12 @@ app.get("/api/pending", (req, res) => {
 app.get("/api/devices", (req, res) => {
   res.json(getDevicesForDashboard());
 });
+
+// Restliche routen => catch all
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 
 io.on("connection", (socket) => {
   console.log("Browser verbunden:", socket.id);

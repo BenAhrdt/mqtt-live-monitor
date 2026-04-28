@@ -10,11 +10,17 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <div class="global-status">
+  <span
+    id="dashboardConnectionDot"
+    class="dashboard-connection-dot disconnected"
+    title="Nicht verbunden"
+  ></span>
+</div>
   <div class="app" id="appLayout">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-left">
-          <div class="brand-icon">◉</div>
           <div class="brand-text">
             <div class="brand-title">MQTT Live Monitor</div>
               <div class="brand-subtitle">
@@ -201,15 +207,19 @@
         <header class="topbar dashboard-topbar">
           <div class="dashboard-title-wrap">
             <div class="dashboard-title-row">
-              <h1>Dashboard</h1>
-              <span id="dashboardConnectionDot" class="dashboard-connection-dot disconnected" title="Nicht verbunden"></span>
             </div>
-            <p class="subtitle" id="dashboardSubtitle">Geräte und Entitäten in Echtzeit</p>
-
             <div id="dashboardTabs" class="dashboard-tabs"></div>
           </div>
 
           <div class="dashboard-header-actions">
+              <button
+              type="button"
+              class="btn icon-btn"
+              id="openSettingsBtn"
+              title="Einstellungen"
+            >
+              ⚙️
+            </button>
             <button
               type="button"
               class="btn secondary hidden"

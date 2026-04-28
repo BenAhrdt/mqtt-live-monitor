@@ -38,14 +38,14 @@ export function createDashboardRenderer(deps) {
         }
 
         return `
-            <button
-                type="button"
-                class="btn secondary small-btn rename-btn"
-                onclick="renameEntity('${escapeHtml(entityId)}')"
-                title="Entität umbenennen"
-            >
-                ✏️
-            </button>
+        <button
+            type="button"
+            class="btn secondary small-btn rename-btn action-rename-entity"
+            data-entity-id="${escapeHtml(entityId)}"
+            title="Entität umbenennen"
+        >
+            ✏️
+        </button>
         `;
     }
 
@@ -211,15 +211,20 @@ export function createDashboardRenderer(deps) {
         return `
         <div class="dashboard-entity-row-block button-entity-block" id="entity-${entity.id}">
             <div class="sensor-row-line">
-            <span class="sensor-name">
-                ${escapeHtml(getEntityDisplayName(entity))}
-            </span>
-            ${renderRenameEntityButton(entity.id)}
 
-            <button class="lock-action-btn button-inline-action"
-                onclick="pressButtonEntity('${entity.id}', this)">
-                Ausführen
-            </button>
+                <div class="sensor-name-group">
+                    <span class="sensor-name">
+                        ${escapeHtml(getEntityDisplayName(entity))}
+                    </span>
+
+                    ${renderRenameEntityButton(entity.id)}
+                </div>
+
+                <button class="lock-action-btn button-inline-action"
+                    onclick="pressButtonEntity('${entity.id}', this)">
+                    Ausführen
+                </button>
+
             </div>
         </div>
         `;
@@ -1015,13 +1020,30 @@ export function createDashboardRenderer(deps) {
                 </div>
 
                 <div class="prefix-actions">
-                <button class="btn secondary" onclick="event.preventDefault(); openCustomDashboard('${escapeHtml(dashboard.id)}')">
-                    Öffnen
-                </button>
+                    <button 
+                        class="btn secondary open-dashboard-btn"
+                        data-dashboard-id="${escapeHtml(dashboard.id)}"
+                    >
+                        Öffnen
+                    </button>
 
-                <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
-                    Entfernen
-                </button>
+                    <button 
+                        class="btn secondary action-rename-dashboard"
+                        data-dashboard-id="${escapeHtml(dashboard.id)}"
+                    >
+                        ✏️
+                    </button>
+
+                    <button 
+                        class="btn secondary action-duplicate-dashboard"
+                        data-dashboard-id="${escapeHtml(dashboard.id)}"
+                    >
+                        📄
+                    </button>
+
+                    <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
+                        Entfernen
+                    </button>
                 </div>
             </summary>
 
@@ -1050,8 +1072,8 @@ export function createDashboardRenderer(deps) {
 
                 <button
                     type="button"
-                    class="btn secondary small-btn rename-btn"
-                    onclick="event.preventDefault(); renameDevice('${safeDeviceId}')"
+                    class="btn secondary small-btn rename-btn action-rename-device"
+                    data-device-id="${safeDeviceId}"
                     title="Gerät umbenennen"
                 >
                     ✏️
@@ -1095,11 +1117,11 @@ export function createDashboardRenderer(deps) {
 
         return `
             <button
-            type="button"
-            class="nav-dashboard-item ${isActive ? 'active' : ''}"
-            onclick="window.location.href='/dashboard/custom/${encodeURIComponent(dashboard.id)}'"
+                type="button"
+                class="nav-dashboard-item ${isActive ? 'active' : ''}"
+                data-dashboard-id="${escapeHtml(dashboard.id)}"
             >
-            ${escapeHtml(dashboard.name)}
+                ${escapeHtml(dashboard.name)}
             </button>
         `;
         }).join('');
@@ -1126,14 +1148,14 @@ export function createDashboardRenderer(deps) {
             <span class="custom-entity-name-wrap">
                 <span>${escapeHtml(getEntityDisplayName(entity))}</span>
 
-                <button
+            <button
                 type="button"
-                class="btn secondary small-btn rename-btn"
-                onclick="event.preventDefault(); renameEntity('${escapeHtml(entity.id)}')"
+                class="btn secondary small-btn rename-btn action-rename-entity"
+                data-entity-id="${escapeHtml(entity.id)}"
                 title="Entität umbenennen"
-                >
+            >
                 ✏️
-                </button>
+            </button>
             </span>
 
             <small>${escapeHtml(entity.type)}</small>
@@ -1153,19 +1175,19 @@ export function createDashboardRenderer(deps) {
 
         let html = `
             <button
-            class="dashboard-tab ${isHomeActive ? 'active' : ''}"
-            onclick="window.location.href='/'"
+                class="dashboard-tab ${isHomeActive ? 'active' : ''}"
+                data-view="home"
             >
-            Home
+                Home
             </button>
         `;
 
         html += customDashboards.map(d => `
             <button
-            class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
-            onclick="window.location.href='/dashboard/custom/${encodeURIComponent(d.id)}'"
+                class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
+                data-dashboard-id="${escapeHtml(d.id)}"
             >
-            ${escapeHtml(d.name)}
+                ${escapeHtml(d.name)}
             </button>
         `).join('');
 
@@ -1181,8 +1203,6 @@ export function createDashboardRenderer(deps) {
         const dashboardEditMode = getDashboardEditMode();
         const dashboardGrid = document.getElementById('dashboardGrid');
         if (!dashboardGrid) return;
-        const dashboardTitleEl = dashboardView.querySelector('h1');
-        dashboardTitleEl.textContent = 'Dashboard';
 
         if (!dashboardDevices.length) {
         dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
@@ -1197,8 +1217,6 @@ export function createDashboardRenderer(deps) {
             dashboardGrid.innerHTML = '<div class="empty-cell">Custom Dashboard nicht gefunden</div>';
             return;
         }
-
-        dashboardTitleEl.textContent = `Dashboard: ${customDashboard.name}`;
 
         devicesToRender = (customDashboard.devices || [])
         .map((dashboardDevice) => {
@@ -1315,8 +1333,8 @@ export function createDashboardRenderer(deps) {
 
                 ${activeCustomDashboardId && dashboardEditMode ? `
                 <button
-                    class="btn secondary small-btn"
-                    onclick="renameDevice('${device.id}')"
+                    class="btn secondary small-btn action-rename-device"
+                    data-device-id="${device.id}"
                     title="Umbenennen"
                 >
                     ✏️

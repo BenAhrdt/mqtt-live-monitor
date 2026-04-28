@@ -105,6 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.3.0 SPA
+* (BenAhrdt) Umbau zum besseren SPA feeling
+* (BenAhrdt) Pending retry, bei auftretenden pending states
+
 ### V1.2.8 Check für Release
 * (BenAhrdt) Leerer commit für Tagging
 

@@ -14,6 +14,7 @@ import {
 } from './utils.js';
 
 import { createDashboardRenderer } from './dashboardRenderer.js';
+window.showView = showView;
 
 socket.on("connect", () => {
     // console.log("Browser Socket verbunden:", socket.id);
@@ -79,6 +80,9 @@ const dashboardEditModeBtn = document.getElementById('dashboardEditModeBtn');
 const exportDashboardsBtn = document.getElementById('exportDashboardsBtn');
 const importDashboardsBtn = document.getElementById('importDashboardsBtn');
 const importDashboardsFile = document.getElementById('importDashboardsFile');
+
+const entityTypesBtn = document.getElementById('entityFilterBtn');
+const editDashboardBtn = document.getElementById('dashboardEditModeBtn');
 
 let paused = false;
 let totalMessages = Number(sessionStorage.getItem('totalMessages') || 0);
@@ -208,12 +212,33 @@ liveMessageLimitInput.addEventListener('change', () => {
 });
 
 function applyInitialMobileSidebarState() {
-    appLayout.classList.add('sidebar-collapsed');
+    const saved = localStorage.getItem('sidebarCollapsed');
+
+    if (saved === '1') {
+        appLayout.classList.add('sidebar-collapsed');
+    } else if (saved === '0') {
+        appLayout.classList.remove('sidebar-collapsed');
+    } else {
+        // 👉 Default (z. B. mobil = collapsed)
+        if (window.innerWidth < 768) {
+            appLayout.classList.add('sidebar-collapsed');
+        }
+    }
 }
 
-function showView(viewName) {
+function showView(viewName, options = {}) {
     currentView = viewName;
 
+    // Aktivierungen deaktiviern
+    document
+    .querySelectorAll('.nav-dashboard-item, [data-view], .top-nav-btn')
+    .forEach(el => el.classList.remove('active'));
+
+    // Button ausblenden
+    entityTypesBtn.classList.add('hidden');
+    editDashboardBtn.classList.add('hidden');
+
+    // Alle Views verstecken
     liveMonitorView.style.display = 'none';
     dashboardView.style.display = 'none';
     settingsView.style.display = 'none';
@@ -221,51 +246,81 @@ function showView(viewName) {
     showHomeBtn.classList.remove('active');
     showLiveMonitorBtn.classList.remove('active');
     showSettingsBtn.classList.remove('active');
-    toggleCustomDashboardsBtn?.classList.remove('active');
 
-    if (viewName === 'dashboard') {
-    dashboardView.style.display = 'block';
-    if (activeCustomDashboardId) {
-        toggleCustomDashboardsBtn?.classList.add('active');
-    } else {
+    // 🏠 HOME
+    if (viewName === 'home') {
+        activeCustomDashboardId = null;
+
+        dashboardView.style.display = 'block';
         showHomeBtn.classList.add('active');
+
+        entityTypesBtn.classList.remove('hidden');
+        document.querySelector('[data-view="home"]')?.classList.add('active');
+
+        if (options.updateUrl !== false) {
+            history.pushState(null, '', '/');
+        }
+
+        loadDashboardDevices();
+        return;
     }
 
-    const isUrlDashboard = window.location.pathname.startsWith('/dashboard/');
-    entityFilterDropdown.style.display = isUrlDashboard ? 'none' : 'block';
+    // 📊 CUSTOM DASHBOARD
+    if (viewName === 'dashboard') {
+        if (options.customDashboardId !== undefined) {
+            activeCustomDashboardId = options.customDashboardId;
+        }
 
-    if (activeCustomDashboardId) {
-        dashboardEditModeBtn.classList.remove('hidden');
-    } else {
-        dashboardEditModeBtn.classList.add('hidden');
-        dashboardEditMode = false; // zurücksetzen
+        editDashboardBtn.classList.remove('hidden');
+
+        dashboardView.style.display = 'block';
+
+        // 👉 Sidebar Active setzen
+        document.querySelector(
+        `.nav-dashboard-item[data-dashboard-id="${activeCustomDashboardId}"]`
+        )?.classList.add('active');
+
+        if (activeCustomDashboardId) {
+            if (options.updateUrl !== false) {
+                history.pushState(
+                    null,
+                    '',
+                    `/dashboard/custom/${encodeURIComponent(activeCustomDashboardId)}`
+                );
+            }
+        }
+
+        loadDashboardDevices();
+        return;
     }
 
-    loadDashboardDevices();
-    return;
-    }
-
+    // 📡 LIVE
     if (viewName === 'live') {
         liveMonitorView.style.display = 'block';
         showLiveMonitorBtn.classList.add('active');
 
-        totalMessagesEl.textContent = totalMessages;
-        updateTopicList();
-        renderLiveMessages();
+        if (options.updateUrl !== false) {
+            history.pushState(null, '', '/live');
+        }
 
         return;
     }
 
+    // ⚙️ SETTINGS
     if (viewName === 'settings') {
-    settingsView.style.display = 'block';
-    showSettingsBtn.classList.add('active');
+        settingsView.style.display = 'block';
+        showSettingsBtn.classList.add('active');
 
-    loadDashboardDevices().then(() => {
-        dashboardRenderer.renderCustomDashboards();
-    });
-
-    return;
+        if (options.updateUrl !== false) {
+            history.pushState(null, '', '/settings');
+        }
+        ensureDevicesInitialized();
+        return;
     }
+}
+
+function ensureDevicesInitialized() {
+    dashboardRenderer.renderCustomDashboards();
 }
 
 function getLightStateValue(value) {
@@ -775,8 +830,83 @@ function removeCustomDashboard(index) {
     saveCustomDashboards();
 }
 
-function openCustomDashboard(id) {
-    window.location.href = `/dashboard/custom/${encodeURIComponent(id)}`;
+function renameDashboard(dashboardId) {
+    const dashboard = customDashboards.find(d => d.id === dashboardId);
+    if (!dashboard) return;
+
+    const newNameRaw = prompt('Dashboard umbenennen:', dashboard.name);
+    if (newNameRaw === null) return;
+
+    const newName = newNameRaw.trim();
+    if (!newName) return;
+
+    // 👉 doppelte Namen verhindern
+    const nameExists = customDashboards.some(
+        d => d.name.toLowerCase() === newName.toLowerCase() && d.id !== dashboardId
+    );
+
+    if (nameExists) {
+        alert('Ein Dashboard mit diesem Namen existiert bereits');
+        return;
+    }
+
+    // 👉 neue ID generieren (slug)
+    const newId = slugifyDashboardName(newName);
+
+    // 👉 ID Konflikt verhindern
+    const idExists = customDashboards.some(
+        d => d.id === newId && d.id !== dashboardId
+    );
+
+    if (idExists) {
+        alert('Interner Fehler: ID bereits vergeben');
+        return;
+    }
+
+    dashboard.name = newName;
+    dashboard.id = newId;
+
+    // 👉 aktives Dashboard updaten
+    if (activeCustomDashboardId === dashboardId) {
+        activeCustomDashboardId = newId;
+    }
+
+    saveCustomDashboards();
+
+    dashboardRenderer.renderCustomDashboards();
+    dashboardRenderer.renderCustomDashboardsNav();
+    dashboardRenderer.renderDashboard();
+}
+
+function duplicateDashboard(dashboardId) {
+    const original = customDashboards.find(d => d.id === dashboardId);
+    if (!original) return;
+
+    let baseName = original.name + ' Kopie';
+    let counter = 1;
+    let newName = baseName;
+
+    // 👉 eindeutigen Namen erzeugen
+    while (customDashboards.some(d => d.name === newName)) {
+        counter++;
+        newName = `${baseName} (${counter})`;
+    }
+
+    const newId = slugifyDashboardName(newName);
+
+    const copy = {
+        id: newId,
+        name: newName,
+        devices: JSON.parse(JSON.stringify(original.devices || []))
+    };
+
+    customDashboards.push(copy);
+
+    saveCustomDashboards();
+
+    dashboardRenderer.renderCustomDashboards();
+    dashboardRenderer.renderCustomDashboardsNav();
+
 }
 
 let draggedDashboardDeviceId = null;
@@ -1656,13 +1786,9 @@ importDashboardsFile.addEventListener('change', async () => {
     }
 });
 
-showHomeBtn.addEventListener('click', () => {
-    activeCustomDashboardId = null;
-    dashboardEditMode = false;
-
-    history.pushState(null, '', '/');
-
-    showView('dashboard');
+showHomeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showView('home');
 });
 
 showSettingsBtn.addEventListener('click', () => {
@@ -1671,11 +1797,124 @@ showSettingsBtn.addEventListener('click', () => {
 
 sidebarToggleBtn.addEventListener('click', () => {
     appLayout.classList.toggle('sidebar-collapsed');
+
+    const isCollapsed = appLayout.classList.contains('sidebar-collapsed');
+
+    localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
 });
 
 entityFilterBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     entityFilterDropdown.classList.toggle('open');
+});
+
+// Clickhandler
+document.addEventListener('click', async (e) => {
+
+    // 🔥 1. TABS (Home + Custom Dashboards)
+    const tab = e.target.closest('.dashboard-tab');
+    if (tab) {
+        e.preventDefault();
+
+        // 👉 Home Tab
+        if (tab.dataset.view === 'home') {
+            showView('home');
+            return;
+        }
+
+        // 👉 Custom Dashboard Tab
+        const id = tab.dataset.dashboardId;
+        if (id) {
+            showView('dashboard', {
+                customDashboardId: id
+            });
+            return;
+        }
+    }
+
+    // 🔥 2. DASHBOARD Navigation (Sidebar + Öffnen)
+    const dashboardBtn = e.target.closest(
+        '.nav-dashboard-item, .open-dashboard-btn'
+    );
+
+    if (dashboardBtn) {
+        e.preventDefault();
+
+        const id = dashboardBtn.dataset.dashboardId;
+
+        if (id) {
+            showView('dashboard', {
+                customDashboardId: id
+            });
+        }
+
+        return;
+    }
+
+    // 🔥 3. RENAME DEVICE  ← HIER!
+    const renameDeviceBtn = e.target.closest('.action-rename-device');
+    if (renameDeviceBtn) {
+        const deviceId = renameDeviceBtn.dataset.deviceId;
+
+        renameDevice(deviceId);
+        return;
+    }
+
+    // 🔥 4. RENAME ENTITY
+    const renameEntityBtn = e.target.closest('.action-rename-entity');
+    if (renameEntityBtn) {
+        const entityId = renameEntityBtn.dataset.entityId;
+
+        renameEntity(entityId);
+        return;
+    }
+
+    // 🔥 3. EFFECT OPTION (Dropdown Auswahl)
+    const option = e.target.closest('.effect-option');
+    if (option) {
+        const dropdown = option.closest('.effect-dropdown');
+        const entityId = dropdown.dataset.entity;
+        const value = option.dataset.value;
+
+        const selectedText = dropdown.querySelector('.effect-selected-text');
+        if (selectedText) {
+            selectedText.textContent = option.textContent.trim();
+        }
+
+        dropdown.classList.remove('open');
+
+        document.querySelectorAll('.effect-option.active')
+            .forEach(el => el.classList.remove('active'));
+        option.classList.add('active');
+
+        await setLightEffect(entityId, value);
+        return;
+    }
+
+    // 🔥 4. Dropdown öffnen
+    const selected = e.target.closest('.effect-selected');
+    if (selected) {
+        const dropdown = selected.closest('.effect-dropdown');
+        const isOpen = dropdown.classList.contains('open');
+
+        document.querySelectorAll('.effect-dropdown.open')
+            .forEach(d => d.classList.remove('open'));
+
+        if (!isOpen) {
+            dropdown.classList.add('open');
+        }
+
+        return;
+    }
+
+    // 🔥 5. Entity Filter Dropdown schließen
+    if (!e.target.closest('.entity-filter-dropdown')) {
+        entityFilterDropdown.classList.remove('open');
+    }
+
+    // 🔥 6. Alle offenen Effekt-Dropdowns schließen
+    document.querySelectorAll('.effect-dropdown.open')
+        .forEach(d => d.classList.remove('open'));
 });
 
 dashboardEditModeBtn.addEventListener('click', () => {
@@ -1823,50 +2062,6 @@ copyBtn.addEventListener('click', async () => {
 
 window.addEventListener('resize', applyInitialMobileSidebarState);
 
-document.addEventListener('click', async (e) => {
-    const option = e.target.closest('.effect-option');
-    if (option) {
-    const dropdown = option.closest('.effect-dropdown');
-    const entityId = dropdown.dataset.entity;
-    const value = option.dataset.value;
-
-    const selectedText = dropdown.querySelector('.effect-selected-text');
-    if (selectedText) {
-        selectedText.textContent = option.textContent.trim();
-    }
-
-    dropdown.classList.remove('open');
-
-    document.querySelectorAll('.effect-option.active')
-        .forEach(el => el.classList.remove('active'));
-    option.classList.add('active');
-
-    await setLightEffect(entityId, value);
-    return;
-    }
-
-    const selected = e.target.closest('.effect-selected');
-    if (selected) {
-    const dropdown = selected.closest('.effect-dropdown');
-    const isOpen = dropdown.classList.contains('open');
-
-    document.querySelectorAll('.effect-dropdown.open')
-        .forEach(d => d.classList.remove('open'));
-
-    if (!isOpen) {
-        dropdown.classList.add('open');
-    }
-    return;
-    }
-
-    if (!e.target.closest('.entity-filter-dropdown')) {
-    entityFilterDropdown.classList.remove('open');
-    }
-
-    document.querySelectorAll('.effect-dropdown.open')
-    .forEach(d => d.classList.remove('open'));
-});
-
 // Einstellungen
 /************************************************************
  * **********************************************************
@@ -1937,10 +2132,6 @@ initSettings({
   loadDashboardDevices
 });
 
-window.renameDevice = renameDevice;
-window.renameEntity = renameEntity;
-
-window.openCustomDashboard = openCustomDashboard;
 window.removeCustomDashboard = removeCustomDashboard;
 window.addDeviceToCustomDashboard = addDeviceToCustomDashboard;
 window.addAllDevicesToCustomDashboard = addAllDevicesToCustomDashboard;
@@ -1979,14 +2170,82 @@ window.pressButtonEntity = pressButtonEntity;
 window.setNumberEntity = setNumberEntity;
 window.setTextEntity = setTextEntity;
 
-activeCustomDashboardId = getCustomDashboardIdFromUrl();
+const customId = getCustomDashboardIdFromUrl();
 
-loadConfig();
-loadVersion();
-checkForUpdates();
-applyInitialMobileSidebarState();
-showView('dashboard');
-messageCountEl.textContent = totalMessages;
-totalMessagesEl.textContent = totalMessages;
+// 4️⃣ starten
+init();
 
 setInterval(checkForUpdates, 60_000);
+
+window.addEventListener('popstate', () => {
+    const customId = getCustomDashboardIdFromUrl();
+
+    if (customId) {
+        showView('dashboard', {
+            customDashboardId: customId,
+            updateUrl: false
+        });
+    } else {
+        showView('home', {
+            updateUrl: false
+        });
+    }
+});
+
+function getViewFromUrl() {
+    const url = window.location.pathname;
+    switch (url) {
+        case '/live':
+            return 'live';
+        case '/settings':
+            return 'settings';
+        default:
+        return 'home';
+    }
+}
+
+async function init() {
+    // 1️⃣ Daten laden (WICHTIG!)
+    await loadConfig();
+
+    // 2️⃣ Danach View anzeigen
+    if (customId) {
+        showView('dashboard', {
+            customDashboardId: customId,
+            updateUrl: false
+        });
+    } else {
+        showView(getViewFromUrl(), {
+            updateUrl: false
+        });
+    }
+
+    // 3️⃣ Rest
+    loadVersion();
+    checkForUpdates();
+    applyInitialMobileSidebarState();
+    messageCountEl.textContent = totalMessages;
+    totalMessagesEl.textContent = totalMessages;
+
+    document.addEventListener('click', (e) => {
+
+        const settingsBtn = e.target.closest('#openSettingsBtn');
+        if (settingsBtn) {
+            showView('settings');
+            return;
+        }
+
+        const renameBtn = e.target.closest('.action-rename-dashboard');
+        if (renameBtn) {
+            renameDashboard(renameBtn.dataset.dashboardId);
+            return;
+        }
+
+        const duplicateBtn = e.target.closest('.action-duplicate-dashboard');
+        if (duplicateBtn) {
+            duplicateDashboard(duplicateBtn.dataset.dashboardId);
+            return;
+        }
+    });
+
+}
