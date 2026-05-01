@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.3.1 Login Position verändert
+* (BenAhrdt) Login icon genz rechts oben hin geschoben
+
 ### V1.3.1 admin login möglich
 * (BenAhrdt) es kann ein Admin angelegt werden und dann ist ein login für die Einstellungen notwendig
 
