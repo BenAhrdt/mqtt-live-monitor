@@ -2174,7 +2174,7 @@ const customId = getCustomDashboardIdFromUrl();
 // 4️⃣ starten
 init();
 
-setInterval(checkForUpdates, 60_000);
+setInterval(checkForUpdates, 120_000);
 
 window.addEventListener('popstate', () => {
     const customId = getCustomDashboardIdFromUrl();
