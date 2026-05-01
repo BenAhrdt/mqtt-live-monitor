@@ -2354,7 +2354,7 @@ if (localStorage.getItem("isLoggedIn")) {
 
 loginBtn.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
-
+    console.log("erfolgreicht gelöscht");
     const confirmReset = confirm("Admin wirklich komplett zurücksetzen?");
     if (!confirmReset) return;
 

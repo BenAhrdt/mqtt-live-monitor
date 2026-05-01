@@ -105,7 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### V1.3.1 Login Position verändert
+### V1.3.3 Update Test
+* (BenAhrdt) Test für Update skript
+
+### V1.3.2 Login Position verändert
 * (BenAhrdt) Login icon genz rechts oben hin geschoben
 
 ### V1.3.1 admin login möglich
