@@ -2384,3 +2384,11 @@ code {
 .main {
   flex: 1;   /* 🔥 DAS IST DER KEY */
 }
+
+.custom-dashboard-device-card.drag-over {
+    border: 2px dashed #4ade80;
+}
+
+.custom-dashboard-device-card.dragging {
+    opacity: 0.5;
+}

@@ -126,7 +126,8 @@ const dashboardRenderer = createDashboardRenderer({
     getEntityDisplayName: (entity) => getEntityDisplayName(entity),
     getLightStateValue: (value) => getLightStateValue(value),
     updateClimateSliderBubble: (input) => updateClimateSliderBubble(input),
-    updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input)
+    updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
+    moveDevice: moveCustomDashboardDevice
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -968,8 +969,10 @@ function setupDashboardDragAndDrop() {
     });
 }
 
-function moveCustomDashboardDevice(draggedId, targetId) {
-    const dashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {
+    const dashboardId = dashboardIdOverride || activeCustomDashboardId;
+
+    const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
     const fromIndex = dashboard.devices.findIndex(d => d.deviceId === draggedId);
@@ -980,7 +983,14 @@ function moveCustomDashboardDevice(draggedId, targetId) {
     const [moved] = dashboard.devices.splice(fromIndex, 1);
     dashboard.devices.splice(toIndex, 0, moved);
 
-    dashboardRenderer.renderDashboard();
+    if (dashboardIdOverride) {
+        // Settings View
+        dashboardRenderer.renderCustomDashboards();
+    } else {
+        // Dashboard View
+        dashboardRenderer.renderDashboard();
+    }
+
     saveCustomDashboards();
 }
 

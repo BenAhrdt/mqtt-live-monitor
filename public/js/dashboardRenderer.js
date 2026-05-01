@@ -26,8 +26,59 @@ export function createDashboardRenderer(deps) {
     getEntityDisplayName,
     getLightStateValue,
     updateClimateSliderBubble,
-    updateHumidifierSliderBubble
+    updateHumidifierSliderBubble,
+    moveDevice
   } = deps;
+
+    function setupSettingsDragAndDrop(container, dashboardId) {
+        let draggedId = null;
+
+        const cards = container.querySelectorAll('.custom-dashboard-device-card');
+
+        cards.forEach((card) => {
+
+            card.addEventListener('dragstart', (e) => {
+                draggedId = card.dataset.deviceId;
+                card.classList.add('dragging');
+
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                draggedId = null;
+
+                document.querySelectorAll('.custom-dashboard-device-card')
+                    .forEach(c => c.classList.remove('drag-over'));
+            });
+
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+
+                if (!draggedId) return;
+
+                card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+
+                const targetId = card.dataset.deviceId;
+
+                document.querySelectorAll('.custom-dashboard-device-card')
+                    .forEach(c => c.classList.remove('drag-over'));
+
+                if (!draggedId || draggedId === targetId) return;
+
+                // 👉 nutzt DEINE bestehende Funktion
+                moveDevice(draggedId, targetId, dashboardId);
+            });
+        });
+    }
 
     function renderRenameEntityButton(entityId) {
         const activeCustomDashboardId = getActiveCustomDashboardId();
@@ -1054,6 +1105,8 @@ export function createDashboardRenderer(deps) {
         `;
 
         list.appendChild(row);
+        const container = row.querySelector('.dashboard-device-selector');
+        setupSettingsDragAndDrop(container, dashboard.id);
         });
     }
 
@@ -1064,38 +1117,44 @@ export function createDashboardRenderer(deps) {
         const safeDeviceId = escapeHtml(device.id);
 
         return `
-        <details class="custom-dashboard-device-card" data-device-key="${escapeHtml(deviceKey)}" ${isOpen ? 'open' : ''}>
-            <summary class="custom-device-summary">
-            <div class="custom-device-left">
-                <div class="custom-device-name-wrap">
-                <strong>${escapeHtml(getDeviceDisplayName(device))}</strong>
-
-                <button
-                    type="button"
-                    class="btn secondary small-btn rename-btn action-rename-device"
-                    data-device-id="${safeDeviceId}"
-                    title="Gerät umbenennen"
-                >
-                    ✏️
-                </button>
-                </div>
-
-                <small class="muted">${escapeHtml(device.id)}</small>
-            </div>
-
-            <button
-                type="button"
-                class="btn danger small-btn"
-                onclick="event.preventDefault(); removeDeviceFromCustomDashboard('${safeDashboardId}', '${safeDeviceId}')"
+            <details 
+                class="custom-dashboard-device-card" 
+                data-device-key="${escapeHtml(deviceKey)}"
+                data-device-id="${safeDeviceId}"
+                ${isOpen ? 'open' : ''}
+                draggable="true"
             >
-                Entfernen
-            </button>
-            </summary>
+                <summary class="custom-device-summary">
+                    <div class="custom-device-left">
+                        <div class="custom-device-name-wrap">
+                            <strong>${escapeHtml(getDeviceDisplayName(device))}</strong>
 
-            <div class="custom-dashboard-entities">
-            ${renderEntitySelector(dashboard, device)}
-            </div>
-        </details>
+                            <button
+                                type="button"
+                                class="btn secondary small-btn rename-btn action-rename-device"
+                                data-device-id="${safeDeviceId}"
+                                title="Gerät umbenennen"
+                            >
+                                ✏️
+                            </button>
+                        </div>
+
+                        <small class="muted">${escapeHtml(device.id)}</small>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="btn danger small-btn"
+                        onclick="event.preventDefault(); removeDeviceFromCustomDashboard('${safeDashboardId}', '${safeDeviceId}')"
+                    >
+                        Entfernen
+                    </button>
+                </summary>
+
+                <div class="custom-dashboard-entities">
+                    ${renderEntitySelector(dashboard, device)}
+                </div>
+            </details>
         `;
     }
 
