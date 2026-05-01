@@ -318,7 +318,8 @@ function showView(viewName, options = {}) {
     }
 }
 
-function ensureDevicesInitialized() {
+async function ensureDevicesInitialized() {
+    await loadDashboardDevices();
     dashboardRenderer.renderCustomDashboards();
 }
 
