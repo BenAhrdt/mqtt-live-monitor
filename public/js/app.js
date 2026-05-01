@@ -213,7 +213,6 @@ liveMessageLimitInput.addEventListener('change', () => {
 
 function applyInitialMobileSidebarState() {
     const saved = localStorage.getItem('sidebarCollapsed');
-
     if (saved === '1') {
         appLayout.classList.add('sidebar-collapsed');
     } else if (saved === '0') {
@@ -2204,6 +2203,183 @@ function getViewFromUrl() {
     }
 }
 
+const loginBtn = document.getElementById("loginBtn");
+const modal = document.getElementById("loginModal");
+
+const createBlock = document.getElementById("loginCreateBlock");
+const existingBlock = document.getElementById("loginExistingBlock");
+const title = document.getElementById("loginTitle");
+const errorBox = document.getElementById("loginError");
+
+loginBtn.addEventListener("click", () => {
+  const isLoggedIn = localStorage.getItem("isLoggedIn");
+
+  // 🔐 bereits eingeloggt → Logout fragen
+  if (isLoggedIn) {
+    const confirmLogout = confirm("Möchtest du dich ausloggen?");
+    
+    if (confirmLogout) {
+      setLoggedIn(false);
+    }
+
+    return;
+  }
+
+  // 🔑 nicht eingeloggt → Login öffnen
+  openLoginModal();
+});
+
+document.getElementById("closeLoginModal").onclick = () => {
+  modal.classList.add("hidden");
+};
+
+async function openLoginModal() {
+    errorBox.textContent = "";
+
+    const res = await fetch("/api/admin/exists");
+    const data = await res.json();
+
+    modal.classList.remove("hidden");
+
+    if (!data.exists) {
+        title.textContent = "Admin erstellen";
+        createBlock.classList.remove("hidden");
+        existingBlock.classList.add("hidden");
+    } else {
+        title.textContent = "Login";
+        createBlock.classList.add("hidden");
+        existingBlock.classList.remove("hidden");
+    }
+}
+
+function updateAuthUI(isLoggedIn, adminExists) {
+    const settingsBtn = document.getElementById("openSettingsBtn");
+    const editBtn = document.getElementById("dashboardEditModeBtn");
+    const sidebar = document.querySelector(".sidebar");
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+
+    if (adminExists && !isLoggedIn) {
+        settingsBtn?.classList.add("hidden-auth");
+        editBtn?.classList.add("hidden-auth");
+        //sidebar?.classList.add("hidden-auth");
+        //sidebarToggleBtn?.classList.add("hidden-auth");
+        appLayout.classList.add("no-sidebar");
+    } else {
+        settingsBtn?.classList.remove("hidden-auth");
+        editBtn?.classList.remove("hidden-auth");
+        //sidebar?.classList.remove("hidden-auth");
+        //sidebarToggleBtn?.classList.remove("hidden-auth");
+        appLayout.classList.remove("no-sidebar");
+    }
+}
+
+document.getElementById("createAdminBtn").onclick = async () => {
+    const p1 = document.getElementById("newPassword1").value;
+    const p2 = document.getElementById("newPassword2").value;
+
+    if (!p1 || !p2) {
+        return errorBox.textContent = "Bitte beide Felder ausfüllen";
+    }
+
+    if (p1 !== p2) {
+        return errorBox.textContent = "Passwörter stimmen nicht überein";
+    }
+
+    const res = await fetch("/api/admin/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: p1 })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+    return errorBox.textContent = data.error || "Fehler";
+    }
+
+    modal.classList.add("hidden");
+    setLoggedIn(true);
+};
+
+document.getElementById("loginSubmitBtn").onclick = async () => {
+  const passwordInput = document.getElementById("loginPassword"); // 👈 NEU
+  const input = passwordInput.value;
+
+  try { // 👈 NEU
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ password: input })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) { // 👈 NEU
+      errorBox.textContent = data.error || "Falsches Passwort";
+      passwordInput.value = ""; // 👈 NEU
+      return; // 👈 NEU
+    }
+
+    // Erfolg
+    modal.classList.add("hidden");
+    setLoggedIn(true);
+    passwordInput.value = ""; // 👈 NEU
+
+  } catch (err) { // 👈 NEU
+    errorBox.textContent = "Netzwerkfehler";
+  }
+};
+
+function setLoggedIn(state) {
+    if (state) {
+        loginBtn.classList.add("logged-in");
+        loginBtn.title = "Logout";
+
+        localStorage.setItem("isLoggedIn", "true");
+    } else {
+        loginBtn.classList.remove("logged-in");
+        loginBtn.title = "Login";
+
+        localStorage.removeItem("isLoggedIn");
+    }
+
+    updateAuthUI(state, true);
+}
+
+// beim Laden prüfen
+if (localStorage.getItem("isLoggedIn")) {
+  setLoggedIn(true);
+}
+
+loginBtn.addEventListener("contextmenu", async (e) => {
+    e.preventDefault();
+
+    const confirmReset = confirm("Admin wirklich komplett zurücksetzen?");
+    if (!confirmReset) return;
+
+    try {
+        const res = await fetch("/api/admin/reset", {
+            method: "POST"
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            localStorage.removeItem("isLoggedIn");
+            loginBtn.classList.remove("logged-in");
+            loginBtn.title = "Login";
+
+            alert("Admin + Login zurückgesetzt");
+        } else {
+            alert(data.error || "Fehler beim Reset");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Serverfehler beim Reset");
+    }
+});
+
 async function init() {
     // 1️⃣ Daten laden (WICHTIG!)
     await loadConfig();
@@ -2226,6 +2402,13 @@ async function init() {
     applyInitialMobileSidebarState();
     messageCountEl.textContent = totalMessages;
     totalMessagesEl.textContent = totalMessages;
+
+    const res = await fetch("/api/admin/exists");
+    const data = await res.json();
+
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+
+    updateAuthUI(isLoggedIn, data.exists);
 
     document.addEventListener('click', (e) => {
 

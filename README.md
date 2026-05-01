@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.3.1 admin login möglich
+* (BenAhrdt) es kann ein Admin angelegt werden und dann ist ein login für die Einstellungen notwendig
+
 ### V1.3.0 SPA
 * (BenAhrdt) Umbau zum besseren SPA feeling
 * (BenAhrdt) Pending retry, bei auftretenden pending states

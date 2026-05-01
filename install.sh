@@ -16,23 +16,29 @@ echo ">> Update Paketliste"
 apt update
 
 echo ">> Installiere benötigte Pakete"
-apt install -y git curl
+apt install -y git curl build-essential python3 make g++
 
-if ! command -v node >/dev/null 2>&1; then
-  echo ">> Installiere Node.js"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+echo ">> Prüfe Node.js"
+
+if command -v node >/dev/null 2>&1; then
+  NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
+
+  if [ "$NODE_MAJOR" -lt 22 ]; then
+    echo ">> Upgrade Node.js auf v22"
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt install -y nodejs
+  else
+    echo ">> Node.js Version ist aktuell: $(node -v)"
+  fi
+else
+  echo ">> Installiere Node.js v22"
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt install -y nodejs
-else
-  echo ">> Node.js bereits installiert"
 fi
 
-if [ -d "$APP_DIR/.git" ]; then
-  echo ">> Bestehende Git-Installation gefunden in $APP_DIR"
-else
-  echo ">> Installationsverzeichnis vorbereiten"
-  rm -rf "$APP_DIR"
-  git clone "$REPO_URL" "$APP_DIR"
-fi
+echo ">> Installationsverzeichnis vorbereiten"
+rm -rf "$APP_DIR"
+git clone "$REPO_URL" "$APP_DIR"
 
 cd "$APP_DIR"
 
@@ -44,12 +50,35 @@ fi
 echo ">> Installiere npm Abhängigkeiten"
 npm install --omit=dev
 
+echo ">> Rebuild native modules (z. B. bcrypt)"
+npm rebuild
+
 echo ">> Installiere systemd Service"
 cp deploy/${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service
 
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}
 systemctl restart ${SERVICE_NAME}
+
+echo ">> Warte auf API..."
+
+SUCCESS=0
+
+for i in {1..10}; do
+  if curl -s http://127.0.0.1:3000/api/version > /dev/null; then
+    echo ">> API erreichbar:"
+    curl -s http://127.0.0.1:3000/api/version
+    echo ""
+    SUCCESS=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SUCCESS" -ne 1 ]; then
+  echo "❌ API nicht erreichbar nach Installation"
+  systemctl status "$SERVICE_NAME" --no-pager
+fi
 
 echo ""
 echo "==== Installation abgeschlossen ===="

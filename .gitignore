@@ -1,5 +1,6 @@
 node_modules/
 config-dev.json
+credentials.json
 .env
 .DS_Store
 npm-debug.log*

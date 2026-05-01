@@ -575,6 +575,9 @@ code {
 .dashboard-title-wrap {
   display: flex;
   flex-direction: column;
+
+    min-width: 0;   /* 👈 NEU hinzufügen */
+    flex: 1;        /* 👈 NEU hinzufügen */
 }
 
 .entity-filter-dropdown {
@@ -2217,6 +2220,8 @@ code {
 
     margin-top: 6px;
     padding-bottom: 2px;
+
+    flex-wrap: wrap;   /* 👈 NEU hinzufügen */
 }
 
 /* BASIS TAB */
@@ -2238,6 +2243,9 @@ code {
     display: flex;
     align-items: center;
     gap: 8px;
+
+    flex-shrink: 0;      /* 👈 NEU */
+    white-space: nowrap; /* 👈 NEU */
 }
 
 /* Hover */
@@ -2289,4 +2297,90 @@ code {
     display: flex;
     align-items: center;
     gap: 10px;
+
+
+    flex-shrink: 0;   /* 👈 NEU */
+}
+
+#loginBtn {
+  background: none;
+  border: none;
+  box-shadow: none;
+
+  color: #cfd8e3; /* grau */
+  font-size: 18px;
+
+  cursor: pointer;
+  padding: 6px;
+}
+
+/* Hover */
+#loginBtn:hover {
+  color: #ffffff;
+}
+
+#loginBtn.logged-in {
+  color: #22c55e;
+}
+
+#loginBtn.logged-in:hover {
+  color: #c41717;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 2000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  width: 90%;
+  max-width: 360px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-content input {
+  background: #0b1422;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.hidden-auth {
+  display: none !important;
+}
+
+.app.no-sidebar {
+  grid-template-columns: 1fr;
+}
+
+.app.no-sidebar .sidebar {
+  display: none;
+}
+
+.no-sidebar .main {
+  width: 100% !important;
+  margin-left: 0 !important;
+}
+
+.main {
+  flex: 1;   /* 🔥 DAS IST DER KEY */
 }

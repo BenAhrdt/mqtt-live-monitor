@@ -5,11 +5,15 @@ const http = require("http");
 const mqtt = require("mqtt");
 const packageJson = require("./package.json");
 const { exec } = require("child_process");
+const bcrypt = require("bcrypt");
 
 const { Server } = require("socket.io");
 
 const https = require('https');
 
+const CRED_FILE = path.join(__dirname, "credentials.json");
+
+// Version
 function fetchLatestVersion() {
   return new Promise((resolve) => {
     https.get(
@@ -43,8 +47,83 @@ let pendingRetryInterval = null;
 let pendingRetryTimeout = null;
 
 const app = express();
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const io = new Server(server);
+
+
+// Admin login
+function readCredentials() {
+  try {
+    if (!fs.existsSync(CRED_FILE)) {
+      return { password: null };
+    }
+
+    const raw = fs.readFileSync(CRED_FILE, "utf8");
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("Fehler beim Lesen credentials.json:", err.message);
+    return { password: null };
+  }
+}
+
+app.get("/api/admin/exists", (req, res) => {
+  const creds = readCredentials();
+
+  res.json({ exists: !!creds.passwordHash });
+});
+
+function writeCredentials(data) {
+  try {
+    fs.writeFileSync(CRED_FILE, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.error("Fehler beim Schreiben credentials.json:", err.message);
+  }
+}
+
+app.post("/api/admin/create", async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ error: "Passwort fehlt" });
+  }
+
+  const creds = readCredentials();
+
+  if (creds.passwordHash) {
+    return res.status(400).json({ error: "Admin existiert bereits" });
+  }
+
+  const hash = await bcrypt.hash(password, 10)
+
+  writeCredentials({ passwordHash: hash });
+
+  res.json({ success: true });
+});
+
+app.post("/api/admin/reset", (req, res) => {
+  writeCredentials({ passwordHash: null });
+  res.json({ success: true });
+});
+
+app.post("/api/admin/login", async (req, res) => {
+  const { password } = req.body;
+  
+  const creds = readCredentials();
+
+  if (!creds.passwordHash) {
+    return res.status(400).json({ error: "Kein Admin vorhanden" });
+  }
+
+  const isValid = await bcrypt.compare(password, creds.passwordHash);
+
+  if (isValid) {
+    return res.json({ success: true });
+  }
+
+  res.status(401).json({ error: "Falsches Passwort" });
+});
 
 app.get('/api/update/check', async (req, res) => {
   const currentVersion = require('./package.json').version;
@@ -87,9 +166,6 @@ const CONFIG_PATH = fs.existsSync(CONFIG_DEV_PATH)
   : CONFIG_DEFAULT_PATH;
 
 console.log("Verwende Config:", path.basename(CONFIG_PATH));
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/version", (req, res) => {
   res.json({
