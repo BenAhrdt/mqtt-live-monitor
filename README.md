@@ -105,6 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Beim Reload in /setting werden die Dashboard Geräte nun korrekt angezeigt
+* (BenAhrdt) Versionscheck alle 120s anstatt 60s
+
 ### V1.3.3 Update Test
 * (BenAhrdt) Test für Update skript
 
