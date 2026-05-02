@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Home im ausgeloggten Zustand nicht sichtbar
+
 ### V1.3.4 Drag and Drop der Geräte auch in den Einstellungen
 * (BenAhrdt) Drag and Drop der Geräte in den Einstellungen
 * (BenAhrdt) Beim Reload in /setting werden die Dashboard Geräte nun korrekt angezeigt

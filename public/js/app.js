@@ -127,7 +127,7 @@ const dashboardRenderer = createDashboardRenderer({
     getLightStateValue: (value) => getLightStateValue(value),
     updateClimateSliderBubble: (input) => updateClimateSliderBubble(input),
     updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
-    moveDevice: moveCustomDashboardDevice
+    moveDevice: moveCustomDashboardDevice,
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -2346,16 +2346,30 @@ function setLoggedIn(state) {
     if (state) {
         loginBtn.classList.add("logged-in");
         loginBtn.title = "Logout";
-
         localStorage.setItem("isLoggedIn", "true");
+
     } else {
         loginBtn.classList.remove("logged-in");
         loginBtn.title = "Login";
-
         localStorage.removeItem("isLoggedIn");
+
+        // 👉 Logout Redirect auf erstes Dashboard
+        const firstDashboard = customDashboards[0];
+
+        if (firstDashboard) {
+            showView('dashboard', {
+                customDashboardId: firstDashboard.id
+            });
+        } else {
+            showView('home');
+        }
     }
 
     updateAuthUI(state, true);
+
+    // 👉 UI neu bauen
+    dashboardRenderer.renderCustomDashboardsNav();
+    dashboardRenderer.renderDashboardTabs();
 }
 
 // beim Laden prüfen

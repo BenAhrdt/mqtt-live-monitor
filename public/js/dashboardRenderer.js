@@ -1231,15 +1231,20 @@ export function createDashboardRenderer(deps) {
         const activeId = getActiveCustomDashboardId();
 
         const isHomeActive = window.location.pathname === '/';
+        const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
-        let html = `
-            <button
-                class="dashboard-tab ${isHomeActive ? 'active' : ''}"
-                data-view="home"
-            >
-                Home
-            </button>
-        `;
+        let html = '';
+
+        if (isLoggedIn) {
+            html += `
+                <button
+                    class="dashboard-tab ${isHomeActive ? 'active' : ''}"
+                    data-view="home"
+                >
+                    Home
+                </button>
+            `;
+        }
 
         html += customDashboards.map(d => `
             <button
@@ -1448,6 +1453,7 @@ export function createDashboardRenderer(deps) {
         renderCustomDashboardDeviceCard,
         renderCustomDashboardsNav,
         renderEntitySelector,
-        renderDashboard
+        renderDashboard,
+        renderDashboardTabs
     };
 }
