@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.3.6 Admin check for home tab
+* (BenAhrdt) Home Tab wird angezeigt, wenn kein Admin angelegt ist.
+
 ### V1.3.5 Erweiterungen der UI
 * (BenAhrdt) Home im ausgeloggten Zustand nicht sichtbar
 * (BenAhrdt) Pending States verzögern in der Abfrage und auch erst bei erfolgreicher zuweisung löschen

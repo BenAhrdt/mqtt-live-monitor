@@ -1231,11 +1231,12 @@ export function createDashboardRenderer(deps) {
         const activeId = getActiveCustomDashboardId();
 
         const isHomeActive = window.location.pathname === '/';
+        const hasAdmin = localStorage.getItem("hasAdmin") === "true";
         const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
         let html = '';
 
-        if (isLoggedIn) {
+        if (!hasAdmin || isLoggedIn) {
             html += `
                 <button
                     class="dashboard-tab ${isHomeActive ? 'active' : ''}"
