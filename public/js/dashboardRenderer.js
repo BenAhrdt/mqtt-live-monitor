@@ -1071,6 +1071,15 @@ export function createDashboardRenderer(deps) {
                 </div>
 
                 <div class="prefix-actions">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+                        <input 
+                            type="checkbox"
+                            class="action-toggle-admin-only"
+                            data-dashboard-id="${escapeHtml(dashboard.id)}"
+                            ${dashboard.adminOnly ? 'checked' : ''}
+                        />
+                        Nur Admin
+                    </label>
                     <button 
                         class="btn secondary open-dashboard-btn"
                         data-dashboard-id="${escapeHtml(dashboard.id)}"

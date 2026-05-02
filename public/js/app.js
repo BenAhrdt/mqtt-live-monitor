@@ -815,6 +815,7 @@ function addCustomDashboard() {
     customDashboards.push({
     id,
     name,
+    adminOnly: false,
     devices: []
     });
 
@@ -877,6 +878,14 @@ function renameDashboard(dashboardId) {
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
     dashboardRenderer.renderDashboard();
+}
+
+function toggleDashboardAdminOnly(dashboardId, value) {
+    const dashboard = customDashboards.find(d => d.id === dashboardId);
+    if (!dashboard) return;
+    dashboard.adminOnly = value;
+    console.log(dashboard);
+    saveCustomDashboards();
 }
 
 function duplicateDashboard(dashboardId) {
@@ -2440,6 +2449,14 @@ async function init() {
         const settingsBtn = e.target.closest('#openSettingsBtn');
         if (settingsBtn) {
             showView('settings');
+            return;
+        }
+
+        const adminToggle = e.target.closest('.action-toggle-admin-only');
+        if (adminToggle) {
+            const dashboardId = adminToggle.dataset.dashboardId;
+            const checked = adminToggle.checked;
+            toggleDashboardAdminOnly(dashboardId, checked);
             return;
         }
 

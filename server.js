@@ -275,9 +275,16 @@ function loadConfigFromFile() {
       discoveryViaPrefixes: normalizeDiscoveryPrefixes(parsed.discoveryViaPrefixes),
     };
 
+    // 👇 NEU: adminOnly sauber setzen
+    mqttConfig.customDashboards = (mqttConfig.customDashboards || []).map(d => ({
+      ...d,
+      adminOnly: d.adminOnly ?? false
+    }));
+
     allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
       .filter(p => p.enabled)
       .map(p => p.value);
+
   } catch (error) {
     console.error(`Fehler beim Laden von ${path.basename(CONFIG_PATH)}:`, error.message);
   }
@@ -2005,6 +2012,7 @@ app.post("/api/custom-dashboards", (req, res) => {
   mqttConfig.customDashboards = customDashboards.map(dashboard => ({
     id: String(dashboard.id || "").trim(),
     name: String(dashboard.name || "").trim(),
+    adminOnly: Boolean(dashboard.adminOnly),
     devices: Array.isArray(dashboard.devices)
       ? dashboard.devices.map(device => ({
           deviceId: String(device.deviceId || "").trim(),
