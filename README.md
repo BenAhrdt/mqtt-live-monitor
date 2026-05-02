@@ -105,9 +105,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.3.5 Erweiterungen der UI
 * (BenAhrdt) Home im ausgeloggten Zustand nicht sichtbar
 * (BenAhrdt) Pending States verzögern in der Abfrage und auch erst bei erfolgreicher zuweisung löschen
+* (BenAhrdt) Render für States update auf Home
 
 ### V1.3.4 Drag and Drop der Geräte auch in den Einstellungen
 * (BenAhrdt) Drag and Drop der Geräte in den Einstellungen

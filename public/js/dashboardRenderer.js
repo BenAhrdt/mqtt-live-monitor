@@ -641,7 +641,7 @@ export function createDashboardRenderer(deps) {
 
         return `
         <div class="dashboard-entity-row-block cover-entity-block" id="entity-${entity.id}">
-            <<div class="dashboard-entity-title">
+            <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
             </div>
@@ -1269,40 +1269,40 @@ export function createDashboardRenderer(deps) {
         if (!dashboardGrid) return;
 
         if (!dashboardDevices.length) {
-        dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
-        return;
+            dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
+            return;
         }
         let devicesToRender = dashboardDevices;
 
         if (activeCustomDashboardId) {
-        const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+            const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 
-        if (!customDashboard) {
-            dashboardGrid.innerHTML = '<div class="empty-cell">Custom Dashboard nicht gefunden</div>';
-            return;
-        }
-
-        devicesToRender = (customDashboard.devices || [])
-        .map((dashboardDevice) => {
-            const device = dashboardDevices.find(d => d.id === dashboardDevice.deviceId);
-
-            if (!device) {
-            return null;
+            if (!customDashboard) {
+                dashboardGrid.innerHTML = '<div class="empty-cell">Custom Dashboard nicht gefunden</div>';
+                return;
             }
 
-            return {
-            ...device,
-            entities: (device.entities || []).filter(entity =>
-                dashboardDevice.entityIds.includes(entity.id)
-            )
-            };
-        })
-        .filter(Boolean);
+            devicesToRender = (customDashboard.devices || [])
+            .map((dashboardDevice) => {
+                const device = dashboardDevices.find(d => d.id === dashboardDevice.deviceId);
+
+                if (!device) {
+                return null;
+                }
+
+                return {
+                ...device,
+                entities: (device.entities || []).filter(entity =>
+                    dashboardDevice.entityIds.includes(entity.id)
+                )
+                };
+            })
+            .filter(Boolean);
         }
         let sortedDevices = [...devicesToRender];
 
         if (!activeCustomDashboardId) {
-        sortedDevices = sortedDevices.sort((a, b) => {
+            sortedDevices = sortedDevices.sort((a, b) => {
             const nameA = getDeviceDisplayName(a).toLowerCase();
             const nameB = getDeviceDisplayName(b).toLowerCase();
 

@@ -1063,16 +1063,16 @@ async function loadDashboardDevices() {
 
 function updateDashboardEntity(update) {
     if (activeCustomDashboardId) {
-    const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
+        const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 
-    const isInCustomDashboard = customDashboard?.devices?.some(device =>
-        device.deviceId === update.deviceId &&
-        device.entityIds.includes(update.entityId)
-    );
+        const isInCustomDashboard = customDashboard?.devices?.some(device =>
+            device.deviceId === update.deviceId &&
+            device.entityIds.includes(update.entityId)
+        );
 
-    if (!isInCustomDashboard) {
-        return;
-    }
+        if (!isInCustomDashboard) {
+            return;
+        }
     }
 
     let found = false;
@@ -1104,8 +1104,8 @@ function updateDashboardEntity(update) {
     };
     });
 
-    if (found && currentView === 'dashboard') {
-    updateSingleEntity(update);
+    if (found && (currentView === 'home' || currentView === 'dashboard')) {
+        updateSingleEntity(update);
     }
 }
 
