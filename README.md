@@ -107,6 +107,7 @@ journalctl -u mqtt-live-monitor -f
 
 ### In Arbeit
 * (BenAhrdt) Home im ausgeloggten Zustand nicht sichtbar
+* (BenAhrdt) Pending States verzögern in der Abfrage und auch erst bei erfolgreicher zuweisung löschen
 
 ### V1.3.4 Drag and Drop der Geräte auch in den Einstellungen
 * (BenAhrdt) Drag and Drop der Geräte in den Einstellungen

@@ -1047,9 +1047,13 @@ function applyPendingStateMessagesForEntity(entity) {
   for (const topic of possibleTopics) {
     if (pendingStateMessages[topic]) {
       const message = pendingStateMessages[topic].message;
-      handleKnownTopicMessage(topic, message);
-      BrowserLog(`Topic: ${topic} aus dem Pending entfernt. Message: ${message}`)
-      delete pendingStateMessages[topic];
+      const result = handleKnownTopicMessage(topic, message);
+      if (result.handled) {
+        BrowserLog(`Topic: ${topic} aus dem Pending entfernt. Message: ${message}`)
+        delete pendingStateMessages[topic];
+      } else {
+        BrowserLog(`Topic: ${topic} wird nochmal im Pending gehalten`)
+      }
     }
   }
 }
@@ -1160,7 +1164,7 @@ function handleDiscoveryMessage(topic, message) {
   setTimeout(() => {
     applyPendingStateMessagesForEntity(entity);
     emitStores();
-  }, 0);
+  }, 50);
 
   return {
     handled: true,
