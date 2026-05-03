@@ -108,7 +108,7 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
-### V1.3.13 Wert nicht empfangen Meldung
+### V1.3.14 Wert nicht empfangen Meldung
 * (BenAhrdt) Neue Kennzeichnung für nicht emfangene Sensor-Werte
 
 ### V1.3.13 Kennzeichnung nicht empfangener Werte & Clean Session = false
