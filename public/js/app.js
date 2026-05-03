@@ -1668,31 +1668,40 @@ async function loadVersion() {
 
 async function checkForUpdates() {
     try {
-    const res = await fetch('/api/update/check');
-    const data = await res.json();
+        const res = await fetch('/api/update/check');
+        const data = await res.json();
 
-    const btn = document.getElementById('updateBtn');
+        const btn = document.getElementById('updateBtn');
+        data.updateAvailable = true;
+        if (data.updateAvailable && btn.classList.contains('hidden')) {
+            btn.classList.remove('hidden');
+            btn.textContent = `update verfügbar ${data.latest}`;
 
-    if (data.updateAvailable && btn.classList.contains('hidden')) {
-        btn.classList.remove('hidden');
-        btn.textContent = `update verfügbar ${data.latest}`;
+            btn.onclick = async () => {
+                if (!confirm(`Update auf ${data.latest} starten?`)) return;
 
-        btn.onclick = async () => {
-        if (!confirm(`Update auf ${data.latest} starten?`)) return;
+                btn.textContent = 'Update läuft...';
 
-        btn.textContent = 'Update läuft...';
+                await fetch('/api/update/run', { method: 'POST' });
 
-        await fetch('/api/update/run', { method: 'POST' });
-
-        btn.textContent = 'Neustart...';
-
-        setTimeout(() => {
-            window.location.reload();
-        }, 6000);
-        };
-    }
+                let rebootTimer = 10000;
+                rebootCountdown(rebootTimer);
+            };
+        }
     } catch (err) {
     console.error('Update-Check fehlgeschlagen', err);
+    }
+}
+
+function rebootCountdown(timer) {
+    secodValue = timer / 1000;
+    btn.textContent = `Neustart in ${secodValue}s`;
+    if(timer <= 0) {
+        window.location.reload();
+    } else {
+        setTimeout(() =>{
+            rebootCountdown(timer - 1000);
+        }, 1000);
     }
 }
 
