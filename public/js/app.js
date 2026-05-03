@@ -1672,7 +1672,7 @@ async function checkForUpdates() {
         const data = await res.json();
 
         const btn = document.getElementById('updateBtn');
-        data.updateAvailable = true;
+
         if (data.updateAvailable && btn.classList.contains('hidden')) {
             btn.classList.remove('hidden');
             btn.textContent = `update verfügbar ${data.latest}`;
