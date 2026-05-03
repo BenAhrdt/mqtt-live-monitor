@@ -1137,7 +1137,14 @@ function handleDiscoveryMessage(topic, message) {
     return { handled: false, reason: "entity-not-created" };
   }
 
-  device.entities[entity.id] = entity;
+  const existing = device.entities[entity.id];
+
+  device.entities[entity.id] = {
+    ...entity,
+    value: existing?.value ?? entity.value,
+    rawState: existing?.rawState ?? entity.rawState,
+    lastUpdate: existing?.lastUpdate ?? entity.lastUpdate
+  };
   device.updatedAt = new Date().toISOString();
 
   registerEntityTopics(entity, deviceId);

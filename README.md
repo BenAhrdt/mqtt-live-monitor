@@ -106,7 +106,10 @@ journalctl -u mqtt-live-monitor -f
 ## Changelog
 
 ### In Arbeit
-* (BenAhrdt) Nur Admin checkbox für Dashboards
+* (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
+
+### V1.3.7 
+* (BenAhrdt) Discoverbehandlung, wenn neu discovered wir. (state behalten)
 
 ### V1.3.6 Admin check for home tab
 * (BenAhrdt) Home Tab wird angezeigt, wenn kein Admin angelegt ist.
