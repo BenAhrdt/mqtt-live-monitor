@@ -1685,7 +1685,7 @@ async function checkForUpdates() {
                 await fetch('/api/update/run', { method: 'POST' });
 
                 let rebootTimer = 10000;
-                rebootCountdown(rebootTimer);
+                rebootCountdown(rebootTimer, updateBtn);
             };
         }
     } catch (err) {
@@ -1693,14 +1693,14 @@ async function checkForUpdates() {
     }
 }
 
-function rebootCountdown(timer) {
+function rebootCountdown(timer, updateBtn) {
     secodValue = timer / 1000;
-    btn.textContent = `Neustart in ${secodValue}s`;
+    updateBtn.textContent = `Neustart in ${secodValue}s`;
     if(timer <= 0) {
         window.location.reload();
     } else {
         setTimeout(() =>{
-            rebootCountdown(timer - 1000);
+            rebootCountdown(timer - 1000, updateBtn);
         }, 1000);
     }
 }
