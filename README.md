@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.15 PID aus client ID entfernt
+* (BenAhrdt) PID Wert aus client id entfernt
+
 ### V1.3.14 Wert nicht empfangen Meldung
 * (BenAhrdt) Neue Kennzeichnung für nicht emfangene Sensor-Werte
 
