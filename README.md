@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.12 Subscribe mit qos 1
+* (BenAhrdt) Verzögern des subscribe entfernt und auf qos 1 gesetzt.
+
 ### V1.3.11 Subscribe verzögert
 * (BenAhrdt) Verzögern des subscribe
 
