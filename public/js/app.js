@@ -1694,8 +1694,8 @@ async function checkForUpdates() {
 }
 
 function rebootCountdown(timer, updateBtn) {
-    secodValue = timer / 1000;
-    updateBtn.textContent = `Neustart in ${secodValue}s`;
+    const secondValue = timer / 1000;
+    updateBtn.textContent = `Neustart in ${secondValue}s`;
     if(timer <= 0) {
         window.location.reload();
     } else {
