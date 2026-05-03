@@ -108,6 +108,10 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.16 Zurückgesetzt auf standard.
+* (BenAhrdt) Verbindung zum Mqtt Broker auf standard Werte zurückgesetzt.
+
+
 ### V1.3.15 PID aus client ID entfernt
 * (BenAhrdt) PID Wert aus client id entfernt
 

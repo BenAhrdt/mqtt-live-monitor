@@ -1672,8 +1672,8 @@ function connectMqtt() {
 
   const { host, port, topic, username, password } = mqttConfig;
   const clientId = isDev
-    ? `${mqttConfig.clientId}_dev`
-    : `${mqttConfig.clientId}_prod`
+    ? `${mqttConfig.clientId}_dev_${process.pid}`
+    : `${mqttConfig.clientId}_prod_${process.pid}`
 
   console.log("Mode:", isDev ? "DEV" : "PROD");
   console.log("MQTT ClientId:", clientId);
@@ -1695,13 +1695,12 @@ function connectMqtt() {
     password: password || undefined,
     clientId,
     reconnectPeriod: 3000,
-    clean: false
   });
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
-      mqttClient.subscribe(topic, {qos: 1}, (err) => {
+      mqttClient.subscribe(topic, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
