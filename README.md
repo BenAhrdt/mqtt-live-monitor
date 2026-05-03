@@ -108,6 +108,10 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.13 Kennzeichnung nicht empfangener Werte & Clean Session = false
+* (BenAhrdt) Nicht empfangene Sensor-Werte, werden gesondert gekennzeichnet
+* (BenAhrdt) clean session = false beim connect
+
 ### V1.3.12 Subscribe mit qos 1
 * (BenAhrdt) Verzögern des subscribe entfernt und auf qos 1 gesetzt.
 

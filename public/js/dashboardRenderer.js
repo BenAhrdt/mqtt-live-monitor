@@ -969,15 +969,13 @@ export function createDashboardRenderer(deps) {
     }
 
     function formatSensorValue(entity) {
-        const value = entity.value;
+        const value = entity.value ?? '-';
         const unit = entity.unit || '';
 
-        if (entity.value === '-') {
+        if (entity.lastUpdate === null) {
+            return 'noch kein Wert empfangen';
+        } else if (entity.value === '-') {
             return '-';
-        } else if (entity.value === null) {
-            return '- (null)';
-        } else if (entity.value === undefined) {
-            return '- (undefined)';
         }
 
         const numericValue = Number(value);

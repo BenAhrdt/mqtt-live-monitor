@@ -49,22 +49,26 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const io = new Server(server);
 
-const loggingFilter = 'badezimmer_fenster';
+const loggingFilter = [ 'homeassistant/sensor/badezimmer_fenster/zigbee2mqtt_0_0x00158d0002a63f48_battery/config',
+                        'lorawan_0/badezimmer_fenster/zigbee2mqtt_0_0x00158d0002a63f48_battery/state',
+                        'homeassistant/sensor/badezimmerfenster/lorawan_1_942ea85a-1ea8-4dff-8900-8141897f95b9_devices_a840414155599145_uplink_decoded_batterypercent/config',
+                        'lorawan_1/badezimmerfenster/lorawan_1_942ea85a-1ea8-4dff-8900-8141897f95b9_devices_a840414155599145_uplink_decoded_batterypercent/state'
+                      ];
 const debugLog = [];
 const MAX_LOG = 500;
 function addLog(type, topic, data) {
-  let safeData;
+  if (loggingFilter === [] || loggingFilter.some(filter => topic.includes(filter))) {
+    let safeData;
+    if (Buffer.isBuffer(data)) {
+      safeData = { payload: data.toString() };
+    } else if (typeof data === 'string') {
+      safeData = { payload: data };
+    } else if (typeof data === 'object' && data !== null) {
+      safeData = data;
+    } else {
+      safeData = { value: data };
+    }
 
-  if (Buffer.isBuffer(data)) {
-    safeData = { payload: data.toString() };
-  } else if (typeof data === 'string') {
-    safeData = { payload: data };
-  } else if (typeof data === 'object' && data !== null) {
-    safeData = data;
-  } else {
-    safeData = { value: data };
-  }
-  if (loggingFilter === '' || topic.includes(loggingFilter)) {
     debugLog.unshift({
       ts: new Date().toISOString(),
       type,
@@ -1691,6 +1695,7 @@ function connectMqtt() {
     password: password || undefined,
     clientId,
     reconnectPeriod: 3000,
+    clean: false
   });
 
   mqttClient.on("connect", () => {
