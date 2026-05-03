@@ -1672,8 +1672,8 @@ function connectMqtt() {
 
   const { host, port, topic, username, password } = mqttConfig;
   const clientId = isDev
-    ? `${mqttConfig.clientId}_dev_${process.pid}`
-    : `${mqttConfig.clientId}_prod_${process.pid}`
+    ? `${mqttConfig.clientId}_dev_${process.pid}_${Date.now()}`
+    : `${mqttConfig.clientId}_prod_${process.pid}_${Date.now()}`
 
   console.log("Mode:", isDev ? "DEV" : "PROD");
   console.log("MQTT ClientId:", clientId);
