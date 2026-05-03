@@ -43,9 +43,6 @@ let allowedDiscoveryViaDevicePrefixes = [
   "lorawan"
 ];
 
-let pendingRetryInterval = null;
-let pendingRetryTimeout = null;
-
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -1065,30 +1062,6 @@ function applyPendingStateMessagesForEntity(entity) {
   }
 }
 
-function triggerPendingRetry() {
-  // läuft schon → nichts tun
-  if (pendingRetryInterval) return;
-
-  pendingRetryInterval = setInterval(() => {
-    const keys = Object.keys(pendingStateMessages);
-    if (!keys.length) return;
-
-    for (const topic of keys) {
-      const entry = pendingStateMessages[topic];
-      handleKnownTopicMessage(topic, entry.message);
-    }
-  }, 500); // etwas schneller als 1s → fühlt sich besser an
-
-  // nach 10 Sekunden automatisch stoppen
-  pendingRetryTimeout = setTimeout(() => {
-    clearInterval(pendingRetryInterval);
-    pendingRetryInterval = null;
-
-    clearTimeout(pendingRetryTimeout);
-    pendingRetryTimeout = null;
-  }, 10000);
-}
-
 function handleDiscoveryMessage(topic, message) {
   if (!isDiscoveryTopic(topic)) {
     return { handled: false, reason: "not-discovery-topic" };
@@ -1168,10 +1141,9 @@ function handleDiscoveryMessage(topic, message) {
   device.updatedAt = new Date().toISOString();
 
   registerEntityTopics(entity, deviceId);
-  setTimeout(() => {
-    applyPendingStateMessagesForEntity(entity);
-    emitStores();
-  }, 50);
+
+  applyPendingStateMessagesForEntity(entity);
+  emitStores();
 
   return {
     handled: true,
@@ -1210,7 +1182,6 @@ function handleKnownTopicMessage(topic, message) {
       message,
       ts: Date.now()
     };
-    triggerPendingRetry();
     return { handled: false, reason: "topic-not-registered-pending" };
   }
 
