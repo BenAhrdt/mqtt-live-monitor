@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.9 Subscribe verzögert
+* (BenAhrdt) Verzögern des subscribe
+
 ### V1.3.9 Logging Jörg
 * (BenAhrdt) Logging für Fehlersuche
 

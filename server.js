@@ -1696,20 +1696,21 @@ function connectMqtt() {
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
-      mqttClient.subscribe(topic, (err) => {
-      if (err) {
-        console.error("Subscribe-Fehler:", err.message);
+      setTimeout(() => {
+        mqttClient.subscribe(topic, (err) => {
+        if (err) {
+          console.error("Subscribe-Fehler:", err.message);
 
-        emitStatus({
-          connected: false,
-          host,
-          port,
-          topic,
-          message: `Subscribe-Fehler: ${err.message}`,
-        });
-        return;
-      }
-
+          emitStatus({
+            connected: false,
+            host,
+            port,
+            topic,
+            message: `Subscribe-Fehler: ${err.message}`,
+          });
+          return;
+        }
+      }, 1000);
       emitStatus({
         connected: true,
         host,
