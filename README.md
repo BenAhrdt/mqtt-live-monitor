@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.8 Untscheid zwischen null and undefined bei Werten (aktuell '-')
+* (BenAhrdt) Untscheid zwischen null and undefined bei Werten (aktuell '-')
+
 ### V1.3.7 
 * (BenAhrdt) Discoverbehandlung, wenn neu discovered wir. (state behalten)
 

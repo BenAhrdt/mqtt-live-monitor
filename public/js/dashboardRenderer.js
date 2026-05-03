@@ -969,11 +969,15 @@ export function createDashboardRenderer(deps) {
     }
 
     function formatSensorValue(entity) {
-        const value = entity.value ?? '-';
+        const value = entity.value;
         const unit = entity.unit || '';
 
-        if (value === '-' || value === null || value === undefined) {
-        return '-';
+        if (entity.value === '-') {
+            return '-';
+        } else if (entity.value === null) {
+            return '- (null)';
+        } else if (entity.value === undefined) {
+            return '- (undefined)';
         }
 
         const numericValue = Number(value);
@@ -985,14 +989,14 @@ export function createDashboardRenderer(deps) {
         let displayValue = String(value);
 
         if (!Number.isNaN(numericValue)) {
-        if (hasSuggestedPrecision) {
-            displayValue = numericValue.toFixed(Number(entity.suggestedDisplayPrecision));
-        } else {
-            displayValue = numericValue.toFixed(3);
-        }
+            if (hasSuggestedPrecision) {
+                displayValue = numericValue.toFixed(Number(entity.suggestedDisplayPrecision));
+            } else {
+                displayValue = numericValue.toFixed(3);
+            }
 
-        displayValue = displayValue
-            .replace(/\.?0+$/, '');
+            displayValue = displayValue
+                .replace(/\.?0+$/, '');
         }
 
         return `${displayValue}${unit ? ' ' + unit : ''}`;
