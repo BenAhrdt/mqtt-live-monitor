@@ -49,6 +49,37 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const io = new Server(server);
 
+const loggingFilter = 'badezimmer_fenster';
+const debugLog = [];
+const MAX_LOG = 500;
+function addLog(type, topic, data) {
+  let safeData;
+
+  if (Buffer.isBuffer(data)) {
+    safeData = { payload: data.toString() };
+  } else if (typeof data === 'string') {
+    safeData = { payload: data };
+  } else if (typeof data === 'object' && data !== null) {
+    safeData = data;
+  } else {
+    safeData = { value: data };
+  }
+  if (loggingFilter === '' || topic.includes(loggingFilter)) {
+    debugLog.unshift({
+      ts: new Date().toISOString(),
+      type,
+      topic,
+      ...safeData
+    });
+
+    if (debugLog.length > MAX_LOG) {
+      debugLog.pop();
+    }
+  }
+}
+app.get("/api/log", (req, res) => {
+  res.json(debugLog);
+});
 
 // Admin login
 function readCredentials() {
@@ -1189,6 +1220,7 @@ function handleKnownTopicMessage(topic, message) {
       message,
       ts: Date.now()
     };
+    addLog("Pending hinzufügen", topic, message);
     return { handled: false, reason: "topic-not-registered-pending" };
   }
 
@@ -1694,12 +1726,15 @@ function connectMqtt() {
     const isDiscovery = isDiscoveryTopic(topic);
     //console.log("MQTT:", topic, "retain:", packet.retain);
     if (isDiscovery) {
+      addLog("DISCOVERY", topic, message);
       const discoveryResult = handleDiscoveryMessage(topic, message);
 
       if (discoveryResult.handled) {
+        addLog("DISCOVERY", topic, 'behandelt');
         //console.log("Discovery erkannt:", discoveryResult);
       }
     } else {
+      addLog("STATE", topic, message);
       const stateResult = handleKnownTopicMessage(topic, message);
 
       if (stateResult.handled) {
