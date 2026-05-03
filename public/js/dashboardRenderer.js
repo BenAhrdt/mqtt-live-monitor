@@ -974,7 +974,7 @@ export function createDashboardRenderer(deps) {
 
         if (entity.lastUpdate === null) {
             return 'noch kein Wert empfangen';
-        } else if (entity.value === '-') {
+        } else if (value === '-') {
             return '-';
         }
 
