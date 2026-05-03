@@ -1685,18 +1685,18 @@ function connectMqtt() {
 
   mqttClient.on("message", (topic, message, packet) => {
     const isDiscovery = isDiscoveryTopic(topic);
-
+    //console.log("MQTT:", topic, "retain:", packet.retain);
     if (isDiscovery) {
       const discoveryResult = handleDiscoveryMessage(topic, message);
 
       if (discoveryResult.handled) {
-        console.log("Discovery erkannt:", discoveryResult);
+        //console.log("Discovery erkannt:", discoveryResult);
       }
     } else {
       const stateResult = handleKnownTopicMessage(topic, message);
 
       if (stateResult.handled) {
-        console.log("State aktualisiert:", stateResult);
+        //console.log("State aktualisiert:", stateResult);
       }
     }
 
@@ -1783,7 +1783,6 @@ function getDevicesForDashboard() {
 
       payloadLock: entity.payloadLock,
       payloadUnlock: entity.payloadUnlock,
-      state: entity.state,
 
       stateOn: entity.stateOn,
       stateOff: entity.stateOff,
