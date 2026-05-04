@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.4.2 Zwischenversion Jörg
+* (BenAhrdt) Test, ob js entsprechend aktualisiert wird.
+
 ### V1.4.1 Passwortwqiederholung bei änderung
 * (BenAhrdt) Bei der Passwortänderung ist nun eine doppelteingabe erforderlich
 
