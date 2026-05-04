@@ -1700,13 +1700,7 @@ function connectMqtt() {
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
-    mqttClient.unsubscribe(topic, (unsubErr) => {
-      if (unsubErr) {
-        console.warn("Unsubscribe-Fehler:", unsubErr.message);
-      } else {
-        console.log(`Unsubscribed: ${topic}`);
-      }
-
+    mqttClient.unsubscribe()
       mqttClient.subscribe(topic, (err) => {
         if (err) {
           console.error("Subscribe-Fehler:", err.message);
@@ -1730,7 +1724,6 @@ function connectMqtt() {
         });
 
         console.log(`Abonniert: ${topic}`);
-      });
     });
   });
 

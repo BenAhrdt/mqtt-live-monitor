@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.19 Ursprungsfunktion
+* (BenAhrdt) Rückgängig des unsubscribe
+
 ### V1.3.18 versuch mit unsubscribe
 * (BenAhrdt) unsubscribe vor erneutem subscribe
 
