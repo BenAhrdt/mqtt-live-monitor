@@ -105,8 +105,12 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
-* (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
+### V1.4.0 Nur Admin Dashboards
+* (BenAhrdt) Nur Admin checkbox für Dashboards
+* (BenAhrdt) Adminpasswort kann geändert und gelöscht werden
+
+### V1.3.23 Rücksetzen auf String
+* (BenAhrdt) Rückstellung auf string von UI
 
 ### V1.3.22 Test mit + zeichen (automatisch)
 * (BenAhrdt) Test

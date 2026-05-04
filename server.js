@@ -44,7 +44,7 @@ let allowedDiscoveryViaDevicePrefixes = [
 ];
 
 const app = express();
-app.use(express.json());
+app.use(express.json({limit: '5mb'}));
 app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const io = new Server(server);
@@ -137,6 +137,32 @@ app.post("/api/admin/create", async (req, res) => {
 app.post("/api/admin/reset", (req, res) => {
   writeCredentials({ passwordHash: null });
   res.json({ success: true });
+});
+
+app.post("/api/admin/change-password", async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword) {
+        return res.status(400).json({ error: "Altes Passwort fehlt" });
+    }
+    
+    const creds = readCredentials();
+    const isValid = await bcrypt.compare(oldPassword, creds.passwordHash);
+
+    if (!isValid) {
+        return res.status(401).json({ error: "Falsches Passwort" });
+    }
+
+    // 👉 löschen
+    if (!newPassword) {
+        writeCredentials({ passwordHash: null });
+        return res.json({ success: true, reset: true });
+    }
+
+    // 👉 ändern
+    const hash = await bcrypt.hash(newPassword, 10)
+    writeCredentials({ passwordHash: hash });
+    res.json({ success: true });
 });
 
 app.post("/api/admin/login", async (req, res) => {
@@ -619,7 +645,6 @@ function createLawnMowerEntity(topic, payload, deviceId) {
 
 function createSensorEntity(topic, payload, deviceId) {
   const entityId = payload.unique_id || topic;
-
   return {
     id: entityId,
     type: "sensor",
@@ -641,6 +666,7 @@ function createSensorEntity(topic, payload, deviceId) {
     rawState: null,
     lastUpdate: null,
     deviceId,
+    valueTemplate: payload.value_template ?? undefined
   };
 }
 
@@ -1156,6 +1182,9 @@ function handleDiscoveryMessage(topic, message) {
     entity = createLawnMowerEntity(topic, payload, deviceId);
   } else if (entityType === "sensor") {
     entity = createSensorEntity(topic, payload, deviceId);
+    if(entity.id.includes('0x0017880100db5a10')) {
+      BrowserLog(JSON.stringify(entity));
+    }
   } else if (entityType === "binary_sensor") {
     entity = createBinarySensorEntity(topic, payload, deviceId);
   } else if (entityType === "switch") {
@@ -1699,11 +1728,7 @@ function connectMqtt() {
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
-    const subscribeTopics =  ['zigbee2mqtt/#', 'homeassistant/#'];
-    for(let i = 0; i< 40; i++) {
-      subscribeTopics.push(`lorawan_${i}/#`);
-    }
-    mqttClient.subscribe(subscribeTopics, (err) => {
+    mqttClient.subscribe(topic, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
@@ -2021,7 +2046,6 @@ app.post("/api/discovery-prefixes", (req, res) => {
 
 app.post("/api/custom-dashboards", (req, res) => {
   const { customDashboards } = req.body;
-
   if (!Array.isArray(customDashboards)) {
     return res.status(400).json({
       error: "customDashboards muss ein Array sein",

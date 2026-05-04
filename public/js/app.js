@@ -26,7 +26,6 @@ let friendlyNames = {
 };
 let liveMessages = [];
 let liveMessageLimit = Number(localStorage.getItem('liveMessageLimit') || 2500);
-
 const topicFilterInput = document.getElementById('liveFilterInput');
 const messageTable = document.getElementById('messageTable');
 const detailsTopicEl = document.getElementById('detailsTopic');
@@ -107,7 +106,13 @@ if (toggleCustomDashboardsBtn) {
     });
 }
 
-
+const loggingStatus = {
+    hasAdmin: false,
+    isLoggedIn: false,
+    getIsLocked: function() {
+        return this.hasAdmin && !this.isLoggedIn
+    }
+}
 
 const dashboardRenderer = createDashboardRenderer({
     getCustomDashboards: () => customDashboards,
@@ -128,6 +133,7 @@ const dashboardRenderer = createDashboardRenderer({
     updateClimateSliderBubble: (input) => updateClimateSliderBubble(input),
     updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
     moveDevice: moveCustomDashboardDevice,
+    loggingStatus,
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -249,6 +255,10 @@ function showView(viewName, options = {}) {
 
     // 🏠 HOME
     if (viewName === 'home') {
+        if(loggingStatus.getIsLocked()) {
+            showView('dashboard');
+            return;
+        }
         activeCustomDashboardId = null;
 
         dashboardView.style.display = 'block';
@@ -296,6 +306,10 @@ function showView(viewName, options = {}) {
 
     // 📡 LIVE
     if (viewName === 'live') {
+        if(loggingStatus.getIsLocked()) {
+            showView('dashboard');
+            return;
+        }
         liveMonitorView.style.display = 'block';
         showLiveMonitorBtn.classList.add('active');
 
@@ -308,6 +322,10 @@ function showView(viewName, options = {}) {
 
     // ⚙️ SETTINGS
     if (viewName === 'settings') {
+        if(loggingStatus.getIsLocked()) {
+            showView('dashboard');
+            return;
+        }
         settingsView.style.display = 'block';
         showSettingsBtn.classList.add('active');
 
@@ -725,17 +743,17 @@ function removeAllDevicesFromCustomDashboard(dashboardId) {
 
 async function saveCustomDashboards() {
     try {
-    const res = await fetch('/api/custom-dashboards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customDashboards })
-    });
+        const res = await fetch('/api/custom-dashboards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customDashboards })
+        });
 
-    if (!res.ok) {
-        console.error('Dashboard speichern fehlgeschlagen');
-    }
+        if (!res.ok) {
+            console.error('Dashboard speichern fehlgeschlagen');
+        }
     } catch (err) {
-    console.error('Dashboard speichern fehlgeschlagen:', err);
+        console.error('Dashboard speichern fehlgeschlagen:', err);
     }
 }
 
@@ -884,7 +902,6 @@ function toggleDashboardAdminOnly(dashboardId, value) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
     dashboard.adminOnly = value;
-    console.log(dashboard);
     saveCustomDashboards();
 }
 
@@ -907,6 +924,7 @@ function duplicateDashboard(dashboardId) {
     const copy = {
         id: newId,
         name: newName,
+        adminOnly: original.adminOnly,
         devices: JSON.parse(JSON.stringify(original.devices || []))
     };
 
@@ -1061,10 +1079,10 @@ function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
 
 async function loadDashboardDevices() {
     try {
-    const response = await fetch('/api/devices');
-    const data = await response.json();
-    dashboardDevices = Array.isArray(data) ? data : [];
-    dashboardRenderer.renderDashboard();
+        const response = await fetch('/api/devices');
+        const data = await response.json();
+        dashboardDevices = Array.isArray(data) ? data : [];
+        dashboardRenderer.renderDashboard();
     } catch (error) {
     console.error('Fehler beim Laden von /api/devices:', error);
     }
@@ -2241,14 +2259,13 @@ const title = document.getElementById("loginTitle");
 const errorBox = document.getElementById("loginError");
 
 loginBtn.addEventListener("click", () => {
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
-
   // 🔐 bereits eingeloggt → Logout fragen
-  if (isLoggedIn) {
+  if (loggingStatus.isLoggedIn) {
     const confirmLogout = confirm("Möchtest du dich ausloggen?");
     
     if (confirmLogout) {
       setLoggedIn(false);
+      window.location.reload();
     }
 
     return;
@@ -2264,13 +2281,9 @@ document.getElementById("closeLoginModal").onclick = () => {
 
 async function openLoginModal() {
     errorBox.textContent = "";
-
-    const res = await fetch("/api/admin/exists");
-    const data = await res.json();
-
     modal.classList.remove("hidden");
 
-    if (!data.exists) {
+    if (!loggingStatus.hasAdmin) {
         title.textContent = "Admin erstellen";
         createBlock.classList.remove("hidden");
         existingBlock.classList.add("hidden");
@@ -2290,14 +2303,10 @@ function updateAuthUI(isLoggedIn, adminExists) {
     if (adminExists && !isLoggedIn) {
         settingsBtn?.classList.add("hidden-auth");
         editBtn?.classList.add("hidden-auth");
-        //sidebar?.classList.add("hidden-auth");
-        //sidebarToggleBtn?.classList.add("hidden-auth");
         appLayout.classList.add("no-sidebar");
     } else {
         settingsBtn?.classList.remove("hidden-auth");
         editBtn?.classList.remove("hidden-auth");
-        //sidebar?.classList.remove("hidden-auth");
-        //sidebarToggleBtn?.classList.remove("hidden-auth");
         appLayout.classList.remove("no-sidebar");
     }
 }
@@ -2333,7 +2342,7 @@ document.getElementById("loginSubmitBtn").onclick = async () => {
   const passwordInput = document.getElementById("loginPassword"); // 👈 NEU
   const input = passwordInput.value;
 
-  try { // 👈 NEU
+  try {
     const res = await fetch("/api/admin/login", {
       method: "POST",
       headers: {
@@ -2353,7 +2362,7 @@ document.getElementById("loginSubmitBtn").onclick = async () => {
     // Erfolg
     modal.classList.add("hidden");
     setLoggedIn(true);
-    passwordInput.value = ""; // 👈 NEU
+    passwordInput.value = "";
 
   } catch (err) { // 👈 NEU
     errorBox.textContent = "Netzwerkfehler";
@@ -2365,15 +2374,22 @@ function setLoggedIn(state) {
         loginBtn.classList.add("logged-in");
         loginBtn.title = "Logout";
         localStorage.setItem("isLoggedIn", "true");
+        loggingStatus.isLoggedIn = true;
 
     } else {
         loginBtn.classList.remove("logged-in");
         loginBtn.title = "Login";
         localStorage.removeItem("isLoggedIn");
+        loggingStatus.isLoggedIn = false;
 
-        // 👉 Logout Redirect auf erstes Dashboard
-        const firstDashboard = customDashboards[0];
-
+        // 👉 Logout Redirect auf erstes Dashboard, was nicht adminOnly ist.
+        let firstDashboard = null;
+        for(const dashboard of Object.values(customDashboards)) {
+            if(!dashboard.adminOnly) {
+                firstDashboard = dashboard;
+                break;
+            }
+        }
         if (firstDashboard) {
             showView('dashboard', {
                 customDashboardId: firstDashboard.id
@@ -2388,40 +2404,75 @@ function setLoggedIn(state) {
     // 👉 UI neu bauen
     dashboardRenderer.renderCustomDashboardsNav();
     dashboardRenderer.renderDashboardTabs();
+
 }
 
-// beim Laden prüfen
-if (localStorage.getItem("isLoggedIn")) {
-  setLoggedIn(true);
-}
+// Beim Laden login setzen
+setLoggedIn(localStorage.getItem("isLoggedIn"));
+
 
 loginBtn.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
-    console.log("erfolgreicht gelöscht");
-    const confirmReset = confirm("Admin wirklich komplett zurücksetzen?");
-    if (!confirmReset) return;
 
-    try {
-        const res = await fetch("/api/admin/reset", {
-            method: "POST"
-        });
+    if (loggingStatus.getIsLocked()) return;
 
-        const data = await res.json();
-
-        if (data.success) {
-            localStorage.removeItem("isLoggedIn");
-            loginBtn.classList.remove("logged-in");
-            loginBtn.title = "Login";
-
-            alert("Admin + Login zurückgesetzt");
-        } else {
-            alert(data.error || "Fehler beim Reset");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Serverfehler beim Reset");
-    }
+    openChangePasswordModal();
 });
+
+function openChangePasswordModal() {
+    loginError.textContent = "";
+
+    const oldPw = document.getElementById("oldPassword");
+    const newPw = document.getElementById("newPassword");
+    oldPw.value = "";
+    newPw.value = "";
+    modal.classList.remove("hidden");
+
+    loginTitle.textContent = "Admin Passwort ändern";
+
+    createBlock.classList.add("hidden");
+    existingBlock.classList.add("hidden");
+    document.getElementById("loginChangeBlock").classList.remove("hidden");
+}
+
+document.getElementById("changePasswordBtn").onclick = async () => {
+    const oldPw = document.getElementById("oldPassword").value;
+    const newPw = document.getElementById("newPassword").value;
+
+    if (!oldPw) {
+        loginError.textContent = "Aktuelles Passwort erforderlich";
+        return;
+    }
+    const res = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            oldPassword: oldPw,
+            newPassword: newPw
+        })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        loginError.textContent = data.error || "Fehler";
+        return;
+    }
+
+    modal.classList.add("hidden");
+
+    if (!newPw) {
+        // 👉 reset
+        setLoggedIn(false);
+        alert("Admin gelöscht");
+        window.location.reload();
+
+    } else {
+        alert("Passwort geändert");
+    }
+};
 
 async function init() {
     // 1️⃣ Daten laden (WICHTIG!)
@@ -2448,10 +2499,9 @@ async function init() {
 
     const res = await fetch("/api/admin/exists");
     const data = await res.json();
+    loggingStatus.hasAdmin = data.exists;
 
-    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-
-    updateAuthUI(isLoggedIn, data.exists);
+    updateAuthUI(loggingStatus.isLoggedIn, loggingStatus.hasAdmin);
 
     document.addEventListener('click', (e) => {
 

@@ -27,7 +27,8 @@ export function createDashboardRenderer(deps) {
     getLightStateValue,
     updateClimateSliderBubble,
     updateHumidifierSliderBubble,
-    moveDevice
+    moveDevice,
+    loggingStatus
   } = deps;
 
     function setupSettingsDragAndDrop(container, dashboardId) {
@@ -968,14 +969,25 @@ export function createDashboardRenderer(deps) {
         return 'via-default';
     }
 
+    function extractValueJsonKey(template) {
+        const match = template.match(/value_json\.([a-zA-Z0-9_]+)/);
+        return match ? match[1] : null;
+    }
+
     function formatSensorValue(entity) {
-        const value = entity.value ?? '-';
+        let value = entity.value ?? '-';
         const unit = entity.unit || '';
 
         if (entity.lastUpdate === null) {
             return 'noch kein Wert empfangen';
         } else if (value === '-') {
             return '-';
+        }
+        if (typeof(value) === 'object') {
+            if (entity.valueTemplate) {
+                const attribute = extractValueJsonKey(entity.valueTemplate)
+                value = value[attribute];
+            }
         }
 
         const numericValue = Number(value);
@@ -1242,12 +1254,11 @@ export function createDashboardRenderer(deps) {
         const activeId = getActiveCustomDashboardId();
 
         const isHomeActive = window.location.pathname === '/';
-        const hasAdmin = localStorage.getItem("hasAdmin") === "true";
-        const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
         let html = '';
 
-        if (!hasAdmin || isLoggedIn) {
+        // 🏠 Home
+        if (!loggingStatus.getIsLocked()) {
             html += `
                 <button
                     class="dashboard-tab ${isHomeActive ? 'active' : ''}"
@@ -1258,16 +1269,20 @@ export function createDashboardRenderer(deps) {
             `;
         }
 
-        html += customDashboards.map(d => `
-            <button
-                class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
-                data-dashboard-id="${escapeHtml(d.id)}"
-            >
-                ${escapeHtml(d.name)}
-            </button>
-        `).join('');
+        // 📊 Custom Dashboards
+        html += customDashboards
+            .filter(d => (!d.adminOnly || !loggingStatus.getIsLocked())) // 🔥 HIER IST DIE MAGIE
+            .map(d => `
+                <button
+                    class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
+                    data-dashboard-id="${escapeHtml(d.id)}"
+                >
+                    ${escapeHtml(d.name)}
+                </button>
+            `)
+            .join('');
 
-        container.innerHTML = html;
+    container.innerHTML = html;
     }
 
     function renderDashboard() {
@@ -1315,11 +1330,11 @@ export function createDashboardRenderer(deps) {
 
         if (!activeCustomDashboardId) {
             sortedDevices = sortedDevices.sort((a, b) => {
-            const nameA = getDeviceDisplayName(a).toLowerCase();
-            const nameB = getDeviceDisplayName(b).toLowerCase();
+                const nameA = getDeviceDisplayName(a).toLowerCase();
+                const nameB = getDeviceDisplayName(b).toLowerCase();
 
-            return nameA.localeCompare(nameB, 'de');
-        });
+                return nameA.localeCompare(nameB, 'de');
+            });
         }
 
         dashboardGrid.innerHTML = sortedDevices.map((device) => {

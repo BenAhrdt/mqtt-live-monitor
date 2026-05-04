@@ -390,25 +390,44 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/js/app.js"></script>
-  <div id="loginModal" class="modal hidden">
+
+<div id="loginModal" class="modal hidden">
   <div class="modal-content">
     <h2 id="loginTitle">Login</h2>
 
+    <!-- 🔐 Admin erstellen -->
     <div id="loginCreateBlock" class="hidden">
       <input type="password" id="newPassword1" placeholder="Passwort">
       <input type="password" id="newPassword2" placeholder="Passwort wiederholen">
-      <button id="createAdminBtn" class="btn primary full-width">Admin erstellen</button>
+      <button id="createAdminBtn" class="btn primary full-width">
+        Admin erstellen
+      </button>
     </div>
 
+    <!-- 🔑 Login -->
     <div id="loginExistingBlock" class="hidden">
       <input type="password" id="loginPassword" placeholder="Passwort">
-      <button id="loginSubmitBtn" class="btn primary full-width">Login</button>
+      <button id="loginSubmitBtn" class="btn primary full-width">
+        Login
+      </button>
+    </div>
+
+    <!-- 🔄 Passwort ändern -->
+    <div id="loginChangeBlock" class="hidden">
+      <input type="password" id="oldPassword" placeholder="Aktuelles Passwort">
+      <input type="password" id="newPassword" placeholder="Neues Passwort (leer = löschen)">
+      <button id="changePasswordBtn" class="btn primary full-width">
+        Speichern
+      </button>
     </div>
 
     <div id="loginError" class="config-message"></div>
 
-    <button id="closeLoginModal" class="btn secondary full-width">Abbrechen</button>
+    <button id="closeLoginModal" class="btn secondary full-width">
+      Abbrechen
+    </button>
   </div>
 </div>
+
 </body>
 </html>
