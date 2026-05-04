@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.20 Test mit + zeichen
+* (BenAhrdt) Test
+
 ### V1.3.20 Genauere subscribtions
 * (BenAhrdt) nicht # subscriben, sondern bspw. lorawan_0/#, homeassistant/# usw.
 

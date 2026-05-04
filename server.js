@@ -1699,7 +1699,10 @@ function connectMqtt() {
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
-    const subscribeTopics =  ['lorawan_0/#', 'lorawan_1/#', 'zigbee2mqtt/#', 'homeassistant/#'];
+    const subscribeTopics =  ['zigbee2mqtt/#', 'homeassistant/#'];
+    for(let i = 0; i< 40; i++) {
+      subscribeTopics.push(`lorawan_${i}/#`);
+    }
     mqttClient.subscribe(subscribeTopics, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
