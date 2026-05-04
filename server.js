@@ -1700,29 +1700,37 @@ function connectMqtt() {
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
+    mqttClient.unsubscribe(topic, (unsubErr) => {
+      if (unsubErr) {
+        console.warn("Unsubscribe-Fehler:", unsubErr.message);
+      } else {
+        console.log(`Unsubscribed: ${topic}`);
+      }
+
       mqttClient.subscribe(topic, (err) => {
-      if (err) {
-        console.error("Subscribe-Fehler:", err.message);
+        if (err) {
+          console.error("Subscribe-Fehler:", err.message);
+
+          emitStatus({
+            connected: false,
+            host,
+            port,
+            topic,
+            message: `Subscribe-Fehler: ${err.message}`,
+          });
+          return;
+        }
 
         emitStatus({
-          connected: false,
+          connected: true,
           host,
           port,
           topic,
-          message: `Subscribe-Fehler: ${err.message}`,
+          message: "Verbunden",
         });
-        return;
-      }
 
-      emitStatus({
-        connected: true,
-        host,
-        port,
-        topic,
-        message: "Verbunden",
+        console.log(`Abonniert: ${topic}`);
       });
-
-      console.log(`Abonniert: ${topic}`);
     });
   });
 

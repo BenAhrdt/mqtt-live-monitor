@@ -108,6 +108,9 @@ journalctl -u mqtt-live-monitor -f
 ### In Arbeit
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
+### V1.3.18 versuch mit unsubscribe
+* (BenAhrdt) unsubscribe vor erneutem subscribe
+
 ### V1.3.17 Client Id mit Zeitstempel
 * (BenAhrdt) Client Id besitzt Zeitstempel um session ne anzulegen
 
