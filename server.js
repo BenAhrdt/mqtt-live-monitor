@@ -1672,8 +1672,8 @@ function connectMqtt() {
 
   const { host, port, topic, username, password } = mqttConfig;
   const clientId = isDev
-    ? `${mqttConfig.clientId}_dev_${process.pid}_${Date.now()}`
-    : `${mqttConfig.clientId}_prod_${process.pid}_${Date.now()}`
+    ? `${mqttConfig.clientId}_dev_${process.pid}`
+    : `${mqttConfig.clientId}_prod_${process.pid}`
 
   console.log("Mode:", isDev ? "DEV" : "PROD");
   console.log("MQTT ClientId:", clientId);
@@ -1699,31 +1699,30 @@ function connectMqtt() {
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
-
-    mqttClient.unsubscribe()
-      mqttClient.subscribe(topic, (err) => {
-        if (err) {
-          console.error("Subscribe-Fehler:", err.message);
-
-          emitStatus({
-            connected: false,
-            host,
-            port,
-            topic,
-            message: `Subscribe-Fehler: ${err.message}`,
-          });
-          return;
-        }
+    const subscribeTopics =  ['lorawan_0/#', 'lorawan_1/#', 'zigbee2mqtt/#', 'homeassistant/#'];
+    mqttClient.subscribe(subscribeTopics, (err) => {
+      if (err) {
+        console.error("Subscribe-Fehler:", err.message);
 
         emitStatus({
-          connected: true,
+          connected: false,
           host,
           port,
           topic,
-          message: "Verbunden",
+          message: `Subscribe-Fehler: ${err.message}`,
         });
+        return;
+      }
 
-        console.log(`Abonniert: ${topic}`);
+      emitStatus({
+        connected: true,
+        host,
+        port,
+        topic,
+        message: "Verbunden",
+      });
+
+      console.log(`Abonniert: ${topic}`);
     });
   });
 
