@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.4.1 Passwortwqiederholung bei änderung
+* (BenAhrdt) Bei der Passwortänderung ist nun eine doppelteingabe erforderlich
+
 ### V1.4.0 Nur Admin Dashboards
 * (BenAhrdt) Nur Admin checkbox für Dashboards
 * (BenAhrdt) Adminpasswort kann geändert und gelöscht werden

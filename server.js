@@ -145,7 +145,7 @@ app.post("/api/admin/change-password", async (req, res) => {
     if (!oldPassword) {
         return res.status(400).json({ error: "Altes Passwort fehlt" });
     }
-    
+
     const creds = readCredentials();
     const isValid = await bcrypt.compare(oldPassword, creds.passwordHash);
 

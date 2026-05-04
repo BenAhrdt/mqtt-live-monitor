@@ -2312,8 +2312,8 @@ function updateAuthUI(isLoggedIn, adminExists) {
 }
 
 document.getElementById("createAdminBtn").onclick = async () => {
-    const p1 = document.getElementById("newPassword1").value;
-    const p2 = document.getElementById("newPassword2").value;
+    const p1 = document.getElementById("password1").value;
+    const p2 = document.getElementById("password2").value;
 
     if (!p1 || !p2) {
         return errorBox.textContent = "Bitte beide Felder ausfüllen";
@@ -2335,6 +2335,7 @@ document.getElementById("createAdminBtn").onclick = async () => {
     }
 
     modal.classList.add("hidden");
+    loggingStatus.hasAdmin = true;
     setLoggedIn(true);
 };
 
@@ -2414,7 +2415,7 @@ setLoggedIn(localStorage.getItem("isLoggedIn"));
 loginBtn.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
 
-    if (loggingStatus.getIsLocked()) return;
+    if (loggingStatus.getIsLocked() || !loggingStatus.hasAdmin) return;
 
     openChangePasswordModal();
 });
@@ -2423,9 +2424,11 @@ function openChangePasswordModal() {
     loginError.textContent = "";
 
     const oldPw = document.getElementById("oldPassword");
-    const newPw = document.getElementById("newPassword");
+    const newPw1 = document.getElementById("newPassword1");
+    const newPw2 = document.getElementById("newPassword2");
     oldPw.value = "";
-    newPw.value = "";
+    newPw1.value = "";
+    newPw2.value = "";
     modal.classList.remove("hidden");
 
     loginTitle.textContent = "Admin Passwort ändern";
@@ -2437,11 +2440,15 @@ function openChangePasswordModal() {
 
 document.getElementById("changePasswordBtn").onclick = async () => {
     const oldPw = document.getElementById("oldPassword").value;
-    const newPw = document.getElementById("newPassword").value;
+    const newPw1 = document.getElementById("newPassword1").value;
+    const newPw2 = document.getElementById("newPassword2").value;
 
     if (!oldPw) {
         loginError.textContent = "Aktuelles Passwort erforderlich";
         return;
+    }
+    if (newPw1 && newPw1 !== newPw2) {
+        return loginError.textContent = "Passwörter stimmen nicht überein";
     }
     const res = await fetch("/api/admin/change-password", {
         method: "POST",
@@ -2450,7 +2457,7 @@ document.getElementById("changePasswordBtn").onclick = async () => {
         },
         body: JSON.stringify({
             oldPassword: oldPw,
-            newPassword: newPw
+            newPassword: newPw1
         })
     });
 
@@ -2463,10 +2470,11 @@ document.getElementById("changePasswordBtn").onclick = async () => {
 
     modal.classList.add("hidden");
 
-    if (!newPw) {
+    if (!newPw1) {
         // 👉 reset
         setLoggedIn(false);
         alert("Admin gelöscht");
+        loggingStatus.hasAdmin = false;
         window.location.reload();
 
     } else {

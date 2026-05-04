@@ -2367,6 +2367,7 @@ code {
   height: 48px;
   font-size: 15px;
   padding: 0 14px;
+  margin-bottom: 12px;
 }
 
 .hidden-auth {
