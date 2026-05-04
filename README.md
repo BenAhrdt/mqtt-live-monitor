@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.4.3 Manuelles Update ,möglich
+* (BenAhrdt) Update durch Strg + Shift + u
+
 ### V1.4.2 Zwischenversion Jörg
 * (BenAhrdt) Test, ob js entsprechend aktualisiert wird.
 

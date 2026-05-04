@@ -1723,6 +1723,44 @@ function rebootCountdown(timer, updateBtn) {
     }
 }
 
+let isUpdating = false;
+document.addEventListener('keydown', async (event) => {
+    // verhindert mehrfaches Feuern beim Gedrückthalten
+    if (event.repeat) return;
+
+    // Shortcut prüfen: Ctrl + Shift + U
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'u') {
+    
+        event.preventDefault();
+
+        // verhindert parallele Updates
+        if (isUpdating) {
+            console.log('Update läuft bereits...');
+            return;
+        }
+
+        isUpdating = true;
+
+        try {
+            const res = await fetch('/api/update/check');
+            const data = await res.json();
+            const btn = document.getElementById('updateBtn');
+            if (!confirm(`Update auf ${data.latest} starten?`)) return;
+            btn.classList.remove('hidden');
+            btn.textContent = 'Update läuft...';
+
+            await fetch('/api/update/run', { method: 'POST' });
+
+            let rebootTimer = 10000;
+            rebootCountdown(rebootTimer, updateBtn);
+        } catch (err) {
+            console.error('Update-Check fehlgeschlagen', err);
+        } finally {
+            isUpdating = false; // wieder freigeben
+        }
+    }
+});
+
 async function loadConfig() {
     const res = await fetch('/api/config');
     const config = await res.json();
