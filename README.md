@@ -109,7 +109,7 @@ journalctl -u mqtt-live-monitor -f
 * (BenAhrdt) Nur Admin checkbox für Dashboards (noch nicht in Dashboards aktiv)
 
 ### V1.3.20 Genauere subscribtions
-* (BenAhrdt) nicht # subscriben, sondern bspw. lorawan_0/#
+* (BenAhrdt) nicht # subscriben, sondern bspw. lorawan_0/#, homeassistant/# usw.
 
 ### V1.3.19 Ursprungsfunktion
 * (BenAhrdt) Rückgängig des unsubscribe
