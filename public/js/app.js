@@ -134,6 +134,7 @@ const dashboardRenderer = createDashboardRenderer({
     updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
     moveDevice: moveCustomDashboardDevice,
     moveDashboard,
+    moveEntity,
     loggingStatus,
 });
 
@@ -1017,6 +1018,45 @@ function moveDashboard(sourceId, targetId) {
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderDashboardTabs();
     dashboardRenderer.renderCustomDashboardsNav();
+}
+
+function moveEntity(draggedId, targetId, dashboardId, deviceId) {
+
+    const dashboards = customDashboards;
+
+    const dashboard = dashboards.find(d => d.id === dashboardId);
+
+    if (!dashboard) return;
+
+    const device = dashboard.devices.find(d => d.deviceId === deviceId);
+
+    if (!device) return;
+
+    const entityIds = [...device.entityIds];
+console.log('Start: ' + JSON.stringify(device.entityIds))
+    const draggedIndex = entityIds.indexOf(draggedId);
+    const targetIndex = entityIds.indexOf(targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+        return;
+    }
+
+    const [moved] = entityIds.splice(draggedIndex, 1);
+
+    entityIds.splice(targetIndex, 0, moved);
+
+    device.entityIds = entityIds;
+console.log('Fertig: ' + JSON.stringify(device.entityIds))
+    saveCustomDashboards();
+
+    dashboardRenderer.renderCustomDashboards();
+
+    console.log('Entity verschoben:', {
+        draggedId,
+        targetId,
+        dashboardId,
+        deviceId
+    });
 }
 
 function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {

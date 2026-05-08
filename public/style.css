@@ -1894,19 +1894,6 @@ code {
   gap: 8px;
 }
 
-.custom-entity-checkbox {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-}
-
-.custom-entity-checkbox small {
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .small-btn {
   padding: 5px 9px;
   font-size: 12px;
@@ -2045,10 +2032,6 @@ code {
 
 .rename-btn {
   flex-shrink: 0;
-}
-
-.custom-entity-checkbox {
-  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .custom-entity-actions {
@@ -2427,11 +2410,53 @@ code {
 }
 
 .custom-dashboard-device-card.drag-over,
-.dashboard-config-block.drag-over {
+.dashboard-config-block.drag-over,
+.custom-entity-row.drag-over {
     border: 2px dashed var(--accent);
 }
 
 .custom-dashboard-device-card.dragging,
-.dashboard-config-block.dragging {
+.dashboard-config-block.dragging,
+.custom-entity-row.dragging {
     opacity: 0.5;
+}
+
+.custom-entity-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 8px;
+    box-sizing: border-box;
+}
+
+.custom-entity-row input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.custom-entity-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.custom-entity-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.custom-entity-type {
+    margin-left: auto;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.custom-entity-drag-handle {
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
 }

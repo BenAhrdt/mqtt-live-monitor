@@ -107,7 +107,7 @@ journalctl -u mqtt-live-monitor -f
 
 ### In Arbeit Farbanpassungen / Drag & Drop
 * (BenAhrdt) Farbanpassungen für das neue helle Konzept
-* (BenAhrdt) Drag & Drop auch für Dashboards
+* (BenAhrdt) Drag & Drop auch für Dashboards und Entities
 
 ### V1.5.0 Einführung Hell / dunkel Optik
 * (BenAhrdt) Möglichkeit das optische Erscheinungsbild von Hell auf Dunkel zu ändern.

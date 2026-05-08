@@ -33,6 +33,7 @@ export function createDashboardRenderer(deps) {
     updateHumidifierSliderBubble,
     moveDevice,
     moveDashboard,
+    moveEntity,
     loggingStatus
   } = deps;
 
@@ -1002,7 +1003,6 @@ export function createDashboardRenderer(deps) {
         if (typeof(value) === 'object') {
             if (entity.valueTemplate) {
                 const attribute = extractValueJsonKey(entity.valueTemplate)
-                console.log('Test 123:' + value[attribute]);
                 value = value[attribute];
             }
         }
@@ -1130,6 +1130,65 @@ export function createDashboardRenderer(deps) {
         });
     }
 
+    function setupEntityDragAndDrop(container, dashboardId, deviceId) {
+
+        let draggedId = null;
+
+        const cards = container.querySelectorAll('.custom-entity-row');
+
+        cards.forEach((card) => {
+
+            card.addEventListener('dragstart', (e) => {
+                const handle = e.target.closest('.custom-entity-drag-handle');
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+                e.stopPropagation();
+                draggedId = card.dataset.entityId;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', () => {
+
+                card.classList.remove('dragging');
+
+                draggedId = null;
+
+                cards.forEach(c => c.classList.remove('drag-over'));
+            });
+
+            card.addEventListener('dragover', (e) => {
+
+                e.preventDefault();
+
+                if (!draggedId) return;
+
+                card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', (e) => {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const targetId = card.dataset.entityId;
+
+                cards.forEach(c => c.classList.remove('drag-over'));
+
+                if (!draggedId || draggedId === targetId) {
+                    return;
+                }
+                moveEntity(draggedId, targetId, dashboardId, deviceId);
+            });
+        });
+    }
+
     function renderCustomDashboards() {
         const customDashboards = getCustomDashboards();
         const list = document.getElementById('customDashboardList');
@@ -1219,8 +1278,22 @@ export function createDashboardRenderer(deps) {
             list.appendChild(row);
             const container = row.querySelector('.dashboard-device-selector');
             setupSettingsDragAndDrop(container, dashboard.id);
+            dashboard.devices.forEach(device => {
+                const entityContainer = row.querySelector(
+                    `#entities-${dashboard.id}-${device.deviceId}`
+                );
+
+                if (entityContainer) {
+
+                    setupEntityDragAndDrop(
+                        entityContainer,
+                        dashboard.id,
+                        device.deviceId
+                    );
+                }
             });
-            setupDashboardSettingsDragAndDrop(list);
+        });
+        setupDashboardSettingsDragAndDrop(list);
     }
 
     function renderCustomDashboardDeviceCard(dashboard, device, openDeviceKeys = new Set()) {
@@ -1270,7 +1343,10 @@ export function createDashboardRenderer(deps) {
                     </button>
                 </summary>
 
-                <div class="custom-dashboard-entities">
+                <div 
+                    class="custom-dashboard-entities"
+                    id="entities-${safeDashboardId}-${safeDeviceId}"
+                >
                     ${renderEntitySelector(dashboard, device)}
                 </div>
             </details>
@@ -1313,31 +1389,55 @@ export function createDashboardRenderer(deps) {
         return '<div class="muted">Keine Entitäten vorhanden</div>';
         }
 
-        return (device.entities || []).map(entity => {
+        return selectedEntities
+            .map(entityId =>
+                (device.entities || []).find(entity => entity.id === entityId)
+            )
+            .filter(Boolean)
+            .map(entity => {
         const checked = selectedEntities.includes(entity.id);
 
         return `
-            <label class="custom-entity-checkbox">
-            <input type="checkbox"
-                ${checked ? 'checked' : ''}
-                onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
-            >
-
-            <span class="custom-entity-name-wrap">
-                <span>${escapeHtml(getEntityDisplayName(entity))}</span>
-
-            <button
-                type="button"
-                class="btn secondary small-btn rename-btn action-rename-entity"
+            <div
+                class="custom-entity-row"
                 data-entity-id="${escapeHtml(entity.id)}"
-                title="Entität umbenennen"
             >
-                ✏️
-            </button>
-            </span>
 
-            <small>${escapeHtml(entity.type)}</small>
-            </label>
+                <div
+                    class="drag-handle custom-entity-drag-handle"
+                    draggable="true"
+                >
+                    ☰
+                </div>
+
+                <input
+                    type="checkbox"
+                    ${checked ? 'checked' : ''}
+                    onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
+                >
+
+                <div class="custom-entity-main">
+
+                    <span class="custom-entity-title">
+                        ${escapeHtml(getEntityDisplayName(entity))}
+                    </span>
+
+                    <button
+                        type="button"
+                        class="btn secondary small-btn rename-btn action-rename-entity"
+                        data-entity-id="${escapeHtml(entity.id)}"
+                        title="Entität umbenennen"
+                    >
+                        ✏️
+                    </button>
+
+                </div>
+
+                <small class="custom-entity-type">
+                    ${escapeHtml(entity.type)}
+                </small>
+
+            </div>
         `;
         }).join('');
     }
@@ -1416,9 +1516,11 @@ export function createDashboardRenderer(deps) {
 
                 return {
                 ...device,
-                entities: (device.entities || []).filter(entity =>
-                    dashboardDevice.entityIds.includes(entity.id)
-                )
+                entities: dashboardDevice.entityIds
+                    .map(entityId =>
+                        (device.entities || []).find(entity => entity.id === entityId)
+                    )
+                    .filter(Boolean)
                 };
             })
             .filter(Boolean);
