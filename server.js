@@ -1239,6 +1239,14 @@ function addTopicMapping(topic, mapping) {
     topicStore[topic] = [];
   }
 
+  const exists = topicStore[topic].some(
+    m => m.entityId === mapping.entityId
+  );
+
+  if (exists) {
+    return;
+  }
+
   topicStore[topic].push(mapping);
 }
 
@@ -1478,6 +1486,25 @@ function handleKnownTopicMapping(topic, message, mapping) {
       return { handled: false, reason: "not-a-sensor-state-topic" };
     }
 
+    // 🔥 value_template guard
+    if (
+        entity.valueTemplate &&
+        typeof parsed === "object" &&
+        parsed !== null
+    ) {
+        const attribute =
+            extractValueJsonKey(entity.valueTemplate);
+        if (
+            attribute &&
+            parsed[attribute] === undefined
+        ) {
+            return {
+                handled: false,
+                reason: "sensor-attribute-not-present"
+            };
+        }
+    }
+
     entity.rawState = parsed;
     entity.value = parsed;
     entity.lastUpdate = new Date().toISOString();
@@ -1645,6 +1672,13 @@ function handleKnownTopicMapping(topic, message, mapping) {
   }
 
   return { handled: false, reason: "unsupported-entity-runtime-type" };
+}
+
+function extractValueJsonKey(template) {
+    const match =
+        template?.match(/value_json\.([a-zA-Z0-9_]+)/);
+
+    return match ? match[1] : null;
 }
 
 function disconnectMqtt() {

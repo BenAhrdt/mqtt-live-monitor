@@ -14,6 +14,8 @@
   --shadow: 0 6px 20px rgba(0,0,0,0.08);
   --radius: 18px;
   --hover: rgba(0,0,0,0.05);
+
+  --success: #22c55e;
 }
 
 body.dark {
@@ -212,7 +214,7 @@ input {
 }
 
 .status.connected {
-  color: var(--accent);
+  color: var(--success);
 }
 
 .status.disconnected {
@@ -646,8 +648,10 @@ code {
   margin: 0;
 }
 
+/* 🟢 CONNECTED */
 .dashboard-connection-dot.connected {
-  background: #4ade80;
+    background: var(--success);
+    animation: pulseDot 1.5s infinite;
 }
 
 .dashboard-device-card {
@@ -2186,12 +2190,8 @@ code {
     box-shadow: 0 0 6px rgba(255, 77, 79, 0.6);
 }
 
-/* 🟢 CONNECTED */
-.dashboard-connection-dot.connected {
-    background: var(--accent);
-}
 
-/* 🟢 sauberer Ring */
+/* 🟢 Ring */
 .dashboard-connection-dot.connected::after {
     content: '';
     position: absolute;
@@ -2205,17 +2205,13 @@ code {
     transform: translate(-50%, -50%);
 
     border-radius: 50%;
-    border: 1px solid rgba(63, 151, 203, 0.5);
+    border: 1px solid rgba(34, 197, 94, 0.45);
 }
 
-/* 🟢 klareres Pulsieren */
-.dashboard-connection-dot.connected {
-    animation: pulseDot 1.5s infinite;
-}
-
+/* 🟢 Pulsieren */
 @keyframes pulseDot {
     0% {
-        box-shadow: 0 0 0 0 rgba(63, 151, 203, 0.6)
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
     }
     70% {
         box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
@@ -2309,21 +2305,13 @@ code {
 .dashboard-tab.active {
     background: var(--accent-2);
     color: var(--text);
-    border-color: #436579;
+
+    border-top: 1px solid #94a3b8;
+    border-left: 1px solid #94a3b8;
+    border-right: 1px solid #94a3b8;
+    border-bottom: 3px solid #111827;
+
     z-index: 2;
-}
-
-/* schöner Übergang zum Content */
-.dashboard-tab.active::after {
-    content: '';
-    position: absolute;
-
-    left: 0;
-    right: 0;
-    bottom: -2px;
-
-    height: 4px;
-    background: var(--bg);
 }
 
 .icon-btn {
@@ -2438,10 +2426,12 @@ code {
   flex: 1;   /* 🔥 DAS IST DER KEY */
 }
 
-.custom-dashboard-device-card.drag-over {
-    border: 2px dashed #4ade80;
+.custom-dashboard-device-card.drag-over,
+.dashboard-config-block.drag-over {
+    border: 2px dashed var(--accent);
 }
 
-.custom-dashboard-device-card.dragging {
+.custom-dashboard-device-card.dragging,
+.dashboard-config-block.dragging {
     opacity: 0.5;
 }

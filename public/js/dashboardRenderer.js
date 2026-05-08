@@ -8,6 +8,10 @@ import {
   translateLawnMowerActivity
 } from './utils.js';
 
+import {
+    extractValueJsonKey
+} from './utils.js';
+
 export function createDashboardRenderer(deps) {
   const {
     getCustomDashboards,
@@ -28,10 +32,12 @@ export function createDashboardRenderer(deps) {
     updateClimateSliderBubble,
     updateHumidifierSliderBubble,
     moveDevice,
+    moveDashboard,
     loggingStatus
   } = deps;
 
     function setupSettingsDragAndDrop(container, dashboardId) {
+
         let draggedId = null;
 
         const cards = container.querySelectorAll('.custom-dashboard-device-card');
@@ -39,18 +45,29 @@ export function createDashboardRenderer(deps) {
         cards.forEach((card) => {
 
             card.addEventListener('dragstart', (e) => {
+                const handle = e.target.closest('.custom-drag-handle');
+
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+
+                e.stopPropagation();
+
                 draggedId = card.dataset.deviceId;
+
                 card.classList.add('dragging');
 
                 e.dataTransfer.effectAllowed = 'move';
             });
 
             card.addEventListener('dragend', () => {
+
                 card.classList.remove('dragging');
+
                 draggedId = null;
 
-                document.querySelectorAll('.custom-dashboard-device-card')
-                    .forEach(c => c.classList.remove('drag-over'));
+                cards.forEach(c => c.classList.remove('drag-over'));
             });
 
             card.addEventListener('dragover', (e) => {
@@ -67,15 +84,15 @@ export function createDashboardRenderer(deps) {
 
             card.addEventListener('drop', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
 
                 const targetId = card.dataset.deviceId;
 
-                document.querySelectorAll('.custom-dashboard-device-card')
-                    .forEach(c => c.classList.remove('drag-over'));
+                cards.forEach(c => c.classList.remove('drag-over'));
 
-                if (!draggedId || draggedId === targetId) return;
-
-                // 👉 nutzt DEINE bestehende Funktion
+                if (!draggedId || draggedId === targetId) {
+                    return;
+                }
                 moveDevice(draggedId, targetId, dashboardId);
             });
         });
@@ -195,24 +212,28 @@ export function createDashboardRenderer(deps) {
         let colorClass = '';
 
         if (['door', 'window', 'opening', 'garage_door'].includes(cls)) {
-        text = isOn ? 'Offen' : 'Geschlossen';
-        colorClass = isOn ? 'danger' : 'ok';
+            text = isOn ? 'Offen' : 'Geschlossen';
+            colorClass = isOn ? 'danger' : 'ok';
         }
         else if (['motion', 'presence'].includes(cls)) {
-        text = isOn ? 'Bewegung erkannt' : 'Keine Bewegung';
-        colorClass = isOn ? 'danger' : 'ok';
+            text = isOn ? 'Bewegung erkannt' : 'Keine Bewegung';
+            colorClass = isOn ? 'danger' : 'ok';
         }
         else if (cls === 'lock') {
-        text = isOn ? 'Verriegelt' : 'Entriegelt';
-        colorClass = isOn ? 'ok' : 'danger';
+            text = isOn ? 'Verriegelt' : 'Entriegelt';
+            colorClass = isOn ? 'ok' : 'danger';
         }
         else if (['smoke', 'moisture'].includes(cls)) {
-        text = isOn ? 'Alarm' : 'OK';
-        colorClass = isOn ? 'danger' : 'ok';
+            text = isOn ? 'Alarm' : 'OK';
+            colorClass = isOn ? 'danger' : 'ok';
+        }
+        else if (entity.name.includes('available')) {
+            text = isOn ? 'Erreichbar' : 'nicht Erreichbar';
+            colorClass = isOn ? 'ok' : 'danger';            
         }
         else {
-        text = isOn ? 'An' : 'Aus';
-        colorClass = isOn ? 'danger' : 'ok';
+            text = isOn ? 'An' : 'Aus';
+            colorClass = isOn ? 'danger' : 'ok';
         }
 
         return `
@@ -969,11 +990,6 @@ export function createDashboardRenderer(deps) {
         return 'via-default';
     }
 
-    function extractValueJsonKey(template) {
-        const match = template.match(/value_json\.([a-zA-Z0-9_]+)/);
-        return match ? match[1] : null;
-    }
-
     function formatSensorValue(entity) {
         let value = entity.value ?? '-';
         const unit = entity.unit || '';
@@ -986,6 +1002,7 @@ export function createDashboardRenderer(deps) {
         if (typeof(value) === 'object') {
             if (entity.valueTemplate) {
                 const attribute = extractValueJsonKey(entity.valueTemplate)
+                console.log('Test 123:' + value[attribute]);
                 value = value[attribute];
             }
         }
@@ -1047,6 +1064,72 @@ export function createDashboardRenderer(deps) {
         `).join('');
     }
 
+    function setupDashboardSettingsDragAndDrop(container) {
+
+        let draggedId = null;
+
+        const cards = container.querySelectorAll('.dashboard-config-block');
+
+        cards.forEach((card) => {
+
+            card.addEventListener('dragstart', (e) => {
+
+                const handle = e.target.closest('.custom-dashboard-drag-handle');
+
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+
+                e.stopPropagation();
+
+                draggedId = card.dataset.dashboardId;
+
+                card.classList.add('dragging');
+
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', () => {
+
+                card.classList.remove('dragging');
+
+                draggedId = null;
+
+                cards.forEach(c => c.classList.remove('drag-over'));
+            });
+
+            card.addEventListener('dragover', (e) => {
+
+                e.preventDefault();
+
+                if (!draggedId) return;
+
+                card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', (e) => {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const targetId = card.dataset.dashboardId;
+
+                cards.forEach(c => c.classList.remove('drag-over'));
+
+                if (!draggedId || draggedId === targetId) {
+                    return;
+                }
+
+                moveDashboard(draggedId, targetId);
+            });
+        });
+    }
+
     function renderCustomDashboards() {
         const customDashboards = getCustomDashboards();
         const list = document.getElementById('customDashboardList');
@@ -1071,66 +1154,73 @@ export function createDashboardRenderer(deps) {
         }
 
         customDashboards.forEach((dashboard, index) => {
-        const row = document.createElement('div');
-        row.className = 'prefix-row';
+            const row = document.createElement('div');
+            row.className = 'prefix-row';
 
-        const isOpen = openDashboardIds.has(dashboard.id);
+            const isOpen = openDashboardIds.has(dashboard.id);
 
-        row.innerHTML = `
-            <details class="dashboard-config-block" data-dashboard-id="${escapeHtml(dashboard.id)}" ${isOpen ? 'open' : ''}>
-            <summary class="dashboard-config-header">
-                <div>
-                <strong>${escapeHtml(dashboard.name)}</strong><br>
-                <small class="muted">/dashboard/custom/${escapeHtml(dashboard.id)}</small>
-                </div>
+            row.innerHTML = `
+                <details class="dashboard-config-block" data-dashboard-id="${escapeHtml(dashboard.id)}" ${isOpen ? 'open' : ''}>
+                <summary class="dashboard-config-header">
+                    <div
+                        class="drag-handle custom-dashboard-drag-handle"
+                        draggable="true"
+                    >
+                        ☰
+                    </div>
+                    <div>
+                    <strong>${escapeHtml(dashboard.name)}</strong><br>
+                    <small class="muted">/dashboard/custom/${escapeHtml(dashboard.id)}</small>
+                    </div>
 
-                <div class="prefix-actions">
-                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
-                        <input 
-                            type="checkbox"
-                            class="action-toggle-admin-only"
+                    <div class="prefix-actions">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+                            <input 
+                                type="checkbox"
+                                class="action-toggle-admin-only"
+                                data-dashboard-id="${escapeHtml(dashboard.id)}"
+                                ${dashboard.adminOnly ? 'checked' : ''}
+                            />
+                            Nur Admin
+                        </label>
+                        <button 
+                            class="btn secondary open-dashboard-btn"
                             data-dashboard-id="${escapeHtml(dashboard.id)}"
-                            ${dashboard.adminOnly ? 'checked' : ''}
-                        />
-                        Nur Admin
-                    </label>
-                    <button 
-                        class="btn secondary open-dashboard-btn"
-                        data-dashboard-id="${escapeHtml(dashboard.id)}"
-                    >
-                        Öffnen
-                    </button>
+                        >
+                            Öffnen
+                        </button>
 
-                    <button 
-                        class="btn secondary action-rename-dashboard"
-                        data-dashboard-id="${escapeHtml(dashboard.id)}"
-                    >
-                        ✏️
-                    </button>
+                        <button 
+                            class="btn secondary action-rename-dashboard"
+                            data-dashboard-id="${escapeHtml(dashboard.id)}"
+                        >
+                            ✏️
+                        </button>
 
-                    <button 
-                        class="btn secondary action-duplicate-dashboard"
-                        data-dashboard-id="${escapeHtml(dashboard.id)}"
-                    >
-                        📄
-                    </button>
+                        <button 
+                            class="btn secondary action-duplicate-dashboard"
+                            data-dashboard-id="${escapeHtml(dashboard.id)}"
+                        >
+                            📄
+                        </button>
 
-                    <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
-                        Entfernen
-                    </button>
+                        <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
+                            Entfernen
+                        </button>
+                    </div>
+                </summary>
+
+                <div class="dashboard-device-selector" id="devices-${escapeHtml(dashboard.id)}">
+                    ${renderDashboardDeviceSelector(dashboard, openDeviceKeys)}
                 </div>
-            </summary>
+                </details>
+            `;
 
-            <div class="dashboard-device-selector" id="devices-${escapeHtml(dashboard.id)}">
-                ${renderDashboardDeviceSelector(dashboard, openDeviceKeys)}
-            </div>
-            </details>
-        `;
-
-        list.appendChild(row);
-        const container = row.querySelector('.dashboard-device-selector');
-        setupSettingsDragAndDrop(container, dashboard.id);
-        });
+            list.appendChild(row);
+            const container = row.querySelector('.dashboard-device-selector');
+            setupSettingsDragAndDrop(container, dashboard.id);
+            });
+            setupDashboardSettingsDragAndDrop(list);
     }
 
     function renderCustomDashboardDeviceCard(dashboard, device, openDeviceKeys = new Set()) {
@@ -1148,6 +1238,12 @@ export function createDashboardRenderer(deps) {
                 draggable="true"
             >
                 <summary class="custom-device-summary">
+                    <div
+                        class="drag-handle custom-drag-handle"
+                        draggable="true"
+                    >
+                        ☰
+                    </div>
                     <div class="custom-device-left">
                         <div class="custom-device-name-wrap">
                             <strong>${escapeHtml(getDeviceDisplayName(device))}</strong>

@@ -133,6 +133,7 @@ const dashboardRenderer = createDashboardRenderer({
     updateClimateSliderBubble: (input) => updateClimateSliderBubble(input),
     updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
     moveDevice: moveCustomDashboardDevice,
+    moveDashboard,
     loggingStatus,
 });
 
@@ -994,6 +995,28 @@ function setupDashboardDragAndDrop() {
         moveCustomDashboardDevice(draggedDashboardDeviceId, targetDeviceId);
     });
     });
+}
+
+function moveDashboard(sourceId, targetId) {
+
+    const dashboards = customDashboards;
+
+    const sourceIndex = dashboards.findIndex(d => d.id === sourceId);
+    const targetIndex = dashboards.findIndex(d => d.id === targetId);
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+        return;
+    }
+
+    const [moved] = dashboards.splice(sourceIndex, 1);
+
+    dashboards.splice(targetIndex, 0, moved);
+
+    saveCustomDashboards();
+
+    dashboardRenderer.renderCustomDashboards();
+    dashboardRenderer.renderDashboardTabs();
+    dashboardRenderer.renderCustomDashboardsNav();
 }
 
 function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {

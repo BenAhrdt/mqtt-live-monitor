@@ -117,3 +117,10 @@ export function parseMqttPayload(value) {
     if (value === 'false') return false;
     return value;
 }
+
+export function extractValueJsonKey(template) {
+    const match =
+        template?.match(/value_json\.([a-zA-Z0-9_]+)/);
+
+    return match ? match[1] : null;
+}
