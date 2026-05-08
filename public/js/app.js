@@ -1146,6 +1146,7 @@ async function loadDashboardDevices() {
 }
 
 function updateDashboardEntity(update) {
+    if (dashboardEditMode) return;
     if (activeCustomDashboardId) {
         const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 

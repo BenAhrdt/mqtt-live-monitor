@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.5.2 Kein Rendern im Bearbeitungsmodus
+* (BenAhrdt) Rendern im Bearbeitungsmodus deaktiviert, damit drag and Drop besser funktioniert.
+
 ### V1.5.2 Bugfix Bedienung
 * (BenAhrdt) Bugfix in Sethandling
 
