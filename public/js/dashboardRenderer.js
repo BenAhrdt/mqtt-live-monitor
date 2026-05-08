@@ -1286,6 +1286,7 @@ export function createDashboardRenderer(deps) {
     }
 
     function renderDashboard() {
+        console.log('Dashboard wird gerendert')
         renderDashboardTabs();
         const customDashboards = getCustomDashboards();
         const dashboardDevices = getDashboardDevices();

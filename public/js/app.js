@@ -1140,7 +1140,6 @@ function updateSingleEntity(update) {
     const oldEl = document.getElementById(`entity-${update.entityId}`);
 
     if (!oldEl) {
-        scheduleDashboardRender();
         return;
     }
 
@@ -2332,6 +2331,41 @@ async function openLoginModal() {
     }
 }
 
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+
+if (themeToggleBtn) {
+
+    // gespeichertes Theme laden
+    const savedTheme = localStorage.getItem("theme");
+
+    if (savedTheme === "dark") {
+        document.body.classList.add("dark");
+    }
+
+    // korrektes Icon setzen
+    themeToggleBtn.textContent =
+        document.body.classList.contains("dark")
+            ? "☀️"
+            : "🌙";
+
+    // Toggle
+    themeToggleBtn.addEventListener("click", () => {
+
+        document.body.classList.toggle("dark");
+
+        const isDark =
+            document.body.classList.contains("dark");
+
+        localStorage.setItem(
+            "theme",
+            isDark ? "dark" : "light"
+        );
+
+        themeToggleBtn.textContent =
+            isDark ? "☀️" : "🌙";
+    });
+}
+
 function updateAuthUI(isLoggedIn, adminExists) {
     const settingsBtn = document.getElementById("openSettingsBtn");
     const editBtn = document.getElementById("dashboardEditModeBtn");
@@ -2350,6 +2384,7 @@ function updateAuthUI(isLoggedIn, adminExists) {
 }
 
 document.getElementById("createAdminBtn").onclick = async () => {
+    console.log('Test')
     const p1 = document.getElementById("password1").value;
     const p2 = document.getElementById("password2").value;
 

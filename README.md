@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.5.0 Einführung Hell / dunkel Optik
+* (BenAhrdt) Möglichkeit das optische Erscheinungsbild von Hell auf Dunkel zu ändern.
+
 ### V1.4.3 Manuelles Update ,möglich
 * (BenAhrdt) Update durch Strg + Shift + u
 
