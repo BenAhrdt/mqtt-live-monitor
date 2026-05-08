@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.5.2 Bugfix Bedienung
+* (BenAhrdt) Bugfix in Sethandling
+
 ### V1.5.1 Farbanpassungen / Drag & Drop
 * (BenAhrdt) Farbanpassungen für das neue helle Konzept
 * (BenAhrdt) Drag & Drop auch für Dashboards und Entities

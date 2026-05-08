@@ -176,7 +176,7 @@ function updateSensorNameShortening() {
 
 async function selectAllEntityTypes() {
     entityFilterMenu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-    input.checked = true;
+        input.checked = true;
     });
 
     updateEntityTypeFilter();
@@ -185,7 +185,7 @@ async function selectAllEntityTypes() {
 
 async function deselectAllEntityTypes() {
     entityFilterMenu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-    input.checked = false;
+        input.checked = false;
     });
 
     updateEntityTypeFilter();
@@ -941,7 +941,7 @@ async function duplicateDashboard(dashboardId) {
 
 let draggedDashboardDeviceId = null;
 
-async function setupDashboardDragAndDrop() {
+function setupDashboardDragAndDrop() {
     if (!activeCustomDashboardId || !dashboardEditMode) return;
 
     const cards = document.querySelectorAll('.dashboard-device-card');
@@ -1145,7 +1145,7 @@ async function loadDashboardDevices() {
     }
 }
 
-async function updateDashboardEntity(update) {
+function updateDashboardEntity(update) {
     if (activeCustomDashboardId) {
         const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 
@@ -1193,7 +1193,7 @@ async function updateDashboardEntity(update) {
     }
 }
 
-async function updateSingleEntity(update) {
+function updateSingleEntity(update) {
     const oldEl = document.getElementById(`entity-${update.entityId}`);
 
     if (!oldEl) {
@@ -1251,7 +1251,7 @@ async function publishMqttCommand(topic, payloadObject) {
     }
 }
 
-async function findDashboardEntityById(entityId) {
+function findDashboardEntityById(entityId) {
     for (const device of dashboardDevices) {
     const entity = (device.entities || []).find(e => e.id === entityId);
     if (entity) {
@@ -1264,7 +1264,6 @@ async function findDashboardEntityById(entityId) {
 async function toggleLightEntity(entityId, isChecked) {
     const entity = findDashboardEntityById(entityId);
     if (!entity || !entity.commandTopic) return;
-
     const newState = isChecked ? 'ON' : 'OFF';
 
     try {

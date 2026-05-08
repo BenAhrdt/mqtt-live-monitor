@@ -1583,12 +1583,6 @@ code {
     white-space: nowrap;
 }
 
-.custom-entity-drag-handle {
-    cursor: grab;
-    user-select: none;
-    flex-shrink: 0;
-}
-
 .dashboard-device-icon {
   display: flex;
   flex-direction: column;

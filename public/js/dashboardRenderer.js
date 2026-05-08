@@ -245,7 +245,7 @@ export function createDashboardRenderer(deps) {
         }
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block binary-sensor-entity-block" id="entity-${entity.id}">
+        <div class="binary-sensor-entity-block">
             <div class="sensor-row-line">
             <div class="sensor-name-wrap">
                 <span class="sensor-name">
@@ -266,7 +266,7 @@ export function createDashboardRenderer(deps) {
         const isOn = Boolean(entity.value);
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block switch-entity-block" id="entity-${entity.id}">
+        <div class="switch-entity-block">
             <div class="sensor-row-line">
                 <div class="sensor-name-wrap">
                     <span class="sensor-name">
@@ -290,7 +290,7 @@ export function createDashboardRenderer(deps) {
 
     function renderButtonEntity(entity) {
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block button-entity-block" id="entity-${entity.id}">
+        <div class="button-entity-block">
             <div class="sensor-row-line">
 
                 <div class="sensor-name-group">
@@ -323,7 +323,7 @@ export function createDashboardRenderer(deps) {
         const unit = entity.unit || '';
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block number-entity-block" id="entity-${entity.id}">
+        <div class="number-entity-block">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -373,7 +373,7 @@ export function createDashboardRenderer(deps) {
 
     function renderTextEntity(entity) {
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block text-entity-block" id="entity-${entity.id}">
+        <div class="text-entity-block">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -403,7 +403,7 @@ export function createDashboardRenderer(deps) {
         const tempStep = Number(entity.tempStep ?? 0.1);
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block climate-entity-block" id="entity-${entity.id}">
+        <div class="climate-entity-block">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
@@ -541,7 +541,7 @@ export function createDashboardRenderer(deps) {
         const maxColorTemp = 6535;
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block" id="entity-${entity.id}">
+        <div>
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
@@ -670,7 +670,7 @@ export function createDashboardRenderer(deps) {
         rawState === 'CLOSED' ? 'closed' : '';
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block cover-entity-block" id="entity-${entity.id}">
+        <div class="cover-entity-block">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
@@ -740,7 +740,7 @@ export function createDashboardRenderer(deps) {
         const isLocked = rawStateText === 'LOCKED';
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block lock-entity-block" id="entity-${entity.id}">
+        <div class="lock-entity-block">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
@@ -791,7 +791,7 @@ export function createDashboardRenderer(deps) {
         const deviceTypeLabel = translateHumidifierDeviceClass(entity.deviceClass);
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block humidifier-entity-block" id="entity-${entity.id}">
+        <div class="humidifier-entity-block">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
@@ -882,7 +882,7 @@ export function createDashboardRenderer(deps) {
         const dockClass = rawActivity === 'docked' ? 'disabled-like' : '';
 
         return wrapDashboardEntity(entity, `
-        <div class="dashboard-entity-row-block lawn-mower-entity-block" id="entity-${entity.id}">
+        <div class="lawn-mower-entity-block">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
                 ${renderRenameEntityButton(entity.id)}
