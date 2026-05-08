@@ -699,7 +699,7 @@ async function importCustomDashboardsFromFile(file) {
     alert('Dashboards und Friendly Names importiert');
 }
 
-function addAllDevicesToCustomDashboard(dashboardId) {
+async function addAllDevicesToCustomDashboard(dashboardId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
@@ -726,10 +726,10 @@ function addAllDevicesToCustomDashboard(dashboardId) {
     });
 
     dashboardRenderer.renderCustomDashboards();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function removeAllDevicesFromCustomDashboard(dashboardId) {
+async function removeAllDevicesFromCustomDashboard(dashboardId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
@@ -740,7 +740,7 @@ function removeAllDevicesFromCustomDashboard(dashboardId) {
     dashboard.devices = [];
 
     dashboardRenderer.renderCustomDashboards();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
 async function saveCustomDashboards() {
@@ -817,7 +817,7 @@ async function renameEntity(entityId) {
     dashboardRenderer.renderCustomDashboards();
 }
 
-function addCustomDashboard() {
+async function addCustomDashboard() {
     const input = document.getElementById('newDashboardNameInput');
     const name = input.value.trim();
 
@@ -842,17 +842,17 @@ function addCustomDashboard() {
     input.value = '';
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function removeCustomDashboard(index) {
+async function removeCustomDashboard(index) {
     customDashboards.splice(index, 1);
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function renameDashboard(dashboardId) {
+async function renameDashboard(dashboardId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
@@ -893,21 +893,21 @@ function renameDashboard(dashboardId) {
         activeCustomDashboardId = newId;
     }
 
-    saveCustomDashboards();
+    await saveCustomDashboards();
 
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
     dashboardRenderer.renderDashboard();
 }
 
-function toggleDashboardAdminOnly(dashboardId, value) {
+async function toggleDashboardAdminOnly(dashboardId, value) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
     dashboard.adminOnly = value;
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function duplicateDashboard(dashboardId) {
+async function duplicateDashboard(dashboardId) {
     const original = customDashboards.find(d => d.id === dashboardId);
     if (!original) return;
 
@@ -932,7 +932,7 @@ function duplicateDashboard(dashboardId) {
 
     customDashboards.push(copy);
 
-    saveCustomDashboards();
+    await saveCustomDashboards();
 
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
@@ -941,7 +941,7 @@ function duplicateDashboard(dashboardId) {
 
 let draggedDashboardDeviceId = null;
 
-function setupDashboardDragAndDrop() {
+async function setupDashboardDragAndDrop() {
     if (!activeCustomDashboardId || !dashboardEditMode) return;
 
     const cards = document.querySelectorAll('.dashboard-device-card');
@@ -998,7 +998,7 @@ function setupDashboardDragAndDrop() {
     });
 }
 
-function moveDashboard(sourceId, targetId) {
+async function moveDashboard(sourceId, targetId) {
 
     const dashboards = customDashboards;
 
@@ -1013,14 +1013,14 @@ function moveDashboard(sourceId, targetId) {
 
     dashboards.splice(targetIndex, 0, moved);
 
-    saveCustomDashboards();
+    await saveCustomDashboards();
 
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderDashboardTabs();
     dashboardRenderer.renderCustomDashboardsNav();
 }
 
-function moveEntity(draggedId, targetId, dashboardId, deviceId) {
+async function moveEntity(draggedId, targetId, dashboardId, deviceId) {
 
     const dashboards = customDashboards;
 
@@ -1033,7 +1033,7 @@ function moveEntity(draggedId, targetId, dashboardId, deviceId) {
     if (!device) return;
 
     const entityIds = [...device.entityIds];
-console.log('Start: ' + JSON.stringify(device.entityIds))
+
     const draggedIndex = entityIds.indexOf(draggedId);
     const targetIndex = entityIds.indexOf(targetId);
 
@@ -1046,20 +1046,14 @@ console.log('Start: ' + JSON.stringify(device.entityIds))
     entityIds.splice(targetIndex, 0, moved);
 
     device.entityIds = entityIds;
-console.log('Fertig: ' + JSON.stringify(device.entityIds))
-    saveCustomDashboards();
+
+    await saveCustomDashboards();
 
     dashboardRenderer.renderCustomDashboards();
-
-    console.log('Entity verschoben:', {
-        draggedId,
-        targetId,
-        dashboardId,
-        deviceId
-    });
+    dashboardRenderer.renderDashboard();
 }
 
-function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {
+async function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {
     const dashboardId = dashboardIdOverride || activeCustomDashboardId;
 
     const dashboard = customDashboards.find(d => d.id === dashboardId);
@@ -1081,10 +1075,10 @@ function moveCustomDashboardDevice(draggedId, targetId, dashboardIdOverride) {
         dashboardRenderer.renderDashboard();
     }
 
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function addDeviceToCustomDashboard(dashboardId) {
+async function addDeviceToCustomDashboard(dashboardId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
@@ -1109,20 +1103,20 @@ function addDeviceToCustomDashboard(dashboardId) {
     });
 
     dashboardRenderer.renderCustomDashboards();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function removeDeviceFromCustomDashboard(dashboardId, deviceId) {
+async function removeDeviceFromCustomDashboard(dashboardId, deviceId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
     dashboard.devices = (dashboard.devices || []).filter(d => d.deviceId !== deviceId);
 
     dashboardRenderer.renderCustomDashboards();
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
-function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
+async function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
@@ -1137,7 +1131,7 @@ function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
     device.entityIds = device.entityIds.filter(id => id !== entityId);
     }
 
-    saveCustomDashboards();
+    await saveCustomDashboards();
 }
 
 async function loadDashboardDevices() {
@@ -1151,7 +1145,7 @@ async function loadDashboardDevices() {
     }
 }
 
-function updateDashboardEntity(update) {
+async function updateDashboardEntity(update) {
     if (activeCustomDashboardId) {
         const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 
@@ -1199,7 +1193,7 @@ function updateDashboardEntity(update) {
     }
 }
 
-function updateSingleEntity(update) {
+async function updateSingleEntity(update) {
     const oldEl = document.getElementById(`entity-${update.entityId}`);
 
     if (!oldEl) {
@@ -1257,7 +1251,7 @@ async function publishMqttCommand(topic, payloadObject) {
     }
 }
 
-function findDashboardEntityById(entityId) {
+async function findDashboardEntityById(entityId) {
     for (const device of dashboardDevices) {
     const entity = (device.entities || []).find(e => e.id === entityId);
     if (entity) {
@@ -2316,8 +2310,6 @@ window.pressButtonEntity = pressButtonEntity;
 window.setNumberEntity = setNumberEntity;
 window.setTextEntity = setTextEntity;
 
-const customId = getCustomDashboardIdFromUrl();
-
 // 4️⃣ starten
 init();
 
@@ -2623,6 +2615,7 @@ async function init() {
     await loadConfig();
 
     // 2️⃣ Danach View anzeigen
+    const customId = getCustomDashboardIdFromUrl();
     if (customId) {
         showView('dashboard', {
             customDashboardId: customId,

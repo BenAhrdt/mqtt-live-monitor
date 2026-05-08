@@ -105,7 +105,7 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit Farbanpassungen / Drag & Drop
+### V1.5.1 Farbanpassungen / Drag & Drop
 * (BenAhrdt) Farbanpassungen für das neue helle Konzept
 * (BenAhrdt) Drag & Drop auch für Dashboards und Entities
 

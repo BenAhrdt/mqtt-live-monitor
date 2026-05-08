@@ -186,23 +186,30 @@ export function createDashboardRenderer(deps) {
     }
 
     function renderSensorEntity(entity) {
-        return `
-        <div class="dashboard-entity-row-block sensor-entity-block" id="entity-${entity.id}">
+
+        const activeCustomDashboardId = getActiveCustomDashboardId();
+        const dashboardEditMode = getDashboardEditMode();
+
+        return wrapDashboardEntity(entity, `
             <div class="sensor-row-line">
-            <div class="sensor-name-wrap">
-                <span class="sensor-name" title="${escapeHtml(getEntityDisplayName(entity))}">
-                ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity), 200))}
-                </span>
 
-                ${renderRenameEntityButton(entity.id)}
-            </div>
+                <div class="sensor-name-wrap">
+                    <span
+                        class="sensor-name"
+                        title="${escapeHtml(getEntityDisplayName(entity))}"
+                    >
+                        ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity), 200))}
+                    </span>
 
-            <strong class="sensor-value">
-                ${escapeHtml(formatSensorValue(entity))}
-            </strong>
+                    ${renderRenameEntityButton(entity.id)}
+                </div>
+
+                <strong class="sensor-value">
+                    ${escapeHtml(formatSensorValue(entity))}
+                </strong>
+
             </div>
-        </div>
-        `;
+        `);
     }
 
     function renderBinarySensorEntity(entity) {
@@ -237,7 +244,7 @@ export function createDashboardRenderer(deps) {
             colorClass = isOn ? 'danger' : 'ok';
         }
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block binary-sensor-entity-block" id="entity-${entity.id}">
             <div class="sensor-row-line">
             <div class="sensor-name-wrap">
@@ -252,13 +259,13 @@ export function createDashboardRenderer(deps) {
             </strong>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderSwitchEntity(entity) {
         const isOn = Boolean(entity.value);
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block switch-entity-block" id="entity-${entity.id}">
             <div class="sensor-row-line">
                 <div class="sensor-name-wrap">
@@ -278,11 +285,11 @@ export function createDashboardRenderer(deps) {
                 </label>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderButtonEntity(entity) {
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block button-entity-block" id="entity-${entity.id}">
             <div class="sensor-row-line">
 
@@ -301,7 +308,7 @@ export function createDashboardRenderer(deps) {
 
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderNumberEntity(entity) {
@@ -315,7 +322,7 @@ export function createDashboardRenderer(deps) {
         const step = Number(entity.step ?? 1);
         const unit = entity.unit || '';
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block number-entity-block" id="entity-${entity.id}">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
@@ -361,11 +368,11 @@ export function createDashboardRenderer(deps) {
             </div>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderTextEntity(entity) {
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block text-entity-block" id="entity-${entity.id}">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
@@ -383,7 +390,7 @@ export function createDashboardRenderer(deps) {
             </div>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderClimateEntity(entity) {
@@ -395,7 +402,7 @@ export function createDashboardRenderer(deps) {
         const maxTemp = Number(entity.maxTemp ?? 30);
         const tempStep = Number(entity.tempStep ?? 0.1);
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block climate-entity-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -471,7 +478,7 @@ export function createDashboardRenderer(deps) {
             `).join('')}
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderDiscoveryPrefixes() {
@@ -533,7 +540,7 @@ export function createDashboardRenderer(deps) {
         const minColorTemp = 2000;
         const maxColorTemp = 6535;
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -649,7 +656,7 @@ export function createDashboardRenderer(deps) {
             </div>
             ` : ''}
         </div>
-        `;
+        `);
     }
 
     function renderCoverEntity(entity) {
@@ -662,7 +669,7 @@ export function createDashboardRenderer(deps) {
         rawState === 'OPEN' ? 'open' :
         rawState === 'CLOSED' ? 'closed' : '';
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block cover-entity-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -722,7 +729,7 @@ export function createDashboardRenderer(deps) {
             </div>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderLockEntity(entity) {
@@ -732,7 +739,7 @@ export function createDashboardRenderer(deps) {
         const isUnlocked = rawStateText === 'UNLOCKED';
         const isLocked = rawStateText === 'LOCKED';
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block lock-entity-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -772,7 +779,7 @@ export function createDashboardRenderer(deps) {
             </button>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderHumidifierEntity(entity) {
@@ -783,7 +790,7 @@ export function createDashboardRenderer(deps) {
         const maxHumidity = Number(entity.maxHumidity ?? 80);
         const deviceTypeLabel = translateHumidifierDeviceClass(entity.deviceClass);
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block humidifier-entity-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -858,7 +865,7 @@ export function createDashboardRenderer(deps) {
             </div>
             </div>
         </div>
-        `;
+        `);
     }
 
     function renderLawnMowerEntity(entity) {
@@ -874,7 +881,7 @@ export function createDashboardRenderer(deps) {
         const pauseClass = (rawActivity === 'paused' || rawActivity === 'docked') ? 'disabled-like' : '';
         const dockClass = rawActivity === 'docked' ? 'disabled-like' : '';
 
-        return `
+        return wrapDashboardEntity(entity, `
         <div class="dashboard-entity-row-block lawn-mower-entity-block" id="entity-${entity.id}">
             <div class="dashboard-entity-title">
                 ${escapeHtml(getEntityDisplayName(entity))}
@@ -914,7 +921,7 @@ export function createDashboardRenderer(deps) {
             </button>
             </div>
         </div>
-        `;
+        `);
     }
 
     function getDeviceIcons(device) {
@@ -1131,7 +1138,6 @@ export function createDashboardRenderer(deps) {
     }
 
     function setupEntityDragAndDrop(container, dashboardId, deviceId) {
-
         let draggedId = null;
 
         const cards = container.querySelectorAll('.custom-entity-row');
@@ -1185,6 +1191,88 @@ export function createDashboardRenderer(deps) {
                     return;
                 }
                 moveEntity(draggedId, targetId, dashboardId, deviceId);
+            });
+        });
+    }
+
+    function setupDashboardEntityDragAndDrop() {
+        let draggedId = null;
+
+        const entities = document.querySelectorAll(
+            '.dashboard-entity-row-block'
+        );
+
+        entities.forEach((entityEl) => {
+
+            entityEl.addEventListener('dragstart', (e) => {
+                const handle = e.target.closest(
+                    '.custom-entity-drag-handle'
+                );
+
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+
+                e.stopPropagation();
+
+                draggedId = entityEl.dataset.entityId;
+
+                entityEl.classList.add('dragging');
+
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            entityEl.addEventListener('dragend', () => {
+
+                entityEl.classList.remove('dragging');
+
+                draggedId = null;
+
+                entities.forEach(el =>
+                    el.classList.remove('drag-over')
+                );
+            });
+
+            entityEl.addEventListener('dragover', (e) => {
+
+                e.preventDefault();
+
+                if (!draggedId) return;
+
+                entityEl.classList.add('drag-over');
+            });
+
+            entityEl.addEventListener('dragleave', () => {
+
+                entityEl.classList.remove('drag-over');
+            });
+
+            entityEl.addEventListener('drop', (e) => {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const targetId = entityEl.dataset.entityId;
+
+                entities.forEach(el =>
+                    el.classList.remove('drag-over')
+                );
+
+                if (!draggedId || draggedId === targetId) {
+                    return;
+                }
+
+                const deviceId = entityEl
+                    .closest('.dashboard-device-body')
+                    ?.dataset.deviceId;
+
+                moveEntity(
+                    draggedId,
+                    targetId,
+                    getActiveCustomDashboardId(),
+                    deviceId
+                );
             });
         });
     }
@@ -1260,7 +1348,7 @@ export function createDashboardRenderer(deps) {
                             class="btn secondary action-duplicate-dashboard"
                             data-dashboard-id="${escapeHtml(dashboard.id)}"
                         >
-                            📄
+                            ⧉
                         </button>
 
                         <button class="btn danger" onclick="event.preventDefault(); removeCustomDashboard(${index})">
@@ -1481,8 +1569,35 @@ export function createDashboardRenderer(deps) {
     container.innerHTML = html;
     }
 
+    function wrapDashboardEntity(entity, innerHtml) {
+
+        const activeCustomDashboardId = getActiveCustomDashboardId();
+        const dashboardEditMode = getDashboardEditMode();
+
+        return `
+            <div
+                class="dashboard-entity-row-block"
+                id="entity-${entity.id}"
+                data-entity-id="${escapeHtml(entity.id)}"
+                ${activeCustomDashboardId && dashboardEditMode ? 'draggable="true"' : ''}
+            >
+
+                ${activeCustomDashboardId && dashboardEditMode ? `
+                    <div
+                        class="drag-handle custom-entity-drag-handle"
+                        draggable="true"
+                    >
+                        ☰
+                    </div>
+                ` : ''}
+
+                ${innerHtml}
+
+            </div>
+        `;
+    }
+
     function renderDashboard() {
-        console.log('Dashboard wird gerendert')
         renderDashboardTabs();
         const customDashboards = getCustomDashboards();
         const dashboardDevices = getDashboardDevices();
@@ -1638,7 +1753,10 @@ export function createDashboardRenderer(deps) {
                 ` : ''}
             </div>
 
-            <div class="dashboard-device-body">
+            <div
+                class="dashboard-device-body"
+                data-device-id="${escapeHtml(device.id)}"
+            >
                 ${entitiesHtml || '<div class="muted">Keine Entitäten</div>'}
             </div>
             </div>
@@ -1654,6 +1772,7 @@ export function createDashboardRenderer(deps) {
         });
 
         setupDashboardDragAndDrop();
+        setupDashboardEntityDragAndDrop();
     }
 
     return {

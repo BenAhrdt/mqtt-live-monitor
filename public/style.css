@@ -1552,24 +1552,41 @@ code {
 }
 
 .sensor-row-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.sensor-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    flex: 1;
+    min-width: 0;
 }
 
 .sensor-name {
-  overflow: hidden;
-  text-overflow: unset;
-  white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sensor-value {
-  white-space: nowrap;
+    margin-left: auto;
+    white-space: nowrap;
+    text-align: right;
 }
 
 .sensor-row-line strong {
-  white-space: nowrap;
+    white-space: nowrap;
+}
+
+.custom-entity-drag-handle {
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
 }
 
 .dashboard-device-icon {
@@ -2411,13 +2428,17 @@ code {
 
 .custom-dashboard-device-card.drag-over,
 .dashboard-config-block.drag-over,
-.custom-entity-row.drag-over {
-    border: 2px dashed var(--accent);
+.custom-entity-row.drag-over,
+.dashboard-entity-row-block.drag-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: 2px;
+    background: rgba(255,255,255,0.04);
 }
 
 .custom-dashboard-device-card.dragging,
 .dashboard-config-block.dragging,
-.custom-entity-row.dragging {
+.custom-entity-row.dragging,
+.dashboard-entity-row-block.dragging {
     opacity: 0.5;
 }
 
@@ -2459,4 +2480,13 @@ code {
     cursor: grab;
     user-select: none;
     flex-shrink: 0;
+}
+
+.sensor-entity-block.drag-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: 2px;
+}
+
+.sensor-entity-block.dragging {
+    opacity: 0.45;
 }
