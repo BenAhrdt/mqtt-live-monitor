@@ -1471,63 +1471,54 @@ export function createDashboardRenderer(deps) {
 
     function renderEntitySelector(dashboard, device) {
         const dashboardDevice = dashboard.devices.find(d => d.deviceId === device.id);
+
         const selectedEntities = dashboardDevice?.entityIds || [];
 
         if (!device.entities || !device.entities.length) {
-        return '<div class="muted">Keine Entitäten vorhanden</div>';
+            return '<div class="muted">Keine Entitäten vorhanden</div>';
         }
 
-        return selectedEntities
-            .map(entityId =>
-                (device.entities || []).find(entity => entity.id === entityId)
-            )
-            .filter(Boolean)
+        return device.entities
             .map(entity => {
-        const checked = selectedEntities.includes(entity.id);
+                const checked = selectedEntities.includes(entity.id);
 
-        return `
-            <div
-                class="custom-entity-row"
-                data-entity-id="${escapeHtml(entity.id)}"
-            >
-
-                <div
-                    class="drag-handle custom-entity-drag-handle"
-                    draggable="true"
-                >
-                    ☰
-                </div>
-
-                <input
-                    type="checkbox"
-                    ${checked ? 'checked' : ''}
-                    onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
-                >
-
-                <div class="custom-entity-main">
-
-                    <span class="custom-entity-title">
-                        ${escapeHtml(getEntityDisplayName(entity))}
-                    </span>
-
-                    <button
-                        type="button"
-                        class="btn secondary small-btn rename-btn action-rename-entity"
+                return `
+                    <div
+                        class="custom-entity-row"
                         data-entity-id="${escapeHtml(entity.id)}"
-                        title="Entität umbenennen"
                     >
-                        ✏️
-                    </button>
 
-                </div>
+                        <div
+                            class="drag-handle custom-entity-drag-handle"
+                            draggable="true"
+                        >
+                            ☰
+                        </div>
 
-                <small class="custom-entity-type">
-                    ${escapeHtml(entity.type)}
-                </small>
+                        <input
+                            type="checkbox"
+                            ${checked ? 'checked' : ''}
+                            onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
+                        >
 
-            </div>
-        `;
-        }).join('');
+                        <div class="custom-entity-main">
+
+                            <span class="custom-entity-title">
+                                ${escapeHtml(getEntityDisplayName(entity))}
+                            </span>
+
+                            ${renderRenameEntityButton(entity.id)}
+
+                        </div>
+
+                        <small class="custom-entity-type">
+                            ${escapeHtml(entity.type)}
+                        </small>
+
+                    </div>
+                `;
+            })
+            .join('');
     }
 
     function renderDashboardTabs() {

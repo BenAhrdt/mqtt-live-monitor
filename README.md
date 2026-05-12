@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.5.4 Anzeigen von abgewählten ENtitäten in den Settings
+* (BenAhrdt) Abgewählte Entitäten, wurden fälschlicherweise nicht mehr angezeigt.
+
 ### V1.5.3 Kein Rendern im Bearbeitungsmodus
 * (BenAhrdt) Rendern im Bearbeitungsmodus deaktiviert, damit drag and Drop besser funktioniert.
 
