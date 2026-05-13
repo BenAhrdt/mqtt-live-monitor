@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Umstellung des Hashverfahrens
+
 ### V1.5.4 Anzeigen von abgewählten ENtitäten in den Settings
 * (BenAhrdt) Abgewählte Entitäten, wurden fälschlicherweise nicht mehr angezeigt.
 

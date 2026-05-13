@@ -5,7 +5,7 @@ const http = require("http");
 const mqtt = require("mqtt");
 const packageJson = require("./package.json");
 const { exec } = require("child_process");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 const { Server } = require("socket.io");
 
