@@ -1612,7 +1612,7 @@ function renderRenameEntityButton(entityId, options) {
         return `
             <div
                 class="dashboard-entity-row-block"
-                id="entity-${entity.id}"
+                data-entity-id="${entity.id}"
                 data-entity-id="${escapeHtml(entity.id)}"
                 ${activeCustomDashboardId && dashboardEditMode ? 'draggable="true"' : ''}
             >

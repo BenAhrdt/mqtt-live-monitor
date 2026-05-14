@@ -1238,11 +1238,11 @@ async function loadDashboardDevices() {
 
 function updateDashboardEntity(update) {
     if (dashboardEditMode) return;
+
     if (activeCustomDashboardId) {
         const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
 
         const isInCustomDashboard = customDashboard?.devices?.some(device =>
-            device.deviceId === update.deviceId &&
             device.entityIds.includes(update.entityId)
         );
 
@@ -1254,30 +1254,28 @@ function updateDashboardEntity(update) {
     let found = false;
 
     dashboardDevices = dashboardDevices.map((device) => {
-    if (device.id !== update.deviceId) {
-        return device;
-    }
 
-    const updatedEntities = (device.entities || []).map((entity) => {
-        if (entity.id !== update.entityId) {
-        return entity;
-        }
+        const updatedEntities = (device.entities || []).map((entity) => {
 
-        found = true;
+            if (entity.id !== update.entityId) {
+                return entity;
+            }
+
+            found = true;
+
+            return {
+                ...entity,
+                ...update.entity,
+                value: update.entity.value,
+                rawState: update.entity.rawState,
+                lastUpdate: update.entity.lastUpdate
+            };
+        });
 
         return {
-        ...entity,
-        ...update.entity,
-        value: update.entity.value,
-        rawState: update.entity.rawState,
-        lastUpdate: update.entity.lastUpdate
+            ...device,
+            entities: updatedEntities
         };
-    });
-
-    return {
-        ...device,
-        entities: updatedEntities
-    };
     });
 
     if (found && (currentView === 'home' || currentView === 'dashboard')) {
@@ -1286,33 +1284,37 @@ function updateDashboardEntity(update) {
 }
 
 function updateSingleEntity(update) {
-    const oldEl = document.getElementById(`entity-${update.entityId}`);
 
-    if (!oldEl) {
+    const elements = document.querySelectorAll(
+        `[data-entity-id="${update.entityId}"]`
+    );
+
+    if (!elements.length) {
         return;
     }
 
     const entity = update.entity;
-    let html = '';
 
-    if (entity.type === 'climate') html = dashboardRenderer.renderClimateEntity(entity);
-    else if (entity.type === 'light') html = dashboardRenderer.renderLightEntity(entity);
-    else if (entity.type === 'cover') html = dashboardRenderer.renderCoverEntity(entity);
-    else if (entity.type === 'lock') html = dashboardRenderer.renderLockEntity(entity);
-    else if (entity.type === 'humidifier') html = dashboardRenderer.renderHumidifierEntity(entity);
-    else if (entity.type === 'lawn_mower') html = dashboardRenderer.renderLawnMowerEntity(entity);
-    else if (entity.type === 'sensor') html = dashboardRenderer.renderSensorEntity(entity);
-    else if (entity.type === 'binary_sensor') html = dashboardRenderer.renderBinarySensorEntity(entity);
-    else if (entity.type === 'switch') html = dashboardRenderer.renderSwitchEntity(entity);
-    else if (entity.type === 'button') html = dashboardRenderer.renderButtonEntity(entity);
-    else if (entity.type === 'number') html = dashboardRenderer.renderNumberEntity(entity);
-    else if (entity.type === 'text') html = dashboardRenderer.renderTextEntity(entity);
-    else {
-        scheduleDashboardRender();
-        return;
-    }
+    elements.forEach(oldEl => {
 
-    oldEl.outerHTML = html;
+        let html = '';
+
+        if (entity.type === 'climate') html = dashboardRenderer.renderClimateEntity(entity);
+        else if (entity.type === 'light') html = dashboardRenderer.renderLightEntity(entity);
+        else if (entity.type === 'cover') html = dashboardRenderer.renderCoverEntity(entity);
+        else if (entity.type === 'lock') html = dashboardRenderer.renderLockEntity(entity);
+        else if (entity.type === 'humidifier') html = dashboardRenderer.renderHumidifierEntity(entity);
+        else if (entity.type === 'lawn_mower') html = dashboardRenderer.renderLawnMowerEntity(entity);
+        else if (entity.type === 'sensor') html = dashboardRenderer.renderSensorEntity(entity);
+        else if (entity.type === 'binary_sensor') html = dashboardRenderer.renderBinarySensorEntity(entity);
+        else if (entity.type === 'switch') html = dashboardRenderer.renderSwitchEntity(entity);
+        else if (entity.type === 'button') html = dashboardRenderer.renderButtonEntity(entity);
+        else if (entity.type === 'number') html = dashboardRenderer.renderNumberEntity(entity);
+        else if (entity.type === 'text') html = dashboardRenderer.renderTextEntity(entity);
+        else return;
+
+        oldEl.outerHTML = html;
+    });
 }
 
 async function publishMqttCommand(topic, payloadObject) {

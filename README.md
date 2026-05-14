@@ -105,8 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.5.9 Mehrere gleiche Entitäten auf einem Dashboard
 * (BenAhrdt) Check for updates auf 10min Intervall gestellt
+* (BenAhrdt) Mehrere Entitäten können auf einem Dashboard sein.
 
 ### V1.5.8 Windows Installer
 * (BenAhrdt) Erster Windows installer
