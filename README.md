@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Check for updates auf 10min Intervall gestellt
+
 ### V1.5.8 Windows Installer
 * (BenAhrdt) Erster Windows installer
 

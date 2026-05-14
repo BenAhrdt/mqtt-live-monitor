@@ -2429,7 +2429,7 @@ window.setTextEntity = setTextEntity;
 // 4️⃣ starten
 init();
 
-setInterval(checkForUpdates, 120_000);
+setInterval(checkForUpdates, 600_000);
 
 window.addEventListener('popstate', () => {
     const customId = getCustomDashboardIdFromUrl();
