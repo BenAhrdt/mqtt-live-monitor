@@ -105,7 +105,7 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### V1.5.6 Windows Installer
+### V1.5.7 Windows Installer
 * (BenAhrdt) Erster Windows installer
 
 ### V1.5.5 Virtuelle Geräte (1. Step)
