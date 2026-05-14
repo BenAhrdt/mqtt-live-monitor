@@ -98,6 +98,8 @@ let dashboardEditMode = false;
 
 let customDashboardsMenuOpen = false;
 
+let currentSelectedEntityIds = new Set();
+
 if (toggleCustomDashboardsBtn) {
     toggleCustomDashboardsBtn.addEventListener('click', () => {
     customDashboardsMenuOpen = !customDashboardsMenuOpen;
@@ -772,23 +774,53 @@ async function saveFriendlyNames() {
 }
 
 async function renameDevice(deviceId) {
+
+    // 👉 echtes Gerät
     const device = dashboardDevices.find(d => d.id === deviceId);
-    if (!device) return;
 
-    const current = getDeviceDisplayName(device);
+    // 👉 virtuelles Gerät suchen
+    let dashboardDevice = null;
 
-    const newName = prompt('Neuer Gerätename:', current);
+    if (!device) {
+        const dashboard = customDashboards.find(d =>
+            d.devices.some(dev => dev.deviceId === deviceId)
+        );
+
+        dashboardDevice = dashboard?.devices.find(dev => dev.deviceId === deviceId);
+    }
+
+    // 👉 aktueller Name bestimmen
+    const current =
+        device
+            ? getDeviceDisplayName(device)
+            : (dashboardDevice?.name || "Virtuelles Gerät");
+
+    const newName = await openRenameModal('Neuer Gerätename', current);
     if (newName === null) return;
 
     const trimmed = newName.trim();
 
-    if (!trimmed) {
-    delete friendlyNames.devices[deviceId];
-    } else {
-    friendlyNames.devices[deviceId] = trimmed;
+    // 👉 echtes Gerät → friendlyNames
+    if (device) {
+        if (!trimmed) {
+            delete friendlyNames.devices[deviceId];
+        } else {
+            friendlyNames.devices[deviceId] = trimmed;
+        }
+
+        await saveFriendlyNames();
     }
 
-    await saveFriendlyNames();
+    // 👉 virtuelles Gerät → direkt im Dashboard speichern
+    if (dashboardDevice) {
+        if (!trimmed) {
+            delete dashboardDevice.name;
+        } else {
+            dashboardDevice.name = trimmed;
+        }
+
+        await saveCustomDashboards();
+    }
 
     dashboardRenderer.renderDashboard();
     dashboardRenderer.renderCustomDashboards();
@@ -800,7 +832,7 @@ async function renameEntity(entityId) {
 
     const current = getEntityDisplayName(entity);
 
-    const newName = prompt('Neuer Entitätsname:', current);
+    const newName = await openRenameModal('Neuer Entitätsname', current);
     if (newName === null) return;
 
     const trimmed = newName.trim();
@@ -856,7 +888,7 @@ async function renameDashboard(dashboardId) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
 
-    const newNameRaw = prompt('Dashboard umbenennen:', dashboard.name);
+    const newNameRaw = await openRenameModal('Dashboard umbenennen', dashboard.name);
     if (newNameRaw === null) return;
 
     const newName = newNameRaw.trim();
@@ -1088,7 +1120,33 @@ async function addDeviceToCustomDashboard(dashboardId) {
     if (!deviceId) return;
 
     if (!Array.isArray(dashboard.devices)) {
-    dashboard.devices = [];
+        dashboard.devices = [];
+    }
+
+    // 👉 VIRTUELLES DEVICE
+    if (deviceId === "virtual") {
+
+        const id = "virtual_" + Date.now();
+
+        // 👉 1. In Dashboard speichern
+        dashboard.devices.push({
+            deviceId: id,
+            isVirtual: true,
+            entityIds: []
+        });
+
+        // 👉 2. SOFORT in dashboardDevices injecten
+        dashboardDevices.push({
+            id,
+            name: "Virtuelles Gerät",
+            entities: [],
+            entityCount: 0,
+            isVirtual: true
+        });
+
+        dashboardRenderer.renderCustomDashboards();
+        await saveCustomDashboards();
+        return;
     }
 
     if (dashboard.devices.some(d => d.deviceId === deviceId)) {
@@ -1138,7 +1196,40 @@ async function loadDashboardDevices() {
     try {
         const response = await fetch('/api/devices');
         const data = await response.json();
+
         dashboardDevices = Array.isArray(data) ? data : [];
+
+        // 🔥 VIRTUELLE GERÄTE INTEGRIEREN
+        customDashboards.forEach(dashboard => {
+            (dashboard.devices || []).forEach(dashboardDevice => {
+
+                if (!dashboardDevice.isVirtual) return;
+
+                // schon vorhanden?
+                const exists = dashboardDevices.some(d => d.id === dashboardDevice.deviceId);
+                if (exists) return;
+
+                dashboardDevices.push({
+                    id: dashboardDevice.deviceId,
+                    name: dashboardDevice.name || "Virtuelles Gerät",
+                    isVirtual: true,
+                    viaDevice: null,
+                    entities: (dashboardDevice.entityIds || []).map(entityId => {
+                        const real = findDashboardEntityById(entityId);
+
+                        return real
+                            ? { ...real } // echte Entity übernehmen
+                            : {
+                                id: entityId,
+                                name: entityId,
+                                type: 'sensor',
+                                value: null
+                            };
+                    })
+                });
+            });
+        });
+
         dashboardRenderer.renderDashboard();
     } catch (error) {
     console.error('Fehler beim Laden von /api/devices:', error);
@@ -1415,8 +1506,8 @@ async function promptHumidifierTargetHumidity(entityId) {
     const min = Number(entity.minHumidity ?? 30);
     const max = Number(entity.maxHumidity ?? 80);
 
-    const input = window.prompt(
-    `Sollfeuchte eingeben (${min} bis ${max} %):`,
+    const input = await openRenameModal(
+    `Sollfeuchte (${min} bis ${max} %)`,
     current.toFixed(0)
     );
 
@@ -1546,8 +1637,8 @@ async function promptClimateTargetTemperature(entityId) {
     const max = Number(entity.maxTemp ?? 30);
     const step = Number(entity.tempStep ?? 0.1);
 
-    const input = window.prompt(
-    `Solltemperatur eingeben (${min} bis ${max} °C):`,
+    const input = await openRenameModal(
+    `Solltemperatur (${min} bis ${max} °C)`,
     current.toFixed(1)
     );
 
@@ -1950,6 +2041,31 @@ entityFilterBtn.addEventListener('click', (e) => {
 
 // Clickhandler
 document.addEventListener('click', async (e) => {
+    // 🔥 ADD ENTITY (Virtuelles Gerät)
+    const addEntityBtn = e.target.closest('.action-add-entity');
+    if (addEntityBtn) {
+
+        const deviceId = addEntityBtn.dataset.deviceId;
+        const dashboardId = addEntityBtn.dataset.dashboardId;
+
+        openEntitySelectModal(dashboardId, deviceId);
+
+        return;
+    }
+
+    // 🔥 ENTITY MODAL SAVE
+    const saveBtn = e.target.closest('.action-save-entities');
+    if (saveBtn) {
+        saveEntitySelection();
+        return;
+    }
+
+    // 🔥 ENTITY MODAL CANCEL
+    const cancelBtn = e.target.closest('.action-cancel-entities');
+    if (cancelBtn) {
+        closeEntityModal();
+        return;
+    }
 
     // 🔥 1. TABS (Home + Custom Dashboards)
     const tab = e.target.closest('.dashboard-tab');
@@ -2386,6 +2502,49 @@ async function openLoginModal() {
     }
 }
 
+function openRenameModal(titleText, defaultValue = "") {
+    return new Promise((resolve) => {
+
+        errorBox.textContent = "";
+        modal.classList.remove("hidden");
+        title.textContent = titleText;
+
+        // ALLE Blöcke sicher verstecken
+        createBlock.classList.add("hidden");
+        existingBlock.classList.add("hidden");
+        document.getElementById("loginChangeBlock").classList.add("hidden");
+        document.getElementById("renameBlock").classList.add("hidden"); // ← wichtig reset
+
+        // dann gezielt EINEN anzeigen
+        const renameBlock = document.getElementById("renameBlock");
+        renameBlock.classList.remove("hidden");
+
+        const input = document.getElementById("renameInput");
+        const confirmBtn = document.getElementById("renameConfirmBtn");
+
+        renameBlock.classList.remove("hidden");
+        input.value = defaultValue;
+        input.focus();
+        input.select();
+
+        function cleanup(result) {
+            renameBlock.classList.add("hidden");
+            confirmBtn.onclick = null;
+            modal.classList.add("hidden");
+            resolve(result);
+        }
+
+        confirmBtn.onclick = () => {
+            cleanup(input.value);
+        };
+
+        const closeBtn = document.getElementById("closeLoginModal");
+        closeBtn.onclick = () => {
+            cleanup(null);
+        };
+    });
+}
+
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 
 if (themeToggleBtn) {
@@ -2609,6 +2768,100 @@ document.getElementById("changePasswordBtn").onclick = async () => {
         alert("Passwort geändert");
     }
 };
+
+let currentEntitySelectContext = {
+    dashboardId: null,
+    deviceId: null
+};
+
+function openEntitySelectModal(dashboardId, deviceId) {
+    currentEntitySelectContext = { dashboardId, deviceId };
+
+    const modal = document.getElementById('entitySelectModal');
+    const list = document.getElementById('entitySelectList');
+    const search = document.getElementById('entitySearch');
+
+    modal.classList.remove('hidden');
+    search.value = '';
+
+    const dashboard = customDashboards.find(d => d.id === dashboardId);
+    const dashboardDevice = dashboard?.devices?.find(d => d.deviceId === deviceId);
+
+    currentSelectedEntityIds = new Set(dashboardDevice?.entityIds || []);
+
+    const allEntities = dashboardDevices.flatMap(device =>
+        (device.entities || []).map(entity => ({
+            ...entity,
+            deviceName: getDeviceDisplayName(device)
+        }))
+    );
+
+    function render(filter = '') {
+        list.innerHTML = '';
+
+        const filtered = allEntities.filter(e =>
+            getEntityDisplayName(e).toLowerCase().includes(filter.toLowerCase())
+        );
+
+        if (!filtered.length) {
+            list.innerHTML = '<div class="empty">Keine Entitäten gefunden</div>';
+            return;
+        }
+
+        filtered.forEach(entity => {
+            const checked = currentSelectedEntityIds.has(entity.id);
+
+            const row = document.createElement('label');
+            row.className = 'entity-row-compact';
+
+            row.innerHTML = `
+                <input type="checkbox" value="${entity.id}" ${checked ? 'checked' : ''}>
+                <span class="entity-name">${getEntityDisplayName(entity)}</span>
+                <span class="entity-device">${entity.deviceName}</span>
+            `;
+
+            const checkbox = row.querySelector('input');
+
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    currentSelectedEntityIds.add(entity.id);
+                } else {
+                    currentSelectedEntityIds.delete(entity.id);
+                }
+            });
+
+            list.appendChild(row);
+        });
+    }
+
+    render();
+
+    search.oninput = () => render(search.value);
+}
+
+function saveEntitySelection() {
+    if (!currentEntitySelectContext) return;
+
+    const { dashboardId, deviceId } = currentEntitySelectContext;
+
+    const dashboard = customDashboards.find(d => d.id === dashboardId);
+    if (!dashboard) return;
+
+    const device = dashboard.devices.find(d => d.deviceId === deviceId);
+    if (!device) return;
+
+    device.entityIds = Array.from(currentSelectedEntityIds);
+
+    closeEntityModal();
+
+    dashboardRenderer.renderCustomDashboards();
+    saveCustomDashboards();
+}
+
+function closeEntityModal() {
+    document.getElementById('entitySelectModal').classList.add('hidden');
+    currentEntitySelectContext = null;
+}
 
 async function init() {
     // 1️⃣ Daten laden (WICHTIG!)

@@ -7,6 +7,30 @@ const packageJson = require("./package.json");
 const { exec } = require("child_process");
 const bcrypt = require("bcryptjs");
 
+let CONFIG_PATH;
+
+// 👉 prüfen ob Electron läuft
+const isElectron = !!process.versions.electron;
+
+if (isElectron) {
+    const { app } = require("electron");
+
+    CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
+} else {
+    const CONFIG_DEFAULT_PATH = path.join(__dirname, "config.json");
+    const CONFIG_DEV_PATH = path.join(__dirname, "config-dev.json");
+    CONFIG_PATH = fs.existsSync(CONFIG_DEV_PATH)
+      ? CONFIG_DEV_PATH
+      : CONFIG_DEFAULT_PATH;
+}
+
+console.log("Verwende Config:", path.basename(CONFIG_PATH));
+console.log("CONFIG PATH:", CONFIG_PATH);
+
+if (!fs.existsSync(CONFIG_PATH)) {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({}, null, 2));
+}
+
 const { Server } = require("socket.io");
 
 const https = require('https');
@@ -191,7 +215,7 @@ app.get('/api/update/check', async (req, res) => {
     current: currentVersion,
     latest: latestVersion,
     updateAvailable:
-      latestVersion && latestVersion !== `v${currentVersion}`
+      !isElectron && latestVersion && latestVersion !== `v${currentVersion}`
   });
 });
 
@@ -216,14 +240,6 @@ app.post("/api/update/run", (req, res) => {
 });
 
 const DEFAULT_WEB_PORT = 3000;
-const CONFIG_DEFAULT_PATH = path.join(__dirname, "config.json");
-const CONFIG_DEV_PATH = path.join(__dirname, "config-dev.json");
-
-const CONFIG_PATH = fs.existsSync(CONFIG_DEV_PATH)
-  ? CONFIG_DEV_PATH
-  : CONFIG_DEFAULT_PATH;
-
-console.log("Verwende Config:", path.basename(CONFIG_PATH));
 
 app.get("/api/version", (req, res) => {
   res.json({
@@ -1734,10 +1750,7 @@ function connectMqtt() {
   resetStores();
 
   const { host, port, topic, username, password } = mqttConfig;
-  const clientId = isDev
-    ? `${mqttConfig.clientId}_dev_${process.pid}`
-    : `${mqttConfig.clientId}_prod_${process.pid}`
-
+  const clientId = `${mqttConfig.clientId}_${isDev ? "dev" : "prod"}`
   console.log("Mode:", isDev ? "DEV" : "PROD");
   console.log("MQTT ClientId:", clientId);
 
@@ -1756,13 +1769,24 @@ function connectMqtt() {
   mqttClient = mqtt.connect(url, {
     username: username || undefined,
     password: password || undefined,
+
     clientId,
+
+    protocolVersion: 4, // MQTT 3.1.1
+
+    clean: false,
+
     reconnectPeriod: 3000,
+    connectTimeout: 10000,
+    keepalive: 30,
+
+    resubscribe: true,
+    queueQoSZero: true,
   });
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
-    mqttClient.subscribe(topic, (err) => {
+    mqttClient.subscribe(topic, { qos: 1 }, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
@@ -2095,7 +2119,11 @@ app.post("/api/custom-dashboards", (req, res) => {
           deviceId: String(device.deviceId || "").trim(),
           entityIds: Array.isArray(device.entityIds)
             ? device.entityIds.map(id => String(id).trim()).filter(Boolean)
-            : []
+            : [],
+          isVirtual: Boolean(device.isVirtual),
+          name: device.isVirtual
+            ? String(device.name || "Virtuelles Gerät").trim()
+            : undefined
         })).filter(device => device.deviceId)
       : []
   })).filter(dashboard => dashboard.id && dashboard.name);

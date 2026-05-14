@@ -425,11 +425,40 @@
       </button>
     </div>
 
+    <div id="renameBlock" class="hidden">
+      <input id="renameInput" type="text" placeholder="Neuer Name">
+      <button id="renameConfirmBtn" class="btn primary full-width">
+        Speichern
+      </button>
+    </div>
+
     <div id="loginError" class="config-message"></div>
 
     <button id="closeLoginModal" class="btn secondary full-width">
       Abbrechen
     </button>
+  </div>
+</div>
+
+<div id="entitySelectModal" class="modal hidden">
+  <div class="modal-content">
+
+    <h3>Entitäten auswählen</h3>
+
+    <input
+      type="text"
+      id="entitySearch"
+      placeholder="Suchen..."
+      class="modal-search"
+    />
+
+    <div id="entitySelectList" class="entity-select-list"></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary action-cancel-entities">Abbrechen</button>
+      <button class="btn primary action-save-entities">Speichern</button>
+    </div>
+
   </div>
 </div>
 

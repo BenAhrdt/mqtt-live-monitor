@@ -105,8 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.5.5 Virtuelle Geräte (1. Step)
 * (BenAhrdt) Umstellung des Hashverfahrens
+* (BenAhrdt) Virtuelle Geräte (1. Step)
 
 ### V1.5.4 Anzeigen von abgewählten ENtitäten in den Settings
 * (BenAhrdt) Abgewählte Entitäten, wurden fälschlicherweise nicht mehr angezeigt.
