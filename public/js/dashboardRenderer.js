@@ -1522,47 +1522,65 @@ function renderRenameEntityButton(entityId, options) {
             return '<div class="muted">Keine Entitäten vorhanden</div>';
         }
 
-        return device.entities
-            .map(entity => {
-                const checked = selectedEntities.includes(entity.id);
+        const allEntities = device.entities || [];
 
-                return `
+        // 👉 sortiere nach Config-Reihenfolge
+        const sortedEntities = [...allEntities].sort((a, b) => {
+            const indexA = selectedEntities.indexOf(a.id);
+            const indexB = selectedEntities.indexOf(b.id);
+
+            // beide in config → nach config sortieren
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+
+            // nur A in config → nach oben
+            if (indexA !== -1) return -1;
+
+            // nur B in config → nach oben
+            if (indexB !== -1) return 1;
+
+            // beide nicht → original Reihenfolge behalten
+            return 0;
+        });
+
+        return sortedEntities.map(entity => {
+            const checked = selectedEntities.includes(entity.id);
+
+            return `
+                <div
+                    class="custom-entity-row"
+                    data-entity-id="${escapeHtml(entity.id)}"
+                >
+
                     <div
-                        class="custom-entity-row"
-                        data-entity-id="${escapeHtml(entity.id)}"
+                        class="drag-handle custom-entity-drag-handle"
+                        draggable="true"
+                    >
+                        ☰
+                    </div>
+
+                    <input
+                        type="checkbox"
+                        ${checked ? 'checked' : ''}
+                        onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
                     >
 
-                        <div
-                            class="drag-handle custom-entity-drag-handle"
-                            draggable="true"
-                        >
-                            ☰
-                        </div>
+                    <div class="custom-entity-main">
+                        <span class="custom-entity-title">
+                            ${escapeHtml(getEntityDisplayName(entity))}
+                        </span>
 
-                        <input
-                            type="checkbox"
-                            ${checked ? 'checked' : ''}
-                            onchange="toggleDashboardEntity('${escapeHtml(dashboard.id)}', '${escapeHtml(device.id)}', '${escapeHtml(entity.id)}', this.checked)"
-                        >
-
-                        <div class="custom-entity-main">
-
-                            <span class="custom-entity-title">
-                                ${escapeHtml(getEntityDisplayName(entity))}
-                            </span>
-
-                            ${renderRenameEntityButton(entity.id, { forceVisible: true })}
-
-                        </div>
-
-                        <small class="custom-entity-type">
-                            ${escapeHtml(entity.type)}
-                        </small>
-
+                        ${renderRenameEntityButton(entity.id, { forceVisible: true })}
                     </div>
-                `;
-            })
-            .join('');
+
+                    <small class="custom-entity-type">
+                        ${escapeHtml(entity.type)}
+                    </small>
+
+                </div>
+            `;
+        }).join('');
     }
 
     function renderDashboardTabs() {

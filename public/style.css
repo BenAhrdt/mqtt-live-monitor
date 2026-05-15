@@ -2573,3 +2573,25 @@ code {
   gap: 10px;
   margin-left: 20px; /* 🔥 MAGIE */
 }
+
+#entitySelectModal .modal-content {
+    width: 500px;          /* 👈 größer */
+    max-width: 95vw;       /* 👈 bleibt responsive */
+}
+
+.entity-name small,
+.entity-device small {
+    display: block;
+    font-size: 11px;
+    text-align: left;
+    opacity: 0.85;
+    margin-top: 2px;
+    line-height: 1.2;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: center; /* 👈 mittig */
+    gap: 40px;
+    margin-top: 24px;
+}

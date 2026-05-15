@@ -2794,16 +2794,28 @@ function openEntitySelectModal(dashboardId, deviceId) {
     const allEntities = dashboardDevices.flatMap(device =>
         (device.entities || []).map(entity => ({
             ...entity,
-            deviceName: getDeviceDisplayName(device)
+            deviceName: getDeviceDisplayName(device), // friendly
+            originalDeviceName: device.name || device.id,      // 🔥 original
+            originalEntityName: entity.name || entity.id       // 🔥 original entity
         }))
     );
 
     function render(filter = '') {
         list.innerHTML = '';
 
-        const filtered = allEntities.filter(e =>
-            getEntityDisplayName(e).toLowerCase().includes(filter.toLowerCase())
-        );
+        const term = filter.toLowerCase();
+
+        const filtered = allEntities.filter(e => {
+            const entityName = getEntityDisplayName(e).toLowerCase();
+            const deviceName = (e.deviceName || '').toLowerCase();
+            const originalDeviceName = (e.originalDeviceName || '').toLowerCase();
+
+            return (
+                entityName.includes(term) ||
+                deviceName.includes(term) ||
+                originalDeviceName.includes(term)
+            );
+        });
 
         if (!filtered.length) {
             list.innerHTML = '<div class="empty">Keine Entitäten gefunden</div>';
@@ -2816,10 +2828,28 @@ function openEntitySelectModal(dashboardId, deviceId) {
             const row = document.createElement('label');
             row.className = 'entity-row-compact';
 
+            const friendlyEntity = getEntityDisplayName(entity);
+            const originalEntity = entity.originalEntityName;
+
+            const friendlyDevice = entity.deviceName;
+            const originalDevice = entity.originalDeviceName;
+
             row.innerHTML = `
                 <input type="checkbox" value="${entity.id}" ${checked ? 'checked' : ''}>
-                <span class="entity-name">${getEntityDisplayName(entity)}</span>
-                <span class="entity-device">${entity.deviceName}</span>
+
+                <span class="entity-name">
+                    ${friendlyEntity}
+                    ${friendlyEntity !== originalEntity
+                        ? `<small class="muted">(${originalEntity})</small>`
+                        : ''}
+                </span>
+
+                <span class="entity-device">
+                    ${friendlyDevice}
+                    ${friendlyDevice !== originalDevice
+                        ? `<small class="muted">(${originalDevice})</small>`
+                        : ''}
+                </span>
             `;
 
             const checkbox = row.querySelector('input');

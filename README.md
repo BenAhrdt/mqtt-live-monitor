@@ -105,6 +105,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Entitätsuche in virtuellen Geräten auch nach Gerätename möglich
+
 ### V1.5.9 Mehrere gleiche Entitäten auf einem Dashboard
 * (BenAhrdt) Check for updates auf 10min Intervall gestellt
 * (BenAhrdt) Mehrere Entitäten können auf einem Dashboard sein.
