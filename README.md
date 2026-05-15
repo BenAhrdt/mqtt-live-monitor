@@ -106,6 +106,7 @@ journalctl -u mqtt-live-monitor -f
 ## Changelog
 
 ### In Arbeit
+* (BenAhrdt) Windows Installer aus dem Repo entfernt
 * (BenAhrdt) Entitätsuche in virtuellen Geräten auch nach Gerätename möglich
 
 ### V1.5.9 Mehrere gleiche Entitäten auf einem Dashboard
