@@ -105,6 +105,11 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Hover auch in Settings
+* (BenAhrdt) Virtuelle Geräte, werden nicht mehr in eigener Entitätsauswahl angezeigt
+* (BenAhrdt) Löschen der Friendly Names, wenn Gerät gelöscht wird, oder wenn dashboard gelöscht wird
+
 ### V1.6.0 Virtuelle Geräte (2. Step)
 * (BenAhrdt) Umbenennen der Entitäten in Virtuellen Geräten unabhängig von den realen Geräten
 * (BenAhrdt) Windows Installer aus dem Repo entfernt

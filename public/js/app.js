@@ -907,9 +907,41 @@ async function addCustomDashboard() {
 }
 
 async function removeCustomDashboard(index) {
+
+    // 🔥 1. Dashboard merken (WICHTIG!)
+    const removedDashboard = customDashboards[index];
+
+    // 🔥 2. Dashboard löschen
     customDashboards.splice(index, 1);
+
+    // 🔥 3. Alle noch verwendeten Geräte sammeln
+    const usedDeviceIds = new Set();
+
+    customDashboards.forEach(d => {
+        (d.devices || []).forEach(dev => {
+            usedDeviceIds.add(dev.deviceId);
+        });
+    });
+
+    // 🔥 4. Nur verwaiste Geräte aus friendlyNames löschen
+    (removedDashboard.devices || []).forEach(dev => {
+        if (!usedDeviceIds.has(dev.deviceId)) {
+            delete friendlyNames[dev.deviceId];
+        }
+    });
+
+    // 🔥 5. FriendlyNames speichern
+    await fetch('/api/friendly-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendlyNames })
+    });
+
+    // 🔥 6. UI neu rendern
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
+
+    // 🔥 7. Dashboards speichern
     await saveCustomDashboards();
 }
 
@@ -1199,7 +1231,15 @@ async function removeDeviceFromCustomDashboard(dashboardId, deviceId) {
 
     dashboard.devices = (dashboard.devices || []).filter(d => d.deviceId !== deviceId);
 
-    delete friendlyNames[deviceId];
+    // 🔥 prüfen, ob device noch irgendwo verwendet wird
+    const stillUsed = customDashboards.some(d =>
+        (d.devices || []).some(dev => dev.deviceId === deviceId)
+    );
+
+    // 🔥 nur löschen, wenn NICHT mehr verwendet
+    if (!stillUsed) {
+        delete friendlyNames[deviceId];
+    }
 
     await fetch('/api/friendly-names', {
         method: 'POST',
@@ -2835,7 +2875,9 @@ function openEntitySelectModal(dashboardId, deviceId) {
 
     currentSelectedEntityIds = new Set(dashboardDevice?.entityIds || []);
 
-    const allEntities = dashboardDevices.flatMap(device =>
+    const allEntities = dashboardDevices
+        .filter(device => !device.isVirtual)
+        .flatMap(device =>
         (device.entities || []).map(entity => ({
             ...entity,
             deviceName: getDeviceDisplayName(device), // friendly

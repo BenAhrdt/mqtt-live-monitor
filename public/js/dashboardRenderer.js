@@ -150,7 +150,7 @@ export function createDashboardRenderer(deps) {
             <option value="">Gerät auswählen...</option>
             <option value="virtual">➕ Virtuelles Gerät</option>
                 ${availableDevices.map(device => {
-                    const friendly = friendlyNames.devices[device.id];
+                    const friendly = friendlyNames[device.id]?.name;
                     const original = device.name || device.id;
 
                     const label = friendly && friendly !== original
@@ -1559,7 +1559,9 @@ export function createDashboardRenderer(deps) {
                         </div>
 
                         <div class="custom-entity-main">
-                            <span class="custom-entity-title">
+                            <span
+                                class="custom-entity-title"
+                                title="${escapeHtml(getOriginalDeviceName(entity.deviceId))}: ${escapeHtml(entity.name)}">
                                 ${escapeHtml(getEntityDisplayName(entity, device.id))}
                             </span>
 
@@ -1628,7 +1630,9 @@ export function createDashboardRenderer(deps) {
                     >
 
                     <div class="custom-entity-main">
-                        <span class="custom-entity-title">
+                        <span
+                            class="custom-entity-title"
+                            title="${escapeHtml(getOriginalDeviceName(entity.deviceId))}: ${escapeHtml(entity.name)}">
                             ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                         </span>
 
