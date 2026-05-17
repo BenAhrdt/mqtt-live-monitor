@@ -81,7 +81,7 @@ const loggingFilter = [ 'homeassistant/sensor/badezimmer_fenster/zigbee2mqtt_0_0
 const debugLog = [];
 const MAX_LOG = 500;
 function addLog(type, topic, data) {
-  if (loggingFilter === [] || loggingFilter.some(filter => topic.includes(filter))) {
+  if (!loggingFilter.length || loggingFilter.some(filter => topic.includes(filter))) {
     let safeData;
     if (Buffer.isBuffer(data)) {
       safeData = { payload: data.toString() };
@@ -314,10 +314,7 @@ let mqttConfig = {
   discoveryViaPrefixes: ["lorawan"],
   enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
   customDashboards: [],
-  friendlyNames: {
-    devices: {},
-    entities: {}
-  },
+  friendlyNames: {},
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -1697,60 +1694,74 @@ function extractValueJsonKey(template) {
     return match ? match[1] : null;
 }
 
+let isConnecting = false;
+
 function disconnectMqtt() {
   if (!mqttClient) {
     emitStatus({
       connected: false,
       message: "Nicht verbunden",
     });
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    try {
+      console.log("MQTT wird getrennt...");
+
+      mqttClient.removeAllListeners(); // 🔥 FIX: verhindert doppelte Events
+
+      mqttClient.end(true, () => {
+        mqttClient = null;
+
+        emitStatus({
+          connected: false,
+          host: mqttConfig.host,
+          port: mqttConfig.port,
+          topic: mqttConfig.topic,
+          message: "Manuell getrennt",
+        });
+
+        console.log("MQTT manuell getrennt");
+        resolve();
+      });
+
+    } catch (err) {
+      console.error("Fehler beim Trennen:", err.message);
+
+      emitStatus({
+        connected: false,
+        host: mqttConfig.host,
+        port: mqttConfig.port,
+        topic: mqttConfig.topic,
+        message: `Fehler beim Trennen: ${err.message}`,
+      });
+
+      mqttClient = null;
+      resolve();
+    }
+  });
+}
+
+async function connectMqtt() {
+  console.log("connectMqtt wurde aufgerufen");
+
+  // 🔥 FIX: verhindert doppelte Verbindungen
+  if (isConnecting) {
+    console.log("MQTT verbindet bereits...");
     return;
   }
 
-  try {
-    mqttClient.end(true);
-    mqttClient = null;
+  isConnecting = true;
 
-    emitStatus({
-      connected: false,
-      host: mqttConfig.host,
-      port: mqttConfig.port,
-      topic: mqttConfig.topic,
-      message: "Manuell getrennt",
-    });
-
-    console.log("MQTT manuell getrennt");
-  } catch (err) {
-    console.error("Fehler beim Trennen:", err.message);
-
-    emitStatus({
-      connected: false,
-      host: mqttConfig.host,
-      port: mqttConfig.port,
-      topic: mqttConfig.topic,
-      message: `Fehler beim Trennen: ${err.message}`,
-    });
-  }
-}
-
-function connectMqtt() {
-  console.log("connectMqtt wurde aufgerufen");
-
-  if (mqttClient) {
-    try {
-      mqttClient.end(true);
-      mqttClient = null;
-    } catch (err) {
-      console.error(
-        "Fehler beim Beenden der alten MQTT-Verbindung:",
-        err.message,
-      );
-    }
-  }
+  // 🔥 FIX: sauber warten bis alter Client wirklich weg ist
+  await disconnectMqtt();
 
   resetStores();
 
   const { host, port, topic, username, password } = mqttConfig;
-  const clientId = `${mqttConfig.clientId}_${isDev ? "dev" : "prod"}`
+
+  const clientId = `${mqttConfig.clientId}_${isDev ? "dev" : "prod"}`;
   console.log("Mode:", isDev ? "DEV" : "PROD");
   console.log("MQTT ClientId:", clientId);
 
@@ -1784,8 +1795,12 @@ function connectMqtt() {
     queueQoSZero: true,
   });
 
+  // 🔥 OPTIONAL FIX: doppelte Listener vermeiden (sicher ist sicher)
+  mqttClient.removeAllListeners();
+
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
+
     mqttClient.subscribe(topic, { qos: 1 }, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
@@ -1797,6 +1812,8 @@ function connectMqtt() {
           topic,
           message: `Subscribe-Fehler: ${err.message}`,
         });
+
+        isConnecting = false;
         return;
       }
 
@@ -1809,26 +1826,26 @@ function connectMqtt() {
       });
 
       console.log(`Abonniert: ${topic}`);
+      isConnecting = false;
     });
   });
 
   mqttClient.on("message", (topic, message, packet) => {
     const isDiscovery = isDiscoveryTopic(topic);
-    //console.log("MQTT:", topic, "retain:", packet.retain);
+
     if (isDiscovery) {
       addLog("DISCOVERY", topic, message);
       const discoveryResult = handleDiscoveryMessage(topic, message);
 
       if (discoveryResult.handled) {
-        addLog("DISCOVERY", topic, 'behandelt');
-        //console.log("Discovery erkannt:", discoveryResult);
+        addLog("DISCOVERY", topic, "behandelt");
       }
     } else {
       addLog("STATE", topic, message);
       const stateResult = handleKnownTopicMessage(topic, message);
 
       if (stateResult.handled) {
-        //console.log("State aktualisiert:", stateResult);
+        // optional logging
       }
     }
 
@@ -1870,6 +1887,8 @@ function connectMqtt() {
       topic,
       message: `Fehler: ${err.message}`,
     });
+
+    isConnecting = false;
   });
 }
 
@@ -1881,6 +1900,7 @@ function getDevicesForDashboard() {
       name: entity.name,
       value: entity.value,
       rawState: entity.rawState,
+      deviceId: entity.deviceId,
       lastUpdate: entity.lastUpdate,
 
       stateTopic: entity.stateTopic,
@@ -1969,7 +1989,7 @@ function getPublicConfig() {
     enabledEntityTypes: mqttConfig.enabledEntityTypes,
     authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
     customDashboards: mqttConfig.customDashboards || [],
-    friendlyNames: mqttConfig.friendlyNames || { devices: {}, entities: {} },
+    friendlyNames: mqttConfig.friendlyNames || {},
   };
 }
 
@@ -2182,22 +2202,80 @@ app.post("/api/mqtt/publish", (req, res) => {
 });
 
 app.post("/api/friendly-names", (req, res) => {
-  const { friendlyNames } = req.body;
+  const { friendlyNames, deviceId, name, entityId, entityName } = req.body;
 
-  mqttConfig.friendlyNames = {
-    devices: friendlyNames?.devices && typeof friendlyNames.devices === "object"
-      ? friendlyNames.devices
-      : {},
-    entities: friendlyNames?.entities && typeof friendlyNames.entities === "object"
-      ? friendlyNames.entities
-      : {},
-  };
+  // 👉 INIT falls nicht vorhanden
+  if (!mqttConfig.friendlyNames || typeof mqttConfig.friendlyNames !== "object") {
+    mqttConfig.friendlyNames = {};
+  }
 
-  saveConfigToFile();
+  // =========================
+  // 🔥 FALL 1: FULL REPLACE (Import)
+  // =========================
+  if (friendlyNames && typeof friendlyNames === "object") {
+    mqttConfig.friendlyNames = friendlyNames;
 
-  res.json({
-    success: true,
-    friendlyNames: mqttConfig.friendlyNames,
+    saveConfigToFile();
+
+    return res.json({
+      success: true,
+      mode: "full-replace",
+      friendlyNames: mqttConfig.friendlyNames,
+    });
+  }
+
+  // =========================
+  // 🔥 FALL 2: DEVICE RENAME
+  // =========================
+  if (deviceId && entityId === undefined) {
+    if (!mqttConfig.friendlyNames[deviceId]) {
+      mqttConfig.friendlyNames[deviceId] = { name: null, entities: {} };
+    }
+
+    if (!name) {
+      delete mqttConfig.friendlyNames[deviceId].name;
+    } else {
+      mqttConfig.friendlyNames[deviceId].name = name;
+    }
+
+    saveConfigToFile();
+
+    return res.json({
+      success: true,
+      mode: "device-rename",
+      deviceId,
+      friendlyNames: mqttConfig.friendlyNames,
+    });
+  }
+
+  // =========================
+  // 🔥 FALL 3: ENTITY RENAME
+  // =========================
+  if (deviceId && entityId) {
+    if (!mqttConfig.friendlyNames[deviceId]) {
+      mqttConfig.friendlyNames[deviceId] = { name: null, entities: {} };
+    }
+
+    if (!entityName) {
+      delete mqttConfig.friendlyNames[deviceId].entities?.[entityId];
+    } else {
+      mqttConfig.friendlyNames[deviceId].entities[entityId] = entityName;
+    }
+
+    saveConfigToFile();
+
+    return res.json({
+      success: true,
+      mode: "entity-rename",
+      deviceId,
+      entityId,
+      friendlyNames: mqttConfig.friendlyNames,
+    });
+  }
+
+  res.status(400).json({
+    success: false,
+    error: "Ungültige Anfrage",
   });
 });
 

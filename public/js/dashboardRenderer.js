@@ -34,7 +34,8 @@ export function createDashboardRenderer(deps) {
     moveDevice,
     moveDashboard,
     moveEntity,
-    loggingStatus
+    loggingStatus,
+    getOriginalDeviceName
   } = deps;
 
     function setupSettingsDragAndDrop(container, dashboardId) {
@@ -99,8 +100,12 @@ export function createDashboardRenderer(deps) {
         });
     }
 
-function renderRenameEntityButton(entityId, options) {
-        const { forceVisible = false } = options;
+    function renderRenameEntityButton(entityId, options) {
+        const {
+            forceVisible = false,
+            dashboardId,
+            deviceId
+        } = options;
 
         const activeCustomDashboardId = getActiveCustomDashboardId();
         const dashboardEditMode = getDashboardEditMode();
@@ -114,6 +119,7 @@ function renderRenameEntityButton(entityId, options) {
             type="button"
             class="btn secondary small-btn rename-btn action-rename-entity"
             data-entity-id="${escapeHtml(entityId)}"
+            data-device-id="${escapeHtml(deviceId || '')}"
             title="Entität umbenennen"
         >
             ✏️
@@ -199,12 +205,13 @@ function renderRenameEntityButton(entityId, options) {
                 <div class="sensor-name-wrap">
                     <span
                         class="sensor-name"
-                        title="${escapeHtml(getEntityDisplayName(entity))}"
                     >
-                        ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity), 200))}
+                        ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId), 200))}
                     </span>
-
-                    ${renderRenameEntityButton(entity.id, {})}
+                    ${renderRenameEntityButton(entity.id, {
+                        dashboardId: getActiveCustomDashboardId(),
+                        deviceId: entity._renderDeviceId || entity.deviceId
+                    })}
                 </div>
 
                 <strong class="sensor-value">
@@ -246,15 +253,17 @@ function renderRenameEntityButton(entityId, options) {
             text = isOn ? 'An' : 'Aus';
             colorClass = isOn ? 'danger' : 'ok';
         }
-
         return wrapDashboardEntity(entity, `
         <div class="binary-sensor-entity-block">
             <div class="sensor-row-line">
             <div class="sensor-name-wrap">
                 <span class="sensor-name">
-                    ${escapeHtml(getEntityDisplayName(entity))}
+                    ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                 </span>
-                ${renderRenameEntityButton(entity.id, {})}
+                    ${renderRenameEntityButton(entity.id, {
+                        dashboardId: getActiveCustomDashboardId(),
+                        deviceId: entity._renderDeviceId || entity.deviceId
+                    })}
             </div>
 
             <strong class="sensor-value ${colorClass}">
@@ -273,9 +282,12 @@ function renderRenameEntityButton(entityId, options) {
             <div class="sensor-row-line">
                 <div class="sensor-name-wrap">
                     <span class="sensor-name">
-                        ${escapeHtml(getEntityDisplayName(entity))}
+                        ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                     </span>
-                    ${renderRenameEntityButton(entity.id, {})}
+                    ${renderRenameEntityButton(entity.id, {
+                        dashboardId: getActiveCustomDashboardId(),
+                        deviceId: entity._renderDeviceId || entity.deviceId
+                    })}
                 </div>
 
                 <label class="switch">
@@ -298,10 +310,13 @@ function renderRenameEntityButton(entityId, options) {
 
                 <div class="sensor-name-group">
                     <span class="sensor-name">
-                        ${escapeHtml(getEntityDisplayName(entity))}
+                        ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                     </span>
 
-                    ${renderRenameEntityButton(entity.id, {})}
+                    ${renderRenameEntityButton(entity.id, {
+                        dashboardId: getActiveCustomDashboardId(),
+                        deviceId: entity._renderDeviceId || entity.deviceId
+                    })}
                 </div>
 
                 <button class="lock-action-btn button-inline-action"
@@ -329,8 +344,11 @@ function renderRenameEntityButton(entityId, options) {
         <div class="number-entity-block">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </span>
             <div class="number-control">
                 ${hasMinMax ? `
@@ -379,8 +397,11 @@ function renderRenameEntityButton(entityId, options) {
         <div class="text-entity-block">
             <div class="dashboard-control-row">
             <span class="dashboard-label">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </span>
 
             <div class="text-control">
@@ -408,8 +429,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div class="climate-entity-block">
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="climate-current-line">
@@ -546,8 +570,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div>
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="dashboard-control-row">
@@ -675,8 +702,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div class="cover-entity-block">
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="cover-status-line">
@@ -745,8 +775,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div class="lock-entity-block">
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="lock-status-line">
@@ -796,8 +829,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div class="humidifier-entity-block">
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="dashboard-control-row">
@@ -887,8 +923,11 @@ function renderRenameEntityButton(entityId, options) {
         return wrapDashboardEntity(entity, `
         <div class="lawn-mower-entity-block">
             <div class="dashboard-entity-title">
-                ${escapeHtml(getEntityDisplayName(entity))}
-                ${renderRenameEntityButton(entity.id, {})}
+                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                ${renderRenameEntityButton(entity.id, {
+                    dashboardId: getActiveCustomDashboardId(),
+                    deviceId: entity._renderDeviceId || entity.deviceId
+                })}
             </div>
 
             <div class="lawn-mower-status-line">
@@ -1507,12 +1546,34 @@ function renderRenameEntityButton(entityId, options) {
                 if (!entity) return '';
 
                 return `
-                    <div class="custom-entity-row">
+                    <div
+                        class="custom-entity-row"
+                        data-entity-id="${escapeHtml(entity.id)}"
+                    >
+
+                        <div
+                            class="drag-handle custom-entity-drag-handle"
+                            draggable="true"
+                        >
+                            ☰
+                        </div>
+
                         <div class="custom-entity-main">
                             <span class="custom-entity-title">
-                                ${escapeHtml(getEntityDisplayName(entity))}
+                                ${escapeHtml(getEntityDisplayName(entity, device.id))}
                             </span>
+
+                            ${renderRenameEntityButton(entity.id, {
+                                forceVisible: true,
+                                dashboardId: dashboard.id,
+                                deviceId: device.id
+                            })}
                         </div>
+
+                        <small class="custom-entity-type">
+                            ${escapeHtml(entity.type)}
+                        </small>
+
                     </div>
                 `;
             }).join('');
@@ -1568,10 +1629,13 @@ function renderRenameEntityButton(entityId, options) {
 
                     <div class="custom-entity-main">
                         <span class="custom-entity-title">
-                            ${escapeHtml(getEntityDisplayName(entity))}
+                            ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                         </span>
 
-                        ${renderRenameEntityButton(entity.id, { forceVisible: true })}
+                        ${renderRenameEntityButton(entity.id, {
+                            forceVisible: true,
+                            deviceId: device.id
+                        })}
                     </div>
 
                     <small class="custom-entity-type">
@@ -1632,6 +1696,7 @@ function renderRenameEntityButton(entityId, options) {
                 class="dashboard-entity-row-block"
                 data-entity-id="${entity.id}"
                 data-entity-id="${escapeHtml(entity.id)}"
+                title="${escapeHtml(getOriginalDeviceName(entity.deviceId))}: ${entity.name}"
                 ${activeCustomDashboardId && dashboardEditMode ? 'draggable="true"' : ''}
             >
 
@@ -1664,7 +1729,13 @@ function renderRenameEntityButton(entityId, options) {
             dashboardGrid.innerHTML = '<div class="empty-cell">Noch keine Geräte erkannt</div>';
             return;
         }
-        let devicesToRender = dashboardDevices;
+        let devicesToRender = dashboardDevices.map(device => ({
+            ...device,
+            entities: (device.entities || []).map(entity => ({
+                ...entity,
+                _renderDeviceId: device.id
+            }))
+        }));
 
         if (activeCustomDashboardId) {
             const customDashboard = customDashboards.find(d => d.id === activeCustomDashboardId);
@@ -1685,9 +1756,13 @@ function renderRenameEntityButton(entityId, options) {
                 return {
                 ...device,
                 entities: dashboardDevice.entityIds
-                    .map(entityId =>
-                        (device.entities || []).find(entity => entity.id === entityId)
-                    )
+                    .map(entityId => {
+                        const original = (device.entities || []).find(entity => entity.id === entityId);
+                        if (!original) return null;
+
+                        original._renderDeviceId = dashboardDevice.deviceId;
+                        return original;
+                    })
                     .filter(Boolean)
                 };
             })
@@ -1778,11 +1853,7 @@ function renderRenameEntityButton(entityId, options) {
 
                 <div class="dashboard-device-header-text">
                 <div class="dashboard-device-name">
-                    ${escapeHtml(
-                    friendlyNames.devices[device.id] ||
-                    device.name ||
-                    device.id
-                    )}
+                    ${escapeHtml(getDeviceDisplayName(device))}
                 </div>
                 <div class="dashboard-device-subtitle">
                     Entitäten: ${escapeHtml(device.entityCount || 0)}

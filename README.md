@@ -105,7 +105,8 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.6.0 Virtuelle Geräte (2. Step)
+* (BenAhrdt) Umbenennen der Entitäten in Virtuellen Geräten unabhängig von den realen Geräten
 * (BenAhrdt) Windows Installer aus dem Repo entfernt
 * (BenAhrdt) Entitätsuche in virtuellen Geräten auch nach Gerätename möglich
 

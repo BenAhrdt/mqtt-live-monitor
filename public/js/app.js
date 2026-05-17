@@ -20,10 +20,7 @@ socket.on("connect", () => {
     // console.log("Browser Socket verbunden:", socket.id);
 });
 let discoveryPrefixes = [];
-let friendlyNames = {
-    devices: {},
-    entities: {}
-};
+let friendlyNames = {};
 let liveMessages = [];
 let liveMessageLimit = Number(localStorage.getItem('liveMessageLimit') || 2500);
 const topicFilterInput = document.getElementById('liveFilterInput');
@@ -129,15 +126,16 @@ const dashboardRenderer = createDashboardRenderer({
     dashboardView,
     decodedDataBoxEl,
     setupDashboardDragAndDrop,
-    getDeviceDisplayName: (device) => getDeviceDisplayName(device),
-    getEntityDisplayName: (entity) => getEntityDisplayName(entity),
-    getLightStateValue: (value) => getLightStateValue(value),
-    updateClimateSliderBubble: (input) => updateClimateSliderBubble(input),
-    updateHumidifierSliderBubble: (input) => updateHumidifierSliderBubble(input),
+    getDeviceDisplayName,
+    getEntityDisplayName,
+    getLightStateValue,
+    updateClimateSliderBubble,
+    updateHumidifierSliderBubble,
     moveDevice: moveCustomDashboardDevice,
     moveDashboard,
     moveEntity,
     loggingStatus,
+    getOriginalDeviceName,
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -146,19 +144,24 @@ socket.on("debug-log", (data) => {
   console.log("[SERVER]", data.timestamp, data.message);
 });
 
-function getEntityDisplayName(entity) {
+function getOriginalDeviceName(deviceId) {
+    const device =  dashboardDevices.find(d => d.id === deviceId);
+    return device?.name || deviceId;
+}
+
+function getEntityDisplayName(entity, deviceId) {
     return String(
-    friendlyNames.entities[entity.id] ||
-    entity.name ||
-    entity.id
+        friendlyNames?.[deviceId]?.entities?.[entity.id] ||
+        entity.name ||
+        entity.id
     );
 }
 
 function getDeviceDisplayName(device) {
     return String(
-    friendlyNames.devices[device.id] ||
-    device.name ||
-    device.id
+        friendlyNames?.[device.id]?.name ||
+        device.name ||
+        device.id
     );
 }
 
@@ -603,10 +606,23 @@ async function importCustomDashboardsFromFile(file) {
         ? data
         : data.customDashboards;
 
-    const importedFriendlyNames = data.friendlyNames || {
-        devices: {},
-        entities: {}
-    };
+    const importedFriendlyNames = data.friendlyNames || {};
+    Object.entries(importedFriendlyNames).forEach(([deviceId, data]) => {
+        if (!friendlyNames[deviceId]) {
+            friendlyNames[deviceId] = { name: null, entities: {} };
+        }
+
+        if (data.name) {
+            friendlyNames[deviceId].name = data.name;
+        }
+
+        if (data.entities) {
+            friendlyNames[deviceId].entities = {
+                ...friendlyNames[deviceId].entities,
+                ...data.entities
+            };
+        }
+    });
 
     if (!Array.isArray(importedDashboards)) {
         alert('Ungültige Dashboard-Datei');
@@ -681,22 +697,17 @@ async function importCustomDashboardsFromFile(file) {
 
     customDashboards = Array.from(dashboardMap.values());
 
-    friendlyNames = {
-        devices: {
-            ...(friendlyNames.devices || {}),
-            ...(importedFriendlyNames.devices || {})
-        },
-        entities: {
-            ...(friendlyNames.entities || {}),
-            ...(importedFriendlyNames.entities || {})
-        }
-    };
-
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
 
     await saveCustomDashboards();
-    await saveFriendlyNames();
+    await fetch('/api/friendly-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            friendlyNames
+        })
+    });
 
     alert('Dashboards und Friendly Names importiert');
 }
@@ -761,18 +772,6 @@ async function saveCustomDashboards() {
     }
 }
 
-async function saveFriendlyNames() {
-    try {
-    await fetch('/api/friendly-names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ friendlyNames })
-    });
-    } catch (err) {
-    console.error('FriendlyNames speichern fehlgeschlagen:', err);
-    }
-}
-
 async function renameDevice(deviceId) {
 
     // 👉 echtes Gerät
@@ -802,13 +801,28 @@ async function renameDevice(deviceId) {
 
     // 👉 echtes Gerät → friendlyNames
     if (device) {
-        if (!trimmed) {
-            delete friendlyNames.devices[deviceId];
-        } else {
-            friendlyNames.devices[deviceId] = trimmed;
+
+        if (!friendlyNames[deviceId]) {
+            friendlyNames[deviceId] = { name: null, entities: {} };
+        }
+        if (!friendlyNames[deviceId].entities) {
+            friendlyNames[deviceId].entities = {};
         }
 
-        await saveFriendlyNames();
+        if (!trimmed) {
+            delete friendlyNames[deviceId].name;
+        } else {
+            friendlyNames[deviceId].name = trimmed;
+        }
+
+        await fetch('/api/friendly-names', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                deviceId,
+                name: trimmed
+            })
+        });
     }
 
     // 👉 virtuelles Gerät → direkt im Dashboard speichern
@@ -826,24 +840,39 @@ async function renameDevice(deviceId) {
     dashboardRenderer.renderCustomDashboards();
 }
 
-async function renameEntity(entityId) {
+async function renameEntity(entityId, deviceId) {
     const entity = findDashboardEntityById(entityId);
     if (!entity) return;
 
-    const current = getEntityDisplayName(entity);
+    const current = getEntityDisplayName(entity, deviceId);
 
     const newName = await openRenameModal('Neuer Entitätsname', current);
     if (newName === null) return;
 
     const trimmed = newName.trim();
 
-    if (!trimmed) {
-    delete friendlyNames.entities[entityId];
-    } else {
-    friendlyNames.entities[entityId] = trimmed;
+    if (!friendlyNames[deviceId]) {
+        friendlyNames[deviceId] = { name: null, entities: {} };
     }
 
-    await saveFriendlyNames();
+    if (!friendlyNames[deviceId].entities) {
+        friendlyNames[deviceId].entities = {};
+    }
+
+    if (!trimmed) {
+        delete friendlyNames[deviceId].entities[entityId];
+    } else {
+        friendlyNames[deviceId].entities[entityId] = trimmed;
+    }
+    await fetch('/api/friendly-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            deviceId,
+            entityId,
+            entityName: trimmed
+        })
+    });
 
     dashboardRenderer.renderDashboard();
     dashboardRenderer.renderCustomDashboards();
@@ -1170,6 +1199,14 @@ async function removeDeviceFromCustomDashboard(dashboardId, deviceId) {
 
     dashboard.devices = (dashboard.devices || []).filter(d => d.deviceId !== deviceId);
 
+    delete friendlyNames[deviceId];
+
+    await fetch('/api/friendly-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendlyNames })
+    });
+
     dashboardRenderer.renderCustomDashboards();
     await saveCustomDashboards();
 }
@@ -1293,9 +1330,19 @@ function updateSingleEntity(update) {
         return;
     }
 
-    const entity = update.entity;
-
     elements.forEach(oldEl => {
+
+        // 🔥 deviceId aus DOM holen
+        const deviceWrapper = oldEl.closest('[data-device-id]');
+        const deviceId = deviceWrapper?.dataset.deviceId;
+
+        if (!deviceId) return;
+
+        // 🔥 Entity mit richtigem Kontext bauen
+        const entity = {
+            ...update.entity,
+            _renderDeviceId: deviceId
+        };
 
         let html = '';
 
@@ -1924,10 +1971,7 @@ async function loadConfig() {
     mqttClientIdInput.value = config.clientId || '';
     discoveryPrefixes = config.discoveryViaPrefixes || [];
     customDashboards = config.customDashboards || [];
-    friendlyNames = config.friendlyNames || {
-    devices: {},
-    entities: {}
-    };
+    friendlyNames = config.friendlyNames || {};
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
     dashboardRenderer.renderDiscoveryPrefixes();
@@ -2122,8 +2166,9 @@ document.addEventListener('click', async (e) => {
     const renameEntityBtn = e.target.closest('.action-rename-entity');
     if (renameEntityBtn) {
         const entityId = renameEntityBtn.dataset.entityId;
+        const deviceId = renameEntityBtn.dataset.deviceId;
 
-        renameEntity(entityId);
+        renameEntity(entityId, deviceId);
         return;
     }
 
@@ -2600,7 +2645,6 @@ function updateAuthUI(isLoggedIn, adminExists) {
 }
 
 document.getElementById("createAdminBtn").onclick = async () => {
-    console.log('Test')
     const p1 = document.getElementById("password1").value;
     const p2 = document.getElementById("password2").value;
 
@@ -2807,13 +2851,16 @@ function openEntitySelectModal(dashboardId, deviceId) {
 
         const filtered = allEntities.filter(e => {
             const entityName = getEntityDisplayName(e).toLowerCase();
+            const originalEntity = (e.originalEntityName || '').toLowerCase();
+
             const deviceName = (e.deviceName || '').toLowerCase();
-            const originalDeviceName = (e.originalDeviceName || '').toLowerCase();
+            const originalDevice = (e.originalDeviceName || '').toLowerCase();
 
             return (
                 entityName.includes(term) ||
+                originalEntity.includes(term) ||
                 deviceName.includes(term) ||
-                originalDeviceName.includes(term)
+                originalDevice.includes(term)
             );
         });
 
@@ -2828,7 +2875,7 @@ function openEntitySelectModal(dashboardId, deviceId) {
             const row = document.createElement('label');
             row.className = 'entity-row-compact';
 
-            const friendlyEntity = getEntityDisplayName(entity);
+            const friendlyEntity = getEntityDisplayName(entity, deviceId)
             const originalEntity = entity.originalEntityName;
 
             const friendlyDevice = entity.deviceName;
@@ -2839,16 +2886,8 @@ function openEntitySelectModal(dashboardId, deviceId) {
 
                 <span class="entity-name">
                     ${friendlyEntity}
-                    ${friendlyEntity !== originalEntity
-                        ? `<small class="muted">(${originalEntity})</small>`
-                        : ''}
-                </span>
-
-                <span class="entity-device">
-                    ${friendlyDevice}
-                    ${friendlyDevice !== originalDevice
-                        ? `<small class="muted">(${originalDevice})</small>`
-                        : ''}
+                    ${`<small class="muted">${originalDevice}</small>`}
+                    ${`<small class="muted">${originalEntity}</small>`}
                 </span>
             `;
 
