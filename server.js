@@ -1,3 +1,4 @@
+const session = require('express-session');
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -7,7 +8,30 @@ const packageJson = require("./package.json");
 const { exec } = require("child_process");
 const bcrypt = require("bcryptjs");
 
+const LOGICAL_FILE = path.join(__dirname, 'data', 'logical-devices.json');
+
 let CONFIG_PATH;
+const USER_FILE = path.join(__dirname, "usercredentials.json");
+
+function readUsers() {
+  try {
+    const filePath = path.join(__dirname, 'usercredentials.json');
+
+    if (!fs.existsSync(filePath)) {
+      return { users: [] }; // 🔥 wichtig
+    }
+
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+
+  } catch (err) {
+    console.error("Fehler beim Lesen der User:", err);
+    return { users: [] };
+  }
+}
+
+function writeUsers(data) {
+  fs.writeFileSync(USER_FILE, JSON.stringify(data, null, 2));
+}
 
 // 👉 prüfen ob Electron läuft
 const isElectron = !!process.versions.electron;
@@ -68,8 +92,14 @@ let allowedDiscoveryViaDevicePrefixes = [
 ];
 
 const app = express();
+app.use(session({
+    secret: 'a8f7d2c9e1b4f6g8h0k2l9m3p5q7r1',
+    resave: false,
+    saveUninitialized: false,
+}));
 app.use(express.json({limit: '5mb'}));
 app.use(express.static(path.join(__dirname, "public")));
+
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -80,6 +110,7 @@ const loggingFilter = [ 'homeassistant/sensor/badezimmer_fenster/zigbee2mqtt_0_0
                       ];
 const debugLog = [];
 const MAX_LOG = 500;
+
 function addLog(type, topic, data) {
   if (!loggingFilter.length || loggingFilter.some(filter => topic.includes(filter))) {
     let safeData;
@@ -113,14 +144,14 @@ app.get("/api/log", (req, res) => {
 function readCredentials() {
   try {
     if (!fs.existsSync(CRED_FILE)) {
-      return { password: null };
+      return { passwordHash: null };
     }
 
     const raw = fs.readFileSync(CRED_FILE, "utf8");
     return JSON.parse(raw);
   } catch (err) {
     console.error("Fehler beim Lesen credentials.json:", err.message);
-    return { password: null };
+    return { passwordHash: null };
   }
 }
 
@@ -138,6 +169,183 @@ function writeCredentials(data) {
   }
 }
 
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  const data = readUsers();
+  const users = data.users || [];
+
+  // Prüfen ob mindestens ein aktiver User existiert
+  const hasActiveUsers = users.some(u => u.active === true);
+
+  // 🔥 FALLBACK: keine User vorhanden, oder keine user aktiv
+  if (users.length === 0 || !hasActiveUsers) {
+    if (username === 'admin' && password === 'admin') {
+      req.session.user = {
+        username: 'admin',
+        role: 'admin',
+        isDefault: true
+      };
+
+      return res.json({ success: true });
+    }
+
+    return res.status(401).json({ error: "Kein Benutzer vorhanden – nutze admin/admin" });
+  }
+
+  // 🔥 NORMALER LOGIN
+  const user = users.find(u => u.username === username);
+
+  if (!user) {
+    return res.status(401).json({ error: "User nicht gefunden" });
+  }
+
+  if (!user.active) {
+    return res.status(401).json({ error: "User nicht aktiv" });
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+
+  if (!valid) {
+    return res.status(401).json({ error: "Falsches Passwort" });
+  }
+
+  req.session.user = {
+    username: user.username,
+    role: user.role
+  };
+
+  res.json({
+    success: true, 
+    username: req.username,
+    role: req.role
+  });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).end();
+  }
+
+  res.json(req.session.user);
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  console.log("Logout aufgerufen");
+
+  req.session.destroy(err => {
+    if (err) {
+      console.error("Logout Fehler:", err);
+      return res.status(500).json({ error: 'Logout fehlgeschlagen' });
+    }
+
+    res.clearCookie('connect.sid'); // 🔥 wichtig
+    res.json({ success: true });
+  });
+});
+
+function requireAuth(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({ error: "Nicht eingeloggt" });
+  }
+  next();
+}
+
+app.use('/api', (req, res, next) => {
+  // 🔥 diese Routen bleiben öffentlich
+  if (
+    req.path.startsWith('/auth/login') ||
+    req.path.startsWith('/auth/me') ||
+    req.path.startsWith('/admin/login') ||
+    req.path.startsWith('/admin/exists') ||
+    req.path.startsWith('/admin/create')
+  ) {
+    return next();
+  }
+
+  return requireAuth(req, res, next);
+});
+
+app.get('/api/users', (req, res) => {
+  const data = readUsers();
+
+  // Passwort NICHT mitsenden!
+  const users = data.users.map(u => ({
+    username: u.username,
+    role: u.role,
+    active: u.active !== false
+  }));
+
+  res.json(users);
+});
+
+app.post('/api/users', async (req, res) => {
+  const { username, password, role } = req.body;
+
+  const data = readUsers();
+
+  if (data.users.find(u => u.username === username)) {
+    return res.status(400).json({ error: 'User existiert bereits' });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  data.users.push({
+    username,
+    passwordHash: hash,
+    role: role || 'user',
+    active: true
+  });
+
+  writeUsers(data);
+
+  res.json({ success: true });
+});
+
+app.put('/api/users/:username/password', async (req, res) => {
+  const { username } = req.params;
+  const { oldPassword, newPassword } = req.body;
+
+  const data = readUsers();
+  const user = data.users.find(u => u.username === username);
+
+  if (!user) return res.status(404).json({ error: 'User nicht gefunden' });
+
+  const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+  if (!valid) return res.status(401).json({ error: 'Falsches Passwort' });
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+
+  writeUsers(data);
+
+  res.json({ success: true });
+});
+
+app.put('/api/users/:username/toggle', (req, res) => {
+  const { username } = req.params;
+
+  const data = readUsers();
+  const user = data.users.find(u => u.username === username);
+
+  if (!user) return res.status(404).json({ error: 'User nicht gefunden' });
+
+  user.active = !user.active;
+
+  writeUsers(data);
+
+  res.json({ success: true });
+});
+
+app.delete('/api/users/:username', (req, res) => {
+  const data = readUsers();
+
+  data.users = data.users.filter(u => u.username !== req.params.username);
+
+  writeUsers(data);
+
+  res.json({ success: true });
+});
+
 app.post("/api/admin/create", async (req, res) => {
   const { password } = req.body;
 
@@ -153,13 +361,16 @@ app.post("/api/admin/create", async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10)
 
-  writeCredentials({ passwordHash: hash });
+  creds.passwordHash = hash
+  writeCredentials(creds);
 
   res.json({ success: true });
 });
 
 app.post("/api/admin/reset", (req, res) => {
-  writeCredentials({ passwordHash: null });
+  const creds = readCredentials();
+  creds.passwordHash = null;
+  writeCredentials(creds);
   res.json({ success: true });
 });
 
@@ -179,13 +390,15 @@ app.post("/api/admin/change-password", async (req, res) => {
 
     // 👉 löschen
     if (!newPassword) {
-        writeCredentials({ passwordHash: null });
+      creds.passwordHash = null;
+        writeCredentials(creds);
         return res.json({ success: true, reset: true });
     }
 
     // 👉 ändern
     const hash = await bcrypt.hash(newPassword, 10)
-    writeCredentials({ passwordHash: hash });
+    creds.passwordHash = hash;
+    writeCredentials(creds);
     res.json({ success: true });
 });
 
@@ -254,6 +467,7 @@ let mqttClient = null;
  * Geräte mit ihren Entitäten
  */
 const deviceStore = {};
+let logicalDeviceStore = {};
 
 /**
  * Store 2:
@@ -1315,16 +1529,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.rawState = parsed;
     entity.value = parsed;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1354,16 +1560,7 @@ function handleKnownTopicMapping(topic, message, mapping) {
       return { handled: false, reason: "not-a-climate-state-topic" };
     }
 
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1384,16 +1581,7 @@ function handleKnownTopicMapping(topic, message, mapping) {
       return { handled: false, reason: "not-a-cover-state-topic" };
     }
 
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1410,16 +1598,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.state = typeof parsed === "string" ? parsed : String(parsed ?? "");
     entity.rawState = { ...entity.rawState, state: entity.state };
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1449,16 +1629,7 @@ function handleKnownTopicMapping(topic, message, mapping) {
       return { handled: false, reason: "not-a-humidifier-state-topic" };
     }
 
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1475,16 +1646,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.activity = typeof parsed === "string" ? parsed : String(parsed ?? "");
     entity.rawState = { ...entity.rawState, activity: entity.activity };
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1520,16 +1683,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.rawState = parsed;
     entity.value = parsed;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1550,16 +1705,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
     entity.state = isOn ? "on" : "off";
     entity.value = isOn;
     entity.rawState = parsed;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1582,16 +1729,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
     entity.state = isOn ? "on" : "off";
     entity.value = isOn;
     entity.rawState = parsed;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1607,16 +1746,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
     }
 
     entity.rawState = parsed;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1635,16 +1766,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.rawState = parsed;
     entity.value = Number.isNaN(numericValue) ? parsed : numericValue;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
-
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1665,16 +1788,8 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
     entity.rawState = parsed;
     entity.value = textValue;
-    entity.lastUpdate = new Date().toISOString();
-    device.updatedAt = new Date().toISOString();
 
-    emitStores();
-
-    io.emit("entity-update", {
-      deviceId: mapping.deviceId,
-      entityId: mapping.entityId,
-      entity,
-    });
+    finalizeEntityUpdate(device, entity, mapping);
 
     return {
       handled: true,
@@ -1686,6 +1801,23 @@ function handleKnownTopicMapping(topic, message, mapping) {
 
   return { handled: false, reason: "unsupported-entity-runtime-type" };
 }
+
+
+function finalizeEntityUpdate(device, entity, mapping) {
+  entity.lastUpdate = new Date().toISOString();
+  device.updatedAt = new Date().toISOString();
+
+  emitStores();
+
+  io.emit("entity-update", {
+    deviceId: mapping.deviceId,
+    entityId: mapping.entityId,
+    entity,
+  });
+
+  logic.handleLogicUpdate(mapping.entityId, getCombinedStore(), io);
+}
+
 
 function extractValueJsonKey(template) {
     const match =
@@ -1893,7 +2025,10 @@ async function connectMqtt() {
 }
 
 function getDevicesForDashboard() {
-  return Object.values(deviceStore).map((device) => {
+
+  const combined = getCombinedStore();
+
+  return Object.values(combined).map((device) => {
     const entities = Object.values(device.entities || {}).map((entity) => ({
       id: entity.id,
       type: entity.type,
@@ -1974,6 +2109,8 @@ function getDevicesForDashboard() {
       entities,
       createdAt: device.createdAt,
       updatedAt: device.updatedAt,
+      isVirtual: device.isVirtual,
+      isLogical: device.isLogical
     };
   });
 }
@@ -2295,6 +2432,74 @@ app.get("/api/devices", (req, res) => {
   res.json(getDevicesForDashboard());
 });
 
+app.get("/api/combined", (req, res) => {
+  res.json(getCombinedStore());
+});
+
+// logical Store ins Backend
+app.post('/api/logical-devices', (req, res) => {
+
+    const devices = req.body.devices || [];
+
+    devices.forEach(d => {
+
+        if (!logicalDeviceStore[d.id]) {
+            logicalDeviceStore[d.id] = {
+                ...d,
+                entities: {},
+                isLogical: true
+            };
+        }
+
+        (d.entities || []).forEach(e => {
+            logicalDeviceStore[d.id].entities[e.id] = e;
+        });
+
+    });
+
+    console.log("💾 Virtuelle Geräte gespeichert:", Object.keys(logicalDeviceStore));
+    saveLogicalDevices();
+    res.json({ success: true });
+});
+
+app.get('/api/logical-devices', (req, res) => {
+  
+    const devices = Object.values(logicalDeviceStore).map(d => ({
+        ...d,
+        entities: Object.values(d.entities || {}) // 🔥 zurück zu Array
+    }));
+
+    res.json({ devices });
+
+});
+
+function getCombinedStore() {
+    return {
+        ...deviceStore,
+        ...logicalDeviceStore
+    };
+}
+
+
+const logic = require('./logic');
+
+app.post('/api/logics', (req, res) => {
+    const logics = req.body.logics || [];
+
+    logic.setLogicStore(logics); // 🔥 DAS FEHLT
+
+    console.log("Logiken gespeichert:", logics);
+
+    res.json({ success: true });
+});
+
+app.get('/api/logics', (req, res) => {
+    const logics = logic.getLogicStore();
+    res.json({ logics });
+});
+
+logic.loadLogicStore();
+
 // Restliche routen => catch all
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -2316,3 +2521,56 @@ server.listen(WEB_PORT, "0.0.0.0", () => {
   // automatische Verbindung beim Start
   connectMqtt();
 });
+
+
+
+
+
+// Virtuele Geräte
+
+function loadLogicalDevices() {
+    try {
+        const raw = fs.readFileSync(LOGICAL_FILE, 'utf-8');
+        const data = JSON.parse(raw);
+
+        // 🔥 array → map umwandeln
+        logicalDeviceStore = {};
+
+        data.forEach(d => {
+            const entityMap = {};
+
+            (d.entities || []).forEach(e => {
+                entityMap[e.id] = e;
+            });
+
+            logicalDeviceStore[d.id] = {
+                ...d,
+                entities: entityMap,
+                isLogical: true
+            };
+        });
+
+        console.log("📂 Virtuelle Geräte geladen");
+
+    } catch (err) {
+        console.warn("⚠️ Keine virtuellen Geräte gefunden");
+        logicalDeviceStore = {};
+    }
+}
+
+function saveLogicalDevices() {
+
+    const devices = Object.values(logicalDeviceStore).map(d => ({
+        ...d,
+        entities: Object.values(d.entities || {})
+    }));
+
+    fs.writeFileSync(
+        LOGICAL_FILE,
+        JSON.stringify(devices, null, 2)
+    );
+
+    console.log("💾 Virtuelle Geräte gespeichert");
+}
+
+loadLogicalDevices();

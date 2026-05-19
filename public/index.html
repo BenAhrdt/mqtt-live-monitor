@@ -1,15 +1,24 @@
 <!doctype html>
 <html lang="de">
 <head>
+  <style>
+    body {
+      display: none;
+    }
+</style>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MQTT Live Monitor</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/mlm32.png">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/css/users.css">
 </head>
 <body>
+  <button class="logout-btn" title="Logout">
+    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+  </button>
   <div class="app" id="appLayout">
     <aside class="sidebar">
       <div class="brand">
@@ -27,19 +36,19 @@
           ☰
         </button>
       </div>
-
       <nav class="nav">
-        <button class="nav-btn active" id="showHomeBtn"><span>Home</span></button>
+        <button class="nav-btn active" id="showHomeBtn"><span>🏠 Home</span></button>
         <div id="customDashboardsNav" class="nav-dashboard-group hidden">
           <button class="nav-btn" id="toggleCustomDashboardsBtn" type="button">
-            <span>Dashboards ▾</span>
+            <span>📊 Dashboards ▾</span>
           </button>
           <div id="customDashboardsNavList" class="nav-dashboard-list"></div>
         </div>
-        <button class="nav-btn" id="showLiveMonitorBtn"><span>Live Monitor</span></button>
-        <button class="nav-btn" id="showSettingsBtn"><span>Einstellungen</span></button>
+        <button class="nav-btn" id="showLiveMonitorBtn"><span>📡 Live Monitor</span></button>
+        <button class="nav-btn" id="showSettingsBtn"><span>⚙️ Einstellungen</span></button>
+        <button class="nav-btn" id="showUsersBtn"><span>👤 Benutzer</span></button>
+        <button class="nav-btn" id="showLogicBtn"><span>🔥 Logiken</span></button>
       </nav>
-
       <div class="sidebar-section connection-box">
         <h3>Verbindung</h3>
         <div class="meta-row">
@@ -389,6 +398,25 @@
           <div id="customDashboardList"></div>
         </div>
       </section>
+      <div id="usersView" style="display:none;"></div>
+      <section id="logicView" style="display:none;">
+        <div class="topbar">
+          <div>
+            <h1>Logiken</h1>
+            <p class="subtitle">Automatische Berechnungen & Regeln</p>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <div class="panel-header">
+            <h2>Logiken</h2>
+            <button id="addLogicBtn" class="btn-primary">+ Neue Logik</button>
+          </div>
+
+          <div id="logicList"></div>
+          <button id="saveLogicBtn" class="btn-primary">💾 Speichern</button>
+        </div>
+      </section>      
     </main>
   </div>
 
@@ -460,6 +488,23 @@
       <button class="btn primary action-save-entities">Speichern</button>
     </div>
 
+  </div>
+</div>
+
+<div id="userModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Benutzer bearbeiten</h3>
+
+    <input id="editUsername" disabled>
+
+    <input id="editOldPassword" type="password" placeholder="Altes Passwort">
+    <input id="editNewPassword" type="password" placeholder="Neues Passwort">
+    <input id="editNewPassword2" type="password" placeholder="Neues Passwort wiederholen">
+
+    <div class="modal-actions">
+      <button id="closeUserModal" class="secondary">Abbrechen</button>
+      <button id="saveUserBtn" class="primary">Speichern</button>
+    </div>
   </div>
 </div>
 

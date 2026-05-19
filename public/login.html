@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    .logo img {
+      width: 64px;
+      height: 64px;
+    }
+
+    /* 📱 Mobile */
+    @media (max-width: 600px) {
+      .logo img {
+        width: 80px;   /* 🔥 größer auf Handy */
+        height: 80px;
+      }
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .logo-text span {
+      display: block;
+      font-size: 11px;
+      font-weight: normal;
+      color: #6b7280;
+    }
+
+    body {
+      font-family: sans-serif;
+      background: #f5f6fa;
+      margin: 0;
+    }
+
+    @media (min-width: 600px) {
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 420px;   /* Desktop */
+      margin: 20px auto;
+      padding: 25px;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    @media (max-width: 600px) {
+      .login-box {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;                 /* 🔥 kein Rand mehr */
+        padding: 20px;
+        border-radius: 0;          /* 🔥 Fullscreen Look */
+        min-height: 100vh;         /* 🔥 volle Höhe */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+    }
+    h2 {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    h2 {
+      font-size: 28px;
+    }
+
+    @media (max-width: 600px) {
+      h2 {
+        font-size: 24px;
+      }
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;   /* 🔥 verhindert Zoom auf iPhone */
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    .error {
+      color: red;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+
+    <div class="logo">
+      <img src="/icons/mlm.png" alt="MQTT Logo">
+      <div class="logo-text">
+        MQTT Live Monitor
+        <span>Live Device & Sensor Dashboard</span>
+      </div>
+    </div>
+
+    <h2>Login</h2>
+
+    <form onsubmit="login(event)">
+      <input id="username" placeholder="Username">
+      <input id="password" type="password" placeholder="Passwort">
+      <button type="submit">Login</button>
+    </form>
+
+    <div id="error" class="error"></div>
+
+  </div>
+<script>
+  async function login(e) {
+    if (e) e.preventDefault(); // 🔥 verhindert reload
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (res.ok) {
+      window.location = '/';
+    } else {
+      document.getElementById('error').innerText = 'Login fehlgeschlagen';
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 import socket from './socket.js';
 import { initSettings } from './settings.js';
+import { renderUsersView } from './views/users.js';
 import {
   escapeHtml,
   shortenMiddleSmart,
@@ -14,6 +15,7 @@ import {
 } from './utils.js';
 
 import { createDashboardRenderer } from './dashboardRenderer.js';
+
 window.showView = showView;
 
 socket.on("connect", () => {
@@ -59,7 +61,11 @@ const showHomeBtn = document.getElementById('showHomeBtn');
 const liveMonitorView = document.getElementById('liveMonitorView');
 const dashboardView = document.getElementById('dashboardView');
 const showSettingsBtn = document.getElementById('showSettingsBtn');
+const showUsersBtn = document.getElementById('showUsersBtn');
 const settingsView = document.getElementById('settingsView');
+const usersView = document.getElementById('usersView');
+const logicView = document.getElementById('logicView');
+const showLogicBtn = document.getElementById('showLogicBtn');
 const appLayout = document.getElementById('appLayout');
 const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
 const entityFilterDropdown = document.getElementById('entityFilterDropdown');
@@ -96,6 +102,41 @@ let dashboardEditMode = false;
 let customDashboardsMenuOpen = false;
 
 let currentSelectedEntityIds = new Set();
+
+
+
+// 🔐 Auth Check beim Start
+(async () => {
+
+  if (window.location.pathname === '/login.html') {
+    document.body.style.display = 'block'; // 🔥 login sichtbar
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/me');
+
+    if (!res.ok) {
+      console.log("Nicht eingeloggt → redirect");
+      window.location.href = '/login.html'; // 🔥 wichtig: href
+      return;
+    }
+
+    const user = await res.json();
+    window.currentUser = user;
+
+    document.body.style.display = 'block';
+
+    init();
+
+  } catch (err) {
+    window.location.href = '/login.html';
+  }
+
+})();
+
+
+
 
 if (toggleCustomDashboardsBtn) {
     toggleCustomDashboardsBtn.addEventListener('click', () => {
@@ -255,10 +296,14 @@ function showView(viewName, options = {}) {
     liveMonitorView.style.display = 'none';
     dashboardView.style.display = 'none';
     settingsView.style.display = 'none';
+    logicView.style.display = 'none';
+    usersView.style.display = 'none';
 
     showHomeBtn.classList.remove('active');
     showLiveMonitorBtn.classList.remove('active');
     showSettingsBtn.classList.remove('active');
+    showUsersBtn.classList.remove('active');
+    showLogicBtn.classList.remove('active');
 
     // 🏠 HOME
     if (viewName === 'home') {
@@ -340,6 +385,44 @@ function showView(viewName, options = {}) {
             history.pushState(null, '', '/settings');
         }
         ensureDevicesInitialized();
+        return;
+    }
+
+    // 👤 USERS
+    if (viewName === 'users') {
+        if (loggingStatus.getIsLocked()) {
+            showView('dashboard');
+            return;
+        }
+
+        usersView.style.display = 'block';
+        showUsersBtn.classList.add('active');
+
+        if (options.updateUrl !== false) {
+            history.pushState(null, '', '/users');
+        }
+
+        renderUsersView(usersView);
+
+        return;
+    }
+
+    // 🔥 LOGIC
+    if (viewName === 'logic') {
+        if (loggingStatus.getIsLocked()) {
+            showView('dashboard');
+            return;
+        }
+
+        logicView.style.display = 'block';
+        showLogicBtn.classList.add('active');
+
+        if (options.updateUrl !== false) {
+            history.pushState(null, '', '/logic');
+        }
+
+        renderLogicView(); // 🔥 wichtig
+
         return;
     }
 }
@@ -1435,9 +1518,9 @@ async function publishMqttCommand(topic, payloadObject) {
 function findDashboardEntityById(entityId) {
     for (const device of dashboardDevices) {
     const entity = (device.entities || []).find(e => e.id === entityId);
-    if (entity) {
-        return entity;
-    }
+        if (entity) {
+            return entity;
+        }
     }
     return null;
 }
@@ -1746,13 +1829,22 @@ async function promptClimateTargetTemperature(entityId) {
     }
 }
 
-socket.on("entity-update", (data) => {
+async function logout() {
+  await fetch('/api/auth/logout', {
+    method: 'POST'
+  });
+
+  window.location = '/login.html';
+}
+
+socket.on('entity-update', (data) => {
+   
     const exists = findDashboardEntityById(data.entityId);
 
     if (!exists) {
-    // neues Gerät oder neue Entity → komplett neu laden
-    loadDashboardDevices();
-    return;
+        // neues Gerät oder neue Entity → komplett neu laden
+        loadDashboardDevices();
+        return;
     }
 
     updateDashboardEntity(data);
@@ -2112,6 +2204,10 @@ showSettingsBtn.addEventListener('click', () => {
     showView('settings');
 });
 
+showUsersBtn.addEventListener('click', () => {
+    showView('users');
+});
+
 sidebarToggleBtn.addEventListener('click', () => {
     appLayout.classList.toggle('sidebar-collapsed');
 
@@ -2127,6 +2223,12 @@ entityFilterBtn.addEventListener('click', (e) => {
 
 // Clickhandler
 document.addEventListener('click', async (e) => {
+    // Logout
+    if (e.target.closest('.logout-btn')) {
+
+        await logout();
+    }
+
     // 🔥 ADD ENTITY (Virtuelles Gerät)
     const addEntityBtn = e.target.closest('.action-add-entity');
     if (addEntityBtn) {
@@ -2135,6 +2237,29 @@ document.addEventListener('click', async (e) => {
         const dashboardId = addEntityBtn.dataset.dashboardId;
 
         openEntitySelectModal(dashboardId, deviceId);
+
+        return;
+    }
+
+    // Operand Auswahl Logik
+    const select = e.target.closest('.logic-input');
+    if (select) {
+        const logicId = select.dataset.logicId;
+        const field = select.dataset.field;
+        const value = select.value;
+
+        updateLogic(logicId, field, value);
+
+        return;
+    }
+
+    // Logik Entität hinzufügen
+    const createBtn = e.target.closest('.action-create-virtual-entity');
+
+    if (createBtn) {
+        const logicId = createBtn.dataset.logicId;
+
+        createLogicEntity(logicId);
 
         return;
     }
@@ -2513,9 +2638,6 @@ window.pressButtonEntity = pressButtonEntity;
 window.setNumberEntity = setNumberEntity;
 window.setTextEntity = setTextEntity;
 
-// 4️⃣ starten
-init();
-
 setInterval(checkForUpdates, 600_000);
 
 window.addEventListener('popstate', () => {
@@ -2878,13 +3000,13 @@ function openEntitySelectModal(dashboardId, deviceId) {
     const allEntities = dashboardDevices
         .filter(device => !device.isVirtual)
         .flatMap(device =>
-        (device.entities || []).map(entity => ({
-            ...entity,
-            deviceName: getDeviceDisplayName(device), // friendly
-            originalDeviceName: device.name || device.id,      // 🔥 original
-            originalEntityName: entity.name || entity.id       // 🔥 original entity
-        }))
-    );
+            (device.entities || []).map(entity => ({
+                ...entity,
+                deviceName: getDeviceDisplayName(device),
+                originalDeviceName: device.name || device.id,
+                originalEntityName: entity.name || entity.id
+            }))
+        );
 
     function render(filter = '') {
         list.innerHTML = '';
@@ -2976,9 +3098,195 @@ function closeEntityModal() {
     currentEntitySelectContext = null;
 }
 
+async function loadLogics() {
+
+    const res = await fetch('/api/logics');
+    const data = await res.json();
+
+    window.logicStore = data.logics || [];
+
+    console.log("📥 Logiken geladen:", window.logicStore);
+
+    renderLogicView();
+}
+
+
+/*******************************************************************************
+ * ************************* Logic *********************************************
+ * *************************************************************************** */
+const LOGIC_DEVICE_ID = 'logic_device';
+
+async function saveLogicStore() {
+    await fetch('/api/logics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logics: window.logicStore || [] })
+    });
+}
+
+function updateLogic(id, field, value) {
+
+    const logic = window.logicStore.find(l => l.id === id);
+    if (!logic) return;
+
+    if (field === 'A' || field === 'B') {
+        logic.operands[field] = value;
+    } else if (field === 'operation') {
+        logic.operation = value;
+    } else if (field === 'target') {
+        logic.targetEntityId = value;
+    }
+
+    renderLogicView();
+}
+
+function renderLogicView() {
+
+    const list = document.getElementById("logicList");
+    const logics = window.logicStore || [];
+
+    if (!logics.length) {
+        list.innerHTML = `<div class="muted">Keine Logiken vorhanden</div>`;
+        return;
+    }
+
+    list.innerHTML = logics.map(l => `
+        <div class="logic-card">
+
+            <div class="logic-row">
+
+                <select class="logic-input" data-field="A" data-logic-id="${l.id}">
+                    ${buildEntityOptions(l.operands?.A)}
+                </select>
+
+                <span class="logic-operator">+</span>
+
+                <select class="logic-input" data-field="B" data-logic-id="${l.id}">
+                    ${buildEntityOptions(l.operands?.B)}
+                </select>
+
+                <span class="logic-operator">=</span>
+
+                <select class="logic-target" data-field="target" data-logic-id="${l.id}">
+                    ${buildTargetOptions(l.targetEntityId)}
+                </select>
+
+                <button class="btn-icon action-create-virtual-entity"
+                        data-logic-id="${l.id}">
+                    +
+                </button>
+
+            </div>
+        </div>
+    `).join('');
+}
+
+function getAllEntitiesFlat() {
+    const result = [];
+
+    (dashboardDevices || []).forEach(device => {
+        (device.entities || []).forEach(entity => {
+            result.push({
+                id: entity.id,
+                name: entity.name,
+                type: entity.type,
+                value: entity.value,
+                deviceName: device.name,
+                deviceId: device.id,
+                deviceIsVirtual: device.isVirtual
+            });
+        });
+    });
+
+    return result;
+}
+
+function buildEntityOptions(selectedId = '') {
+
+    const allowedTypes = ['sensor', 'number', 'power'];
+
+    const entities = getAllEntitiesFlat()
+        .filter(e => allowedTypes.includes(e.type) && !e.deviceIsVirtual);
+
+    return `
+        <option value="">-- wählen --</option>
+        ${entities.map(e => `
+            <option value="${e.id}" ${e.id === selectedId ? 'selected' : ''}>
+                ${e.deviceName}: ${e.name}
+            </option>
+        `).join('')}
+    `;
+}
+
+function buildTargetOptions(selectedId = '') {
+
+    const device = (dashboardDevices || [])
+        .find(d => d.isLogical);
+    if (!device || !device.entities?.length) {
+        return `<option value="">⚠ Keine Logik-Entities vorhanden</option>`;
+    }
+
+    return `
+        <option value="">-- Ziel wählen --</option>
+        ${device.entities.map(e => `
+            <option value="${e.id}" ${e.id === selectedId ? 'selected' : ''}>
+                ${e.name}
+            </option>
+        `).join('')}
+    `;
+}
+
+function createLogicEntity(logicId) {
+    const name = prompt("Name der neuen virtuellen Entity:");
+    if (!name) return;
+
+    let device = dashboardDevices.find(d => d.id === LOGIC_DEVICE_ID);
+
+    if (!device) {
+        device = {
+            id: LOGIC_DEVICE_ID,
+            name: "Logik",
+            isLogical: true,
+            entities: []
+        };
+        dashboardDevices.push(device);
+    }
+
+    const entityId = `logic_${Date.now()}`;
+
+    const entity = {
+        id: entityId,
+        name: name,
+        type: "sensor",
+        value: 0,
+        isLogical: true
+    };
+
+    device.entities.push(entity);
+
+    updateLogic(logicId, 'target', entityId);
+
+    syncLogicalDevices();
+    renderLogicView();
+}
+
+async function syncLogicalDevices() {
+
+    await fetch('/api/logical-devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            devices: dashboardDevices.filter(d => d.isLogical)
+        })
+    });
+
+}
+
+
 async function init() {
     // 1️⃣ Daten laden (WICHTIG!)
     await loadConfig();
+    await loadLogics();
 
     // 2️⃣ Danach View anzeigen
     const customId = getCustomDashboardIdFromUrl();
@@ -3006,11 +3314,27 @@ async function init() {
 
     updateAuthUI(loggingStatus.isLoggedIn, loggingStatus.hasAdmin);
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
 
         const settingsBtn = e.target.closest('#openSettingsBtn');
         if (settingsBtn) {
             showView('settings');
+            return;
+        }
+
+        const logicBtn = e.target.closest('#showLogicBtn');
+        if (logicBtn) {
+            showView('logic');
+            return;
+        }
+
+        const saveLogicBtn = e.target.closest('#saveLogicBtn');
+        if (saveLogicBtn) {
+
+            await saveLogicStore();
+
+            alert("Logiken gespeichert");
+
             return;
         }
 
@@ -3033,6 +3357,31 @@ async function init() {
             duplicateDashboard(duplicateBtn.dataset.dashboardId);
             return;
         }
+
+        const addLogicBtn = e.target.closest('#addLogicBtn');
+        if (addLogicBtn) {
+
+            if (!window.logicStore) window.logicStore = [];
+
+            window.logicStore.push({
+                id: "logic_" + Date.now(),
+
+                targetEntityId: "",
+
+                operands: {
+                    A: "",
+                    B: ""
+                },
+
+                operation: "add"
+            });
+
+            renderLogicView();
+            saveLogicStore();
+
+            return;
+        }
+
     });
 
 }

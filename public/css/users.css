@@ -1,0 +1,333 @@
+.user-create-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.user-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px 80px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f9fafb;
+  margin-bottom: 8px;
+}
+
+.user-row:hover {
+  background: #f1f5f9;
+}
+
+.user-create-grid input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.user-create-grid button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.user-create-grid button:hover {
+  background: #2563eb;
+}
+
+.user-create-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.card {
+  padding: 20px 25px;
+}
+
+.card h3 {
+  margin-bottom: 15px;
+}
+
+@media (max-width: 600px) {
+  .user-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-create-grid button {
+    width: 100%;
+  }
+}
+
+.divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 20px 0;
+}
+
+.user-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  margin-bottom: 10px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.icon-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+@media (max-width: 600px) {
+  .user-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.toggle-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px; /* 🔥 rund wie bei Prefix */
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.toggle-btn.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.toggle-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px; /* 🔥 rund wie bei Prefix */
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.toggle-btn.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.danger-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  padding: 8px 14px;        /* 🔥 größer */
+  border-radius: 999px;     /* 🔥 pill perfekt */
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.danger-btn:hover {
+  background: #fecaca;
+  transform: scale(1.05);
+}
+
+.user-row {
+  align-items: center;
+}
+
+.user-row button {
+  justify-self: end; /* 🔥 sorgt für saubere Position */
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;  /* 🔥 alles nach rechts */
+  gap: 10px;
+  margin-top: 15px;
+}
+
+button.primary {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button.primary:hover {
+  background: #2563eb;
+}
+
+button.secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button.secondary:hover {
+  background: #e5e7eb;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 90px;   /* 🔥 länger */
+  height: 28px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background-color: #e5e7eb;
+  border-radius: 999px;
+  transition: 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Kugel */
+.slider::before {
+  content: "";
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  top: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+  z-index: 2;
+}
+
+/* Aktiv Zustand */
+.switch input:checked + .slider {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(62px); /* 🔥 an Länge angepasst */
+}
+
+.switch-label {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+  transition: 0.2s;
+}
+
+/* beide erstmal verstecken */
+.switch-label.on,
+.switch-label.off {
+  opacity: 0;
+}
+
+/* Aktiv */
+.switch input:checked + .slider .on {
+  opacity: 1;
+}
+
+/* Inaktiv */
+.switch input:not(:checked) + .slider .off {
+  opacity: 1;
+}
+
+.switch-label.on {
+  text-align: left;
+  padding-left: 18px;
+}
+
+.switch-label.off {
+  text-align: right;
+  padding-right: 30px;
+}
+
+
+
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-content input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
