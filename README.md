@@ -115,6 +115,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Toggelbutton für Mobile Anficht angepasst
+
 ### V1.6.1 User Login
 * (BenAhrdt) User Login
 * (BenAhrdt) Logiken (1. Step)

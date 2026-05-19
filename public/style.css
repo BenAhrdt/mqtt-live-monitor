@@ -978,12 +978,14 @@ code {
 
   .app.sidebar-collapsed .sidebar-toggle-btn {
     position: fixed;
-    top: 12px;
-    left: 12px;
-    width: 44px;
-    height: 44px;
-    z-index: 1001;
-    background: rgba(15, 23, 54, 0.95);
+    top: 40px;
+    left: 20px;
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    z-index: 1300;
+    background: var(--panel);
+    color: var(--text);
     border: 1px solid rgba(148, 163, 184, 0.2);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
     backdrop-filter: blur(10px);
@@ -2683,7 +2685,7 @@ code {
 }
 
 .logout-btn {
-  z-index: 1000;
+  z-index: 2000;
   position: fixed;
   top: 0px;
   right: 0px; /* 🔥 neben Burger */
