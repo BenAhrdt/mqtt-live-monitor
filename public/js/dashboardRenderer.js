@@ -34,8 +34,8 @@ export function createDashboardRenderer(deps) {
     moveDevice,
     moveDashboard,
     moveEntity,
-    loggingStatus,
-    getOriginalDeviceName
+    getOriginalDeviceName,
+    isAdmin
   } = deps;
 
     function setupSettingsDragAndDrop(container, dashboardId) {
@@ -1652,7 +1652,7 @@ export function createDashboardRenderer(deps) {
     }
 
     function renderDashboardTabs() {
-        const container = document.getElementById('dashboardTabs');
+        const container = document.getElementById('header-tabs');
         if (!container) return;
 
         const customDashboards = getCustomDashboards();
@@ -1663,7 +1663,7 @@ export function createDashboardRenderer(deps) {
         let html = '';
 
         // 🏠 Home
-        if (!loggingStatus.getIsLocked()) {
+        if (isAdmin()) {
             html += `
                 <button
                     class="dashboard-tab ${isHomeActive ? 'active' : ''}"
@@ -1676,7 +1676,7 @@ export function createDashboardRenderer(deps) {
 
         // 📊 Custom Dashboards
         html += customDashboards
-            .filter(d => (!d.adminOnly || !loggingStatus.getIsLocked())) // 🔥 HIER IST DIE MAGIE
+            .filter(d => (!d.adminOnly || isAdmin())) // 🔥 HIER IST DIE MAGIE
             .map(d => `
                 <button
                     class="dashboard-tab ${activeId === d.id ? 'active' : ''}"

@@ -1,29 +1,244 @@
-export function renderUsersView(container) {
-    container.innerHTML = `
-    <h2>Benutzer</h2>
+let users = [];
+const usersView = document.getElementById('usersView');
+const ALL_ROLES = [
+  'admin',
+  'Benutzergruppe 1',
+  'Benutzergruppe 2',
+  'Benutzergruppe 3',
+  'Benutzergruppe 4',
+  'Benutzergruppe 5'
+];
 
-    <div class="card">
-        <h3>Benutzerverwaltung</h3>
+function renderRoleMultiSelect(containerId, selectedRoles = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
 
-        <!-- 🔥 USER LIST -->
-        <div id="userList" class="user-list"></div>
+  container.innerHTML = `
+    <div class="multi-select" id="roleSelectWrapper">
 
-        <!-- 🔥 TRENNER -->
-        <div class="divider"></div>
+      <div class="multi-select-display" id="roleSelectDisplay">
+        ${
+          selectedRoles.length
+            ? selectedRoles.join(', ')
+            : 'Rollen auswählen'
+        }
+        <span class="arrow">▼</span>
+      </div>
 
-        <!-- 🔥 CREATE USER -->
-        <div class="user-create-grid">
-        <input id="newUsername" placeholder="Username">
-        <input id="newPassword" type="password" placeholder="Passwort">
-        <input id="newPassword2" type="password" placeholder="Passwort wiederholen">
-        <button id="createUserBtn" class="primary">Benutzer erstellen</button>
-        </div>
+      <div class="multi-select-dropdown hidden" id="roleSelectDropdown">
+        ${ALL_ROLES.map(role => `
+          <label>
+            <input type="checkbox" value="${role}"
+              ${selectedRoles.includes(role) ? 'checked' : ''}>
+            ${role}
+          </label>
+        `).join('')}
+      </div>
 
     </div>
-    `;
-
-  initUsersView();
+  `;
 }
+
+export function renderUsersView(container, currentUser, mode = 'admin') {
+  const isSelfView = mode === 'self';
+  const isAdmin = currentUser.roles.includes('admin');
+  if(!selectedUser || isSelfView) {
+    selectedUser = currentUser;
+  }
+
+  container.innerHTML = `
+    <h2>${isSelfView || !isAdmin ? 'Mein Profil' : 'Benutzerverwaltung'}</h2>
+
+    ${!isSelfView && isAdmin ? `
+      <div class="card">
+        <h3>Benutzerprofile</h3>
+
+        <div id="userList" class="user-list"></div>
+        <div class="divider"></div>
+
+        <div class="user-create-grid">
+          <input id="newUsername" placeholder="Username">
+          <input id="newPassword" type="password" placeholder="Passwort">
+          <input id="newPassword2" type="password" placeholder="Passwort wiederholen">
+          <button id="createUserBtn" class="primary">Benutzer erstellen</button>
+        </div>
+      </div>
+    ` : ''}
+  `;
+
+  if (selectedUser) {
+
+    const showRoles = isAdmin && !isSelfView && selectedUser.username !== 'admin';
+
+    container.innerHTML += `
+      <div class="card user-detail-card">
+        <h3>Benutzer bearbeiten: ${selectedUser.username}</h3>
+
+        <div class="form-grid">
+          <input type="password" id="editPassword" placeholder="Neues Passwort">
+          <input type="password" id="editPasswordRepeat" placeholder="Passwort wiederholen">
+        </div>
+
+        ${showRoles ? `
+          <div class="form-group">
+            <label class="form-label">Rollen</label>
+            <div class="form-role" id="roleSelect"></div>
+          </div>
+        ` : ''}
+
+        <div class="form-actions">
+          <button id="saveUserChangesBtn" class="primary">Speichern</button>
+        </div>
+
+        <div id="userErrorBox" style="margin-top:10px;"></div>
+      </div>
+    `;
+  }
+
+  if (!isSelfView && isAdmin) {
+    initUsersView();
+  }
+
+  if (
+    selectedUser &&
+    isAdmin &&
+    !isSelfView &&
+    selectedUser.username !== 'admin'
+  ) {
+    renderRoleMultiSelect('roleSelect', selectedUser.roles);
+  }
+}
+
+export async function openOwnProfile(currentUser) {
+
+  await fetchUsers();
+
+  const user = users.find(u => u.username === currentUser.username);
+  if (!user) return;
+
+  renderUsersView(usersView, currentUser, 'self');
+}
+
+
+let selectedUser = null;
+// Clickhandler
+document.addEventListener('click', async (e) => {
+
+  // 👉 User auswählen
+  const card = e.target.closest('.user-row');
+  if (card) {
+
+    // Userbuttons herausfiltern
+    if (
+      e.target.closest('.switch') ||
+      e.target.closest('.deleteUserBtn') ||
+      e.target.closest('#roleSelectDropdown') ||
+      e.target.closest('#roleSelectDisplay')
+    ) {
+      return;
+    }
+
+    const username = card.dataset.user;
+    selectedUser = users.find(u => u.username === username);
+
+    renderUsersView(usersView, window.currentUser, 'admin');
+    return;
+  }
+
+  // 👉 Speichern
+  const saveBtn = e.target.closest('#saveUserChangesBtn');
+  if (saveBtn) {
+    const password = document.getElementById('editPassword').value;
+    const repeat = document.getElementById('editPasswordRepeat').value;
+
+    const isAdmin = selectedUser.username === 'admin';
+
+    // 🔥 Fehleranzeige vorbereiten
+    let errorBox = document.getElementById('userErrorBox');
+    if (!errorBox) {
+      errorBox = document.createElement('div');
+      errorBox.id = 'userErrorBox';
+      errorBox.style.color = 'red';
+      errorBox.style.marginTop = '10px';
+      document.querySelector('.user-detail-card').appendChild(errorBox);
+    }
+    errorBox.innerText = '';
+
+    // 🔥 Passwort prüfen (nur wenn gesetzt)
+    if (password || repeat) {
+      if (password !== repeat) {
+        errorBox.innerText = 'Passwörter stimmen nicht überein';
+        return;
+      }
+    }
+
+    try {
+      // 🔥 ADMIN → nur Passwort
+      if (isAdmin) {
+        await fetch(`/api/users/${selectedUser.username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: password || undefined
+          })
+        });
+      } else {
+        // 🔥 Rollen sammeln
+        const checked = document.querySelectorAll('#roleSelectDropdown input:checked');
+        const roles = Array.from(checked).map(i => i.value);
+
+        await fetch(`/api/users/${selectedUser.username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: password || undefined,
+            roles
+          })
+        });
+      }
+
+      // 🔥 Erfolg
+      errorBox.style.color = 'green';
+      errorBox.innerText = 'Gespeichert';
+
+      loadUsers();
+
+    } catch (err) {
+      errorBox.innerText = 'Fehler beim Speichern';
+    }
+
+    return;
+  }
+
+  // 👉 Dropdown öffnen
+  const display = e.target.closest('#roleSelectDisplay');
+  if (display) {
+    const dropdown = document.getElementById('roleSelectDropdown');
+    if (!dropdown) return; // 🔥 verhindert crash
+
+    dropdown.classList.toggle('hidden');
+    return;
+  }
+
+  // 👉 Checkbox Änderung (Anzeige updaten)
+  const roleCheckbox = e.target.closest('#roleSelectDropdown input');
+  if (roleCheckbox) {
+    const dropdown = document.getElementById('roleSelectDropdown');
+    const display = document.getElementById('roleSelectDisplay');
+
+    if (!dropdown || !display) return; // 🔥 wichtig
+
+    const checked = dropdown.querySelectorAll('input:checked');
+    const values = Array.from(checked).map(i => i.value);
+
+    display.childNodes[0].textContent =
+      values.length ? values.join(', ') : 'Rollen auswählen';
+
+    return;
+  }
+
+
+});
 
 async function initUsersView() {
   document.getElementById('createUserBtn')
@@ -33,8 +248,7 @@ async function initUsersView() {
 }
 
 async function loadUsers() {
-  const res = await fetch('/api/users');
-  const users = await res.json();
+  await fetchUsers();
 
   const container = document.getElementById('userList');
   container.innerHTML = '';
@@ -48,23 +262,37 @@ async function loadUsers() {
     const el = document.createElement('div');
     el.className = 'user-row';
 
+    if (selectedUser && selectedUser.username === u.username) {
+      el.classList.add('active');
+    }
+    el.dataset.user = u.username;
+
+    const isDefaultAdmin = u.username === 'admin';
+    const warningIcon = u.isDefault
+      ? `<span class="admin-warning" title="Bitte Standard Passwort ändern">⚠️</span>`
+      : '';
+
     el.innerHTML = `
       <div>
-        <b>${u.username}</b><br>
-        <span style="font-size:12px;color:#6b7280;">${u.role}</span>
+        <div class="user-name">
+          ${u.username} ${warningIcon}
+        </div>
+        <span style="font-size:12px;color:#6b7280;">${u.roles}</span>
       </div>
 
-    <label class="switch">
-    <input type="checkbox" ${u.active ? 'checked' : ''} data-user="${u.username}">
-    <span class="slider">
-        <span class="switch-label on">Aktiv</span>
-        <span class="switch-label off">Inaktiv</span>
-    </span>
-    </label>
+      ${!isDefaultAdmin ? `
+        <label class="switch">
+          <input type="checkbox" ${u.active ? 'checked' : ''} data-user="${u.username}">
+          <span class="slider">
+            <span class="switch-label on">Aktiv</span>
+            <span class="switch-label off">Inaktiv</span>
+          </span>
+        </label>
+      ` : ''}
 
-      <button class="icon-btn editUserBtn" data-user="${u.username}">✏️</button>
-
-      <button class="danger-btn deleteUserBtn" data-user="${u.username}">Entfernen</button>
+      ${!isDefaultAdmin ? `
+        <button class="danger-btn deleteUserBtn" data-user="${u.username}">Entfernen</button>
+      ` : ''}
     `;
 
     container.appendChild(el);
@@ -72,35 +300,35 @@ async function loadUsers() {
 
     // Switch active
     document.querySelectorAll('.switch input').forEach(input => {
-    input.addEventListener('change', async () => {
-        const username = input.dataset.user;
-
-        await fetch(`/api/users/${username}/toggle`, {
-        method: 'PUT'
-        });
-
-        // optional: reloadUsers(); oder einfach lassen
-    });
+      input.addEventListener('change', async () => {
+          const username = input.dataset.user;
+          console.log(username);
+          fetch(`/api/users/${username}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              active: input.checked
+            })
+          });
+      });
     });
 
     // Edit
     document.querySelectorAll('.editUserBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const username = btn.dataset.user;
-
-            resetUserModal();
-
-            document.getElementById('editUsername').value = username;
-            document.getElementById('userModal').classList.remove('hidden');
+            openEditUserModal(username);
         });
     });
 
+    // Abbrechen
     document.getElementById('closeUserModal')
     .addEventListener('click', () => {
         document.getElementById('userModal').classList.add('hidden');
         resetUserModal();
     });
 
+    // Speichern
     document.getElementById('saveUserBtn')
     .addEventListener('click', async () => {
 
@@ -110,14 +338,17 @@ async function loadUsers() {
         const newPassword2 = document.getElementById('editNewPassword2').value;
 
         if (newPassword !== newPassword2) {
-        alert("Passwörter stimmen nicht überein");
-        return;
+          alert("Passwörter stimmen nicht überein");
+          return;
         }
 
-        const res = await fetch(`/api/users/${username}/password`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldPassword, newPassword })
+        const res = await fetch(`/api/users/${selectedUser.username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: password || undefined,
+            roles
+          })
         });
 
         if (!res.ok) {
@@ -185,4 +416,31 @@ function resetUserModal() {
   document.getElementById('editOldPassword').value = '';
   document.getElementById('editNewPassword').value = '';
   document.getElementById('editNewPassword2').value = '';
+}
+
+function renderUserDetailOnly() {
+
+  usersView.innerHTML = `
+    <h2>Mein Profil</h2>
+
+    <div class="card user-detail-card">
+      <h3>Benutzer bearbeiten: ${selectedUser.username}</h3>
+
+      <div class="form-grid">
+        <input type="password" id="editPassword" placeholder="Neues Passwort">
+        <input type="password" id="editPasswordRepeat" placeholder="Passwort wiederholen">
+      </div>
+
+      <div class="form-actions">
+        <button id="saveUserChangesBtn" class="primary">Speichern</button>
+      </div>
+
+      <div id="userErrorBox" style="margin-top:10px;"></div>
+    </div>
+  `;
+}
+
+async function fetchUsers() {
+  const res = await fetch('/api/users');
+  users = await res.json();
 }

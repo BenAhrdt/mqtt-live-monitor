@@ -115,7 +115,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
-### In Arbeit
+### V1.6.2 Neues Benutzerkonzept (1. Step)
+* (BenAhrdt) Usermanagement Step 1
+* (BenAhrdt) Drag & Drop verbessert
+* (BenAhrdt) Nur nötigste API Routen frei
 * (BenAhrdt) Toggelbutton für Mobile Anficht angepasst
 
 ### V1.6.1 User Login

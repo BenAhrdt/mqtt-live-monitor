@@ -6,7 +6,7 @@ const http = require("http");
 const mqtt = require("mqtt");
 const packageJson = require("./package.json");
 const { exec } = require("child_process");
-const bcrypt = require("bcryptjs");
+const bcryptjs = require("bcryptjs");
 
 const LOGICAL_FILE = path.join(__dirname, 'data', 'logical-devices.json');
 
@@ -100,6 +100,25 @@ app.use(session({
 app.use(express.json({limit: '5mb'}));
 app.use(express.static(path.join(__dirname, "public")));
 
+function requireAuth(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({ error: "Nicht eingeloggt" });
+  }
+  next();
+}
+
+app.use('/api', (req, res, next) => {
+  // 🔥 diese Routen bleiben öffentlich
+  if (
+    req.path.startsWith('/auth/login') ||
+    req.path.startsWith('/auth/me')
+  ) {
+    return next();
+  }
+
+  return requireAuth(req, res, next);
+});
+
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -175,24 +194,6 @@ app.post("/api/auth/login", async (req, res) => {
   const data = readUsers();
   const users = data.users || [];
 
-  // Prüfen ob mindestens ein aktiver User existiert
-  const hasActiveUsers = users.some(u => u.active === true);
-
-  // 🔥 FALLBACK: keine User vorhanden, oder keine user aktiv
-  if (users.length === 0 || !hasActiveUsers) {
-    if (username === 'admin' && password === 'admin') {
-      req.session.user = {
-        username: 'admin',
-        role: 'admin',
-        isDefault: true
-      };
-
-      return res.json({ success: true });
-    }
-
-    return res.status(401).json({ error: "Kein Benutzer vorhanden – nutze admin/admin" });
-  }
-
   // 🔥 NORMALER LOGIN
   const user = users.find(u => u.username === username);
 
@@ -204,7 +205,7 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(401).json({ error: "User nicht aktiv" });
   }
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
+  const valid = await bcryptjs.compare(password, user.passwordHash);
 
   if (!valid) {
     return res.status(401).json({ error: "Falsches Passwort" });
@@ -212,13 +213,15 @@ app.post("/api/auth/login", async (req, res) => {
 
   req.session.user = {
     username: user.username,
-    role: user.role
+    roles: user.roles,
+    isDefault: users.isDefault
   };
 
   res.json({
     success: true, 
-    username: req.username,
-    role: req.role
+    username: req.session.user.username,
+    roles: req.session.user.roles,
+    isDefault: req.session.user.isDefault
   });
 });
 
@@ -227,7 +230,12 @@ app.get('/api/auth/me', (req, res) => {
     return res.status(401).end();
   }
 
-  res.json(req.session.user);
+  res.json({
+    success: true, 
+    username: req.session.user.username,
+    roles: req.session.user.roles,
+    isDefault: req.session.user.isDefault
+  });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -244,92 +252,73 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
-function requireAuth(req, res, next) {
-  if (!req.session.user) {
-    return res.status(401).json({ error: "Nicht eingeloggt" });
-  }
-  next();
-}
-
-app.use('/api', (req, res, next) => {
-  // 🔥 diese Routen bleiben öffentlich
-  if (
-    req.path.startsWith('/auth/login') ||
-    req.path.startsWith('/auth/me') ||
-    req.path.startsWith('/admin/login') ||
-    req.path.startsWith('/admin/exists') ||
-    req.path.startsWith('/admin/create')
-  ) {
-    return next();
-  }
-
-  return requireAuth(req, res, next);
-});
-
 app.get('/api/users', (req, res) => {
   const data = readUsers();
 
   // Passwort NICHT mitsenden!
   const users = data.users.map(u => ({
     username: u.username,
-    role: u.role,
-    active: u.active !== false
+    roles: u.roles,
+    active: u.active !== false,
+    isDefault: u.isDefault
   }));
 
   res.json(users);
 });
 
 app.post('/api/users', async (req, res) => {
-  const { username, password, role } = req.body;
+  const { username, password, roles } = req.body;
 
   const data = readUsers();
-
   if (data.users.find(u => u.username === username)) {
     return res.status(400).json({ error: 'User existiert bereits' });
   }
 
-  const hash = await bcrypt.hash(password, 10);
-
-  data.users.push({
+  const hash = await bcryptjs.hash(password, 10);
+  const newUser = {
     username,
-    passwordHash: hash,
-    role: role || 'user',
+    password: hash,
+    roles: ['Benutzergruppe 1'], // 👈 Default
     active: true
-  });
+  };
+
+  data.users.push(newUser);
 
   writeUsers(data);
 
   res.json({ success: true });
 });
 
-app.put('/api/users/:username/password', async (req, res) => {
+app.put('/api/users/:username', async (req, res) => {
   const { username } = req.params;
-  const { oldPassword, newPassword } = req.body;
+  const { password, roles, active } = req.body;
 
   const data = readUsers();
   const user = data.users.find(u => u.username === username);
 
-  if (!user) return res.status(404).json({ error: 'User nicht gefunden' });
+  if (!user) {
+    return res.status(404).json({ error: 'User nicht gefunden' });
+  }
 
-  const valid = await bcrypt.compare(oldPassword, user.passwordHash);
-  if (!valid) return res.status(401).json({ error: 'Falsches Passwort' });
+  const isDefaultAdmin = user.username === 'admin';
 
-  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  // 🔥 Passwort ändern
+  if (password) {
+    user.passwordHash = await bcryptjs.hash(password, 10);
+    if(isDefaultAdmin) {
+      delete user.isDefault;
+    }
+  }
 
-  writeUsers(data);
+  // 🔥 Rollen ändern (nicht für admin)
+  if (roles && !isDefaultAdmin) {
+    user.roles = roles;
+  }
 
-  res.json({ success: true });
-});
-
-app.put('/api/users/:username/toggle', (req, res) => {
-  const { username } = req.params;
-
-  const data = readUsers();
-  const user = data.users.find(u => u.username === username);
-
-  if (!user) return res.status(404).json({ error: 'User nicht gefunden' });
-
-  user.active = !user.active;
+  // 🔥 Active ändern (nicht für admin)
+  if (typeof active === 'boolean' && !isDefaultAdmin) {
+    user.active = active;
+  }
 
   writeUsers(data);
 
@@ -359,7 +348,7 @@ app.post("/api/admin/create", async (req, res) => {
     return res.status(400).json({ error: "Admin existiert bereits" });
   }
 
-  const hash = await bcrypt.hash(password, 10)
+  const hash = await bcryptjs.hash(password, 10)
 
   creds.passwordHash = hash
   writeCredentials(creds);
@@ -382,7 +371,7 @@ app.post("/api/admin/change-password", async (req, res) => {
     }
 
     const creds = readCredentials();
-    const isValid = await bcrypt.compare(oldPassword, creds.passwordHash);
+    const isValid = await bcryptjs.compare(oldPassword, creds.passwordHash);
 
     if (!isValid) {
         return res.status(401).json({ error: "Falsches Passwort" });
@@ -396,7 +385,7 @@ app.post("/api/admin/change-password", async (req, res) => {
     }
 
     // 👉 ändern
-    const hash = await bcrypt.hash(newPassword, 10)
+    const hash = await bcryptjs.hash(newPassword, 10)
     creds.passwordHash = hash;
     writeCredentials(creds);
     res.json({ success: true });
@@ -411,7 +400,7 @@ app.post("/api/admin/login", async (req, res) => {
     return res.status(400).json({ error: "Kein Admin vorhanden" });
   }
 
-  const isValid = await bcrypt.compare(password, creds.passwordHash);
+  const isValid = await bcryptjs.compare(password, creds.passwordHash);
 
   if (isValid) {
     return res.json({ success: true });
@@ -451,6 +440,36 @@ app.post("/api/update/run", (req, res) => {
     });
   }, 1000);
 });
+
+
+
+
+async function ensureAdminUser() {
+  const data = readUsers();
+
+  const adminUser = data.users.find(u => u.username === 'admin');
+
+  if (!adminUser) {
+    console.log('⚠️ Kein Admin vorhanden → erstelle Default Admin');
+
+    const hash = await bcryptjs.hash('admin', 10);
+
+    data.users.push({
+      username: 'admin',
+      passwordHash: hash,
+      roles: ['admin'],
+      active: true,
+      isDefault: true // 👈 wichtig
+    });
+
+    writeUsers(data);
+  }
+}
+
+
+
+
+
 
 const DEFAULT_WEB_PORT = 3000;
 
@@ -2500,6 +2519,11 @@ app.get('/api/logics', (req, res) => {
 
 logic.loadLogicStore();
 
+// Restliche API Routen als unbekannt melden
+app.use('/api/',(req, res) => {
+  return res.status(401).json({ error: "API unbekannt"});
+});
+
 // Restliche routen => catch all
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -2515,8 +2539,11 @@ io.on("connection", (socket) => {
 
 const WEB_PORT = Number(mqttConfig.webPort || DEFAULT_WEB_PORT);
 
-server.listen(WEB_PORT, "0.0.0.0", () => {
+server.listen(WEB_PORT, "0.0.0.0", async () => {
   console.log(`Webserver läuft auf http://0.0.0.0:${WEB_PORT}`);
+
+  //Admin prüfen
+  await ensureAdminUser();
 
   // automatische Verbindung beim Start
   connectMqtt();

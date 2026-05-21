@@ -1,6 +1,6 @@
 import socket from './socket.js';
 import { initSettings } from './settings.js';
-import { renderUsersView } from './views/users.js';
+import { renderUsersView, openOwnProfile } from './views/users.js';
 import {
   escapeHtml,
   shortenMiddleSmart,
@@ -67,7 +67,6 @@ const usersView = document.getElementById('usersView');
 const logicView = document.getElementById('logicView');
 const showLogicBtn = document.getElementById('showLogicBtn');
 const appLayout = document.getElementById('appLayout');
-const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
 const entityFilterDropdown = document.getElementById('entityFilterDropdown');
 const entityFilterBtn = document.getElementById('entityFilterBtn');
 const entityFilterMenu = document.getElementById('entityFilterMenu');
@@ -103,8 +102,6 @@ let customDashboardsMenuOpen = false;
 
 let currentSelectedEntityIds = new Set();
 
-
-
 // 🔐 Auth Check beim Start
 (async () => {
 
@@ -122,10 +119,13 @@ let currentSelectedEntityIds = new Set();
       return;
     }
 
-    const user = await res.json();
-    window.currentUser = user;
+    const currentUser = await res.json();
+    window.currentUser = currentUser;
+    updateHeader();
 
     document.body.style.display = 'block';
+
+    initHeader(currentUser);
 
     init();
 
@@ -135,7 +135,9 @@ let currentSelectedEntityIds = new Set();
 
 })();
 
-
+export function isAdmin() {
+  return window.currentUser?.roles?.includes('admin');
+}
 
 
 if (toggleCustomDashboardsBtn) {
@@ -144,14 +146,6 @@ if (toggleCustomDashboardsBtn) {
 
     customDashboardsNavList.style.display = customDashboardsMenuOpen ? 'block' : 'none';
     });
-}
-
-const loggingStatus = {
-    hasAdmin: false,
-    isLoggedIn: false,
-    getIsLocked: function() {
-        return this.hasAdmin && !this.isLoggedIn
-    }
 }
 
 const dashboardRenderer = createDashboardRenderer({
@@ -175,8 +169,8 @@ const dashboardRenderer = createDashboardRenderer({
     moveDevice: moveCustomDashboardDevice,
     moveDashboard,
     moveEntity,
-    loggingStatus,
     getOriginalDeviceName,
+    isAdmin
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -307,7 +301,7 @@ function showView(viewName, options = {}) {
 
     // 🏠 HOME
     if (viewName === 'home') {
-        if(loggingStatus.getIsLocked()) {
+        if(!isAdmin()) {
             showView('dashboard');
             return;
         }
@@ -358,7 +352,7 @@ function showView(viewName, options = {}) {
 
     // 📡 LIVE
     if (viewName === 'live') {
-        if(loggingStatus.getIsLocked()) {
+        if(!isAdmin()) {
             showView('dashboard');
             return;
         }
@@ -374,7 +368,7 @@ function showView(viewName, options = {}) {
 
     // ⚙️ SETTINGS
     if (viewName === 'settings') {
-        if(loggingStatus.getIsLocked()) {
+        if(!isAdmin()) {
             showView('dashboard');
             return;
         }
@@ -390,11 +384,6 @@ function showView(viewName, options = {}) {
 
     // 👤 USERS
     if (viewName === 'users') {
-        if (loggingStatus.getIsLocked()) {
-            showView('dashboard');
-            return;
-        }
-
         usersView.style.display = 'block';
         showUsersBtn.classList.add('active');
 
@@ -402,14 +391,14 @@ function showView(viewName, options = {}) {
             history.pushState(null, '', '/users');
         }
 
-        renderUsersView(usersView);
+        renderUsersView(usersView, window.currentUser, 'admin');
 
         return;
     }
 
     // 🔥 LOGIC
     if (viewName === 'logic') {
-        if (loggingStatus.getIsLocked()) {
+        if (!isAdmin()) {
             showView('dashboard');
             return;
         }
@@ -1116,61 +1105,86 @@ async function duplicateDashboard(dashboardId) {
 }
 
 let draggedDashboardDeviceId = null;
+let dragInitialized = false;
 
 function setupDashboardDragAndDrop() {
-    if (!activeCustomDashboardId || !dashboardEditMode) return;
+    if (dragInitialized) return;
+    dragInitialized = true;
 
-    const cards = document.querySelectorAll('.dashboard-device-card');
-    const handles = document.querySelectorAll('.drag-handle[draggable="true"]');
+    // 🔥 DRAG START
+    document.addEventListener('dragstart', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
 
-    handles.forEach((handle) => {
-    handle.addEventListener('dragstart', (e) => {
-        draggedDashboardDeviceId = handle.dataset.deviceId;
+        if (!activeCustomDashboardId || !dashboardEditMode) return;
 
         const card = handle.closest('.dashboard-device-card');
-        card?.classList.add('dragging');
+        draggedDashboardDeviceId = card?.dataset.deviceId;
+
+        if (!draggedDashboardDeviceId) {
+            e.preventDefault();
+            return;
+        }
+
+        card.classList.add('dragging');
 
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedDashboardDeviceId);
     });
 
-    handle.addEventListener('dragend', () => {
+    // 🔥 DRAG END
+    document.addEventListener('dragend', () => {
         document.querySelectorAll('.dashboard-device-card.dragging')
-        .forEach(card => card.classList.remove('dragging'));
+            .forEach(card => card.classList.remove('dragging'));
 
         document.querySelectorAll('.dashboard-device-card.drag-over')
-        .forEach(card => card.classList.remove('drag-over'));
+            .forEach(card => card.classList.remove('drag-over'));
 
         draggedDashboardDeviceId = null;
     });
-    });
 
-    cards.forEach((card) => {
-    card.addEventListener('dragover', (e) => {
-        e.preventDefault();
+    // 🔥 DRAG OVER
+    document.addEventListener('dragover', (e) => {
+        const card = e.target.closest('.dashboard-device-card');
+        if (!card) return;
 
         if (!draggedDashboardDeviceId) return;
+
+        e.preventDefault();
+
+        document.querySelectorAll('.dashboard-device-card.drag-over')
+            .forEach(c => c.classList.remove('drag-over'));
 
         card.classList.add('drag-over');
         e.dataTransfer.dropEffect = 'move';
     });
 
-    card.addEventListener('dragleave', () => {
-        card.classList.remove('drag-over');
+    // 🔥 DRAG LEAVE
+    document.addEventListener('dragleave', (e) => {
+        const card = e.target.closest('.dashboard-device-card');
+        if (!card) return;
+
+        // 🔥 nur entfernen wenn wirklich verlassen
+        if (!card.contains(e.relatedTarget)) {
+            card.classList.remove('drag-over');
+        }
     });
 
-    card.addEventListener('drop', (e) => {
+    // 🔥 DROP
+    document.addEventListener('drop', (e) => {
+        const card = e.target.closest('.dashboard-device-card');
+        if (!card) return;
+
         e.preventDefault();
 
         const targetDeviceId = card.dataset.deviceId;
 
         document.querySelectorAll('.dashboard-device-card.drag-over')
-        .forEach(card => card.classList.remove('drag-over'));
+            .forEach(card => card.classList.remove('drag-over'));
 
         if (!draggedDashboardDeviceId || draggedDashboardDeviceId === targetDeviceId) return;
 
         moveCustomDashboardDevice(draggedDashboardDeviceId, targetDeviceId);
-    });
     });
 }
 
@@ -2005,7 +2019,7 @@ async function loadVersion() {
 
     const versionEl = document.getElementById('appVersion');
     if (versionEl && data.version) {
-        versionEl.textContent = `v${data.version}`;
+        versionEl.textContent = `Version: ${data.version}`;
     }
     } catch (err) {
     console.error("Version konnte nicht geladen werden", err);
@@ -2208,14 +2222,6 @@ showUsersBtn.addEventListener('click', () => {
     showView('users');
 });
 
-sidebarToggleBtn.addEventListener('click', () => {
-    appLayout.classList.toggle('sidebar-collapsed');
-
-    const isCollapsed = appLayout.classList.contains('sidebar-collapsed');
-
-    localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
-});
-
 entityFilterBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     entityFilterDropdown.classList.toggle('open');
@@ -2223,20 +2229,32 @@ entityFilterBtn.addEventListener('click', (e) => {
 
 // Clickhandler
 document.addEventListener('click', async (e) => {
-    // Logout
-    if (e.target.closest('.logout-btn')) {
 
-        await logout();
+    const dropdown = document.getElementById('avatarDropdown');
+    const avatar = e.target.closest('#avatarBtn');
+
+    // 🔥 Avatar Klick
+    if (avatar) {
+        e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+        return;
     }
 
-    // 🔥 ADD ENTITY (Virtuelles Gerät)
-    const addEntityBtn = e.target.closest('.action-add-entity');
-    if (addEntityBtn) {
+    const btn = e.target.closest('.dropdown-item');
+    if (btn) {
+        const action = btn.dataset.action;
 
-        const deviceId = addEntityBtn.dataset.deviceId;
-        const dashboardId = addEntityBtn.dataset.dashboardId;
+        dropdown.classList.add('hidden');
 
-        openEntitySelectModal(dashboardId, deviceId);
+        if (action === 'logout') {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login.html';
+        }
+
+        if (action === 'profile') {
+            showView('users');
+            openOwnProfile(window.currentUser);
+        }
 
         return;
     }
@@ -2383,6 +2401,12 @@ document.addEventListener('click', async (e) => {
     // 🔥 6. Alle offenen Effekt-Dropdowns schließen
     document.querySelectorAll('.effect-dropdown.open')
         .forEach(d => d.classList.remove('open'));
+
+    // Avartar menü schließen
+    if (!e.target.closest('.user-menu')) {
+        dropdown.classList.add('hidden');
+    }
+
 });
 
 dashboardEditModeBtn.addEventListener('click', () => {
@@ -2447,17 +2471,11 @@ socket.on('mqtt-status', (status) => {
     statusTextEl.textContent = 'Verbunden';
     statusTextEl.className = 'status connected';
     connectionStateEl.textContent = 'Verbunden';
-    dashboardConnectionDot.classList.remove('disconnected');
-    dashboardConnectionDot.classList.add('connected');
-    dashboardConnectionDot.title = 'Verbunden';
     configMessageEl.textContent = 'Verbunden';
     } else {
     statusTextEl.textContent = 'Getrennt';
     statusTextEl.className = 'status disconnected';
     connectionStateEl.textContent = 'Getrennt';
-    dashboardConnectionDot.classList.remove('connected');
-    dashboardConnectionDot.classList.add('disconnected');
-    dashboardConnectionDot.title = 'Getrennt';
     }
 });
 
@@ -2667,49 +2685,12 @@ function getViewFromUrl() {
     }
 }
 
-const loginBtn = document.getElementById("loginBtn");
 const modal = document.getElementById("loginModal");
 
 const createBlock = document.getElementById("loginCreateBlock");
 const existingBlock = document.getElementById("loginExistingBlock");
 const title = document.getElementById("loginTitle");
 const errorBox = document.getElementById("loginError");
-
-loginBtn.addEventListener("click", () => {
-  // 🔐 bereits eingeloggt → Logout fragen
-  if (loggingStatus.isLoggedIn) {
-    const confirmLogout = confirm("Möchtest du dich ausloggen?");
-    
-    if (confirmLogout) {
-      setLoggedIn(false);
-      window.location.reload();
-    }
-
-    return;
-  }
-
-  // 🔑 nicht eingeloggt → Login öffnen
-  openLoginModal();
-});
-
-document.getElementById("closeLoginModal").onclick = () => {
-  modal.classList.add("hidden");
-};
-
-async function openLoginModal() {
-    errorBox.textContent = "";
-    modal.classList.remove("hidden");
-
-    if (!loggingStatus.hasAdmin) {
-        title.textContent = "Admin erstellen";
-        createBlock.classList.remove("hidden");
-        existingBlock.classList.add("hidden");
-    } else {
-        title.textContent = "Login";
-        createBlock.classList.add("hidden");
-        existingBlock.classList.remove("hidden");
-    }
-}
 
 function openRenameModal(titleText, defaultValue = "") {
     return new Promise((resolve) => {
@@ -2789,20 +2770,22 @@ if (themeToggleBtn) {
     });
 }
 
-function updateAuthUI(isLoggedIn, adminExists) {
+function updateAuthUI() {
     const settingsBtn = document.getElementById("openSettingsBtn");
     const editBtn = document.getElementById("dashboardEditModeBtn");
     const sidebar = document.querySelector(".sidebar");
-    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    const sidebarToggleHandle = document.getElementById("sidebarToggleHandle");
 
-    if (adminExists && !isLoggedIn) {
+    if (!isAdmin()) {
         settingsBtn?.classList.add("hidden-auth");
         editBtn?.classList.add("hidden-auth");
         appLayout.classList.add("no-sidebar");
+        sidebarToggleHandle.classList.add("hidden");
     } else {
         settingsBtn?.classList.remove("hidden-auth");
         editBtn?.classList.remove("hidden-auth");
         appLayout.classList.remove("no-sidebar");
+        sidebarToggleHandle.classList.remove("hidden");
     }
 }
 
@@ -2830,7 +2813,6 @@ document.getElementById("createAdminBtn").onclick = async () => {
     }
 
     modal.classList.add("hidden");
-    loggingStatus.hasAdmin = true;
     setLoggedIn(true);
 };
 
@@ -2865,56 +2847,6 @@ document.getElementById("loginSubmitBtn").onclick = async () => {
   }
 };
 
-function setLoggedIn(state) {
-    if (state) {
-        loginBtn.classList.add("logged-in");
-        loginBtn.title = "Logout";
-        localStorage.setItem("isLoggedIn", "true");
-        loggingStatus.isLoggedIn = true;
-
-    } else {
-        loginBtn.classList.remove("logged-in");
-        loginBtn.title = "Login";
-        localStorage.removeItem("isLoggedIn");
-        loggingStatus.isLoggedIn = false;
-
-        // 👉 Logout Redirect auf erstes Dashboard, was nicht adminOnly ist.
-        let firstDashboard = null;
-        for(const dashboard of Object.values(customDashboards)) {
-            if(!dashboard.adminOnly) {
-                firstDashboard = dashboard;
-                break;
-            }
-        }
-        if (firstDashboard) {
-            showView('dashboard', {
-                customDashboardId: firstDashboard.id
-            });
-        } else {
-            showView('home');
-        }
-    }
-
-    updateAuthUI(state, true);
-
-    // 👉 UI neu bauen
-    dashboardRenderer.renderCustomDashboardsNav();
-    dashboardRenderer.renderDashboardTabs();
-
-}
-
-// Beim Laden login setzen
-setLoggedIn(localStorage.getItem("isLoggedIn"));
-
-
-loginBtn.addEventListener("contextmenu", async (e) => {
-    e.preventDefault();
-
-    if (loggingStatus.getIsLocked() || !loggingStatus.hasAdmin) return;
-
-    openChangePasswordModal();
-});
-
 function openChangePasswordModal() {
     loginError.textContent = "";
 
@@ -2932,50 +2864,6 @@ function openChangePasswordModal() {
     existingBlock.classList.add("hidden");
     document.getElementById("loginChangeBlock").classList.remove("hidden");
 }
-
-document.getElementById("changePasswordBtn").onclick = async () => {
-    const oldPw = document.getElementById("oldPassword").value;
-    const newPw1 = document.getElementById("newPassword1").value;
-    const newPw2 = document.getElementById("newPassword2").value;
-
-    if (!oldPw) {
-        loginError.textContent = "Aktuelles Passwort erforderlich";
-        return;
-    }
-    if (newPw1 && newPw1 !== newPw2) {
-        return loginError.textContent = "Passwörter stimmen nicht überein";
-    }
-    const res = await fetch("/api/admin/change-password", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            oldPassword: oldPw,
-            newPassword: newPw1
-        })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-        loginError.textContent = data.error || "Fehler";
-        return;
-    }
-
-    modal.classList.add("hidden");
-
-    if (!newPw1) {
-        // 👉 reset
-        setLoggedIn(false);
-        alert("Admin gelöscht");
-        loggingStatus.hasAdmin = false;
-        window.location.reload();
-
-    } else {
-        alert("Passwort geändert");
-    }
-};
 
 let currentEntitySelectContext = {
     dashboardId: null,
@@ -3310,9 +3198,8 @@ async function init() {
 
     const res = await fetch("/api/admin/exists");
     const data = await res.json();
-    loggingStatus.hasAdmin = data.exists;
 
-    updateAuthUI(loggingStatus.isLoggedIn, loggingStatus.hasAdmin);
+    updateAuthUI();
 
     document.addEventListener('click', async (e) => {
 
@@ -3384,4 +3271,129 @@ async function init() {
 
     });
 
+}
+
+// Header für avatarBtn
+function updateHeader() {
+  const avatar = document.getElementById('avatarBtn');
+
+  const firstLetter = window.currentUser.username.charAt(0).toUpperCase();
+  avatar.textContent = firstLetter;
+}
+
+function initHeader(currentUser) {
+
+  const avatar = document.getElementById('avatarBtn');
+  const dropdown = document.getElementById('avatarDropdown');
+  const bell = document.getElementById('notificationBell');
+  const dot = document.getElementById('notificationDot');
+
+  // 👤 Avatar Buchstabe
+  avatar.textContent = currentUser.username.charAt(0).toUpperCase();
+
+  // 🔴 Notification (nur anzeigen, wenn nötig)
+  if (currentUser.isDefault) {
+    dot.classList.remove('hidden');
+  }
+
+  // 👤 Avatar Klick
+  avatar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  });
+
+  // ❌ Klick außerhalb → schließen
+  document.addEventListener('click', () => {
+    dropdown.classList.add('hidden');
+  });
+
+  // 🔘 Dropdown Aktionen
+  dropdown.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.dropdown-item');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+
+    if (action === 'logout') {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    }
+
+    if (action === 'profile') {
+      openUsersView(); // nutzt deine bestehende Logik
+    }
+  });
+
+  // 🔔 Glocke klick (placeholder)
+  bell.addEventListener('click', () => {
+    console.log('Notifications öffnen (kommt später)');
+  });
+}
+
+
+// Sidebar Toggle Button
+const handle = document.getElementById('sidebarToggleHandle');
+handle?.addEventListener('click', toggleSidebar);
+
+function toggleSidebar() {
+  const app = document.getElementById('appLayout');
+  if (!app) return;
+
+  const collapsed = app.classList.toggle('sidebar-collapsed');
+
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const app = document.getElementById('appLayout');
+  if (!app) return;
+
+  const saved = localStorage.getItem('sidebarCollapsed');
+
+  if (saved === '1') {
+    app.classList.add('sidebar-collapsed');
+  }
+});
+
+// otification Glocke
+let notifications = [];
+
+function addNotification(message) {
+  notifications.push(message);
+  updateNotificationUI();
+}
+
+function updateNotificationUI() {
+  const dot = document.getElementById('notificationDot');
+
+  if (!dot) return;
+
+  if (notifications.length === 0) {
+    dot.classList.add('hidden');
+  } else {
+    dot.classList.remove('hidden');
+    dot.innerText = notifications.length;
+  }
+}
+
+//addNotification('Passwort muss geändert werden');
+//addNotification('Neue Nachricht');
+
+document.getElementById('notificationBell').addEventListener('click', () => {
+  console.log(notifications);
+});
+
+const bell = document.getElementById('notificationBell');
+const dropdown = document.getElementById('notificationDropdown');
+
+if (bell && dropdown) {
+  bell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  });
+
+  // Klick außerhalb schließt Dropdown
+  document.addEventListener('click', () => {
+    dropdown.classList.add('hidden');
+  });
 }
