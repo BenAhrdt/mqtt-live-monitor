@@ -861,7 +861,7 @@ code {
 }
 
 .sidebar-toggle-handle {
-  position: absolute;
+  position: fixed;
   top: 60px;
 
   width: 0;
@@ -2787,4 +2787,41 @@ code {
 
 .hidden {
   display: none;
+}
+
+/* Hauptreihe */
+.dashboard-control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Linke Seite */
+.control-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Rechte Seite */
+.control-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Slider NICHT full width vom Container */
+.dashboard-slider-wrap {
+  width: 100%;
+  max-width: 220px; /* 👈 DAS ist der Trick */
+}
+
+/* Min / Max */
+.slider-minmax {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #888;
 }

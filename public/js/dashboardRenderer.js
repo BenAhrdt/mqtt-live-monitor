@@ -341,54 +341,59 @@ export function createDashboardRenderer(deps) {
         const unit = entity.unit || '';
 
         return wrapDashboardEntity(entity, `
-        <div class="number-entity-block">
+            <div class="number-entity-block">
+
             <div class="dashboard-control-row">
-            <span class="dashboard-label">
-                ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
-                ${renderRenameEntityButton(entity.id, {
-                    dashboardId: getActiveCustomDashboardId(),
-                    deviceId: entity._renderDeviceId || entity.deviceId
-                })}
-            </span>
-            <div class="number-control">
+
+                <!-- 🔹 LINKS -->
+                <div class="control-left">
+
+                <span class="dashboard-label">
+                    ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
+                    ${renderRenameEntityButton(entity.id, {
+                        dashboardId: getActiveCustomDashboardId(),
+                        deviceId: entity._renderDeviceId || entity.deviceId
+                    })}
+                </span>
+
                 ${hasMinMax ? `
                 <div class="dashboard-slider-wrap">
-                    <div class="dashboard-slider-bubble hidden"></div>
                     <div class="slider-minmax">
                     <span>${min}</span>
                     <span>${max}</span>
                     </div>
+
                     <input
                     type="range"
                     min="${min}"
                     max="${max}"
                     step="${step}"
                     value="${value === '' ? min : value}"
-                    data-unit="${escapeHtml(unit)}"
                     class="dashboard-range"
-                    oninput="handleDashboardSliderInput(this); this.closest('.number-control').querySelector('.number-input').value = this.value"
-                    onmousedown="handleDashboardSliderStart(this)"
-                    onmouseup="handleDashboardSliderEnd(this)"
-                    ontouchstart="handleDashboardSliderStart(this)"
-                    ontouchend="handleDashboardSliderEnd(this)"
+                    oninput="this.closest('.dashboard-control-row').querySelector('.number-input').value = this.value"
                     onchange="setNumberEntity('${entity.id}', this.value)"
                     >
                 </div>
                 ` : ''}
 
-                <input
-                type="number"
-                class="number-input"
-                ${hasMinMax ? `min="${min}" max="${max}"` : ''}
-                step="${step}"
-                value="${value}"
-                onchange="setNumberEntity('${entity.id}', this.value)"
-                >
+                </div>
 
+                <!-- 🔹 RECHTS -->
+                <div class="control-right">
+                <input
+                    type="number"
+                    class="number-input"
+                    ${hasMinMax ? `min="${min}" max="${max}"` : ''}
+                    step="${step}"
+                    value="${value}"
+                    onchange="setNumberEntity('${entity.id}', this.value)"
+                >
                 ${unit ? `<span class="number-unit">${escapeHtml(unit)}</span>` : ''}
+                </div>
+
             </div>
+
             </div>
-        </div>
         `);
     }
 

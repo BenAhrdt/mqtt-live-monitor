@@ -116,6 +116,8 @@ journalctl -u mqtt-live-monitor -f
 ## Changelog
 
 ### V1.6.3 Useransicht verbessert
+* (BenAhrdt) Sidebar Handle Position festgesetzt
+* (BenAhrdt) Slider vor Input unter den Text
 * (BenAhrdt) User sieht kein Home und keione Home Geräte
 
 ### V1.6.2 Neues Benutzerkonzept (1. Step)
