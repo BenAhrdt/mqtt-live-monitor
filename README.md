@@ -115,6 +115,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.4 Bugfix Entity virtuelles Gerät
+* (BenAhrdt) Entities können wirder ausgewählt werden.
+
 ### V1.6.3 Useransicht verbessert
 * (BenAhrdt) Sidebar Handle Position festgesetzt
 * (BenAhrdt) Slider vor Input unter den Text

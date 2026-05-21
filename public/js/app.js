@@ -2258,25 +2258,36 @@ document.addEventListener('click', async (e) => {
         dropdown.classList.toggle('hidden');
         return;
     }
-
     const btn = e.target.closest('.dropdown-item');
     if (btn) {
         const action = btn.dataset.action;
 
         dropdown.classList.add('hidden');
 
-        if (action === 'logout') {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            window.location.href = '/login.html';
-        }
-
         if (action === 'profile') {
             showView('users');
             openOwnProfile(window.currentUser);
         }
 
+        if (action === 'logout') {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login.html';
+        }
         return;
     }
+
+    // 🔥 ADD ENTITY (Virtuelles Gerät)
+    const addEntityBtn = e.target.closest('.action-add-entity');
+    if (addEntityBtn) {
+
+        const deviceId = addEntityBtn.dataset.deviceId;
+        const dashboardId = addEntityBtn.dataset.dashboardId;
+
+        openEntitySelectModal(dashboardId, deviceId);
+
+        return;
+    }
+
 
     // Operand Auswahl Logik
     const select = e.target.closest('.logic-input');
@@ -2315,7 +2326,7 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 1. TABS (Home + Custom Dashboards)
+    // 🔥 TABS (Home + Custom Dashboards)
     const tab = e.target.closest('.dashboard-tab');
     if (tab) {
         e.preventDefault();
@@ -2336,7 +2347,7 @@ document.addEventListener('click', async (e) => {
         }
     }
 
-    // 🔥 2. DASHBOARD Navigation (Sidebar + Öffnen)
+    // 🔥 DASHBOARD Navigation (Sidebar + Öffnen)
     const dashboardBtn = e.target.closest(
         '.nav-dashboard-item, .open-dashboard-btn'
     );
@@ -2355,7 +2366,7 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 3. RENAME DEVICE  ← HIER!
+    // 🔥 RENAME DEVICE  ← HIER!
     const renameDeviceBtn = e.target.closest('.action-rename-device');
     if (renameDeviceBtn) {
         const deviceId = renameDeviceBtn.dataset.deviceId;
@@ -2364,7 +2375,7 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 4. RENAME ENTITY
+    // 🔥 RENAME ENTITY
     const renameEntityBtn = e.target.closest('.action-rename-entity');
     if (renameEntityBtn) {
         const entityId = renameEntityBtn.dataset.entityId;
@@ -2374,7 +2385,7 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 3. EFFECT OPTION (Dropdown Auswahl)
+    // 🔥 EFFECT OPTION (Dropdown Auswahl)
     const option = e.target.closest('.effect-option');
     if (option) {
         const dropdown = option.closest('.effect-dropdown');
@@ -2396,7 +2407,7 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 4. Dropdown öffnen
+    // 🔥 Dropdown öffnen
     const selected = e.target.closest('.effect-selected');
     if (selected) {
         const dropdown = selected.closest('.effect-dropdown');
@@ -2412,12 +2423,12 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // 🔥 5. Entity Filter Dropdown schließen
+    // 🔥 Entity Filter Dropdown schließen
     if (!e.target.closest('.entity-filter-dropdown')) {
         entityFilterDropdown.classList.remove('open');
     }
 
-    // 🔥 6. Alle offenen Effekt-Dropdowns schließen
+    // 🔥 Alle offenen Effekt-Dropdowns schließen
     document.querySelectorAll('.effect-dropdown.open')
         .forEach(d => d.classList.remove('open'));
 
@@ -2890,6 +2901,7 @@ let currentEntitySelectContext = {
 };
 
 function openEntitySelectModal(dashboardId, deviceId) {
+    console.log('Erreicht');
     currentEntitySelectContext = { dashboardId, deviceId };
 
     const modal = document.getElementById('entitySelectModal');
