@@ -277,7 +277,7 @@ app.post('/api/users', async (req, res) => {
   const hash = await bcryptjs.hash(password, 10);
   const newUser = {
     username,
-    password: hash,
+    passwordHash: hash,
     roles: ['Benutzergruppe 1'], // 👈 Default
     active: true
   };

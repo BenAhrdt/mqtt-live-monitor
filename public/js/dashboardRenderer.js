@@ -1784,111 +1784,111 @@ export function createDashboardRenderer(deps) {
         }
 
         dashboardGrid.innerHTML = sortedDevices.map((device) => {
-        const visibleEntities = activeCustomDashboardId
-            ? (device.entities || [])
-            : (device.entities || []).filter((entity) =>
-                isEntityTypeVisible(entity.type)
-            );
+            const visibleEntities = activeCustomDashboardId
+                ? (device.entities || [])
+                : (device.entities || []).filter((entity) =>
+                    isEntityTypeVisible(entity.type)
+                );
 
-        if (!visibleEntities.length) {
-            return '';
-        }
-
-        const entitiesHtml = visibleEntities.map((entity) => {
-            switch (entity.type) {
-                case 'light':
-                    return renderLightEntity(entity);
-
-                case 'climate':
-                    return renderClimateEntity(entity);
-
-                case 'cover':
-                    return renderCoverEntity(entity);
-
-                case 'lock':
-                    return renderLockEntity(entity);
-
-                case 'humidifier':
-                    return renderHumidifierEntity(entity);
-
-                case 'lawn_mower':
-                    return renderLawnMowerEntity(entity);
-
-                case 'sensor':
-                    return renderSensorEntity(entity);
-
-                case 'binary_sensor':
-                    return renderBinarySensorEntity(entity);
-
-                case 'switch':
-                    return renderSwitchEntity(entity);
-
-                case 'button':
-                    return renderButtonEntity(entity);
-
-                case 'number':
-                    return renderNumberEntity(entity);
-
-                case 'text':
-                    return renderTextEntity(entity);
-
-                default:
-                    console.warn('Unbekannter Entity-Typ:', entity.type, entity);
-                    return '';
+            if (!visibleEntities.length) {
+                return '';
             }
-        }).join('');
 
-        const viaClass = getViaDeviceClass(device.viaDevice);
-        const via = String(device.viaDevice || '').toLowerCase();
-        const isZigbee = via.includes('zigbee');
+            const entitiesHtml = visibleEntities.map((entity) => {
+                switch (entity.type) {
+                    case 'light':
+                        return renderLightEntity(entity);
 
-        return `
-            <div
-            class="dashboard-device-card ${viaClass}"
-            id="device-${device.id}"
-            data-device-id="${escapeHtml(device.id)}"
-            draggable="false"
-            >
-            <div class="dashboard-device-header">
-                ${activeCustomDashboardId && dashboardEditMode ? `<div class="drag-handle" draggable="true" data-device-id="${escapeHtml(device.id)}" title="Verschieben">☰</div>` : ''}
-                <div class="dashboard-device-icon">
-                ${getDeviceIcons(device)}
-                </div>
+                    case 'climate':
+                        return renderClimateEntity(entity);
 
-                <div class="dashboard-device-header-text">
-                <div class="dashboard-device-name">
-                    ${escapeHtml(getDeviceDisplayName(device))}
-                </div>
-                <div class="dashboard-device-subtitle">
-                    Entitäten: ${escapeHtml(device.entityCount || 0)}
-                </div>
-                </div>
+                    case 'cover':
+                        return renderCoverEntity(entity);
 
-                ${activeCustomDashboardId && dashboardEditMode ? `
-                <button
-                    class="btn secondary small-btn action-rename-device"
-                    data-device-id="${device.id}"
-                    title="Umbenennen"
-                >
-                    ✏️
-                </button>
-                ` : ''}
+                    case 'lock':
+                        return renderLockEntity(entity);
 
-                ${isZigbee ? `
-                <div class="zigbee-badge">
-                    <img src="/icons/Zigbee2MqttLogo.png" alt="Zigbee2MQTT">
-                </div>
-                ` : ''}
-            </div>
+                    case 'humidifier':
+                        return renderHumidifierEntity(entity);
 
-            <div
-                class="dashboard-device-body"
+                    case 'lawn_mower':
+                        return renderLawnMowerEntity(entity);
+
+                    case 'sensor':
+                        return renderSensorEntity(entity);
+
+                    case 'binary_sensor':
+                        return renderBinarySensorEntity(entity);
+
+                    case 'switch':
+                        return renderSwitchEntity(entity);
+
+                    case 'button':
+                        return renderButtonEntity(entity);
+
+                    case 'number':
+                        return renderNumberEntity(entity);
+
+                    case 'text':
+                        return renderTextEntity(entity);
+
+                    default:
+                        console.warn('Unbekannter Entity-Typ:', entity.type, entity);
+                        return '';
+                }
+            }).join('');
+
+            const viaClass = getViaDeviceClass(device.viaDevice);
+            const via = String(device.viaDevice || '').toLowerCase();
+            const isZigbee = via.includes('zigbee');
+
+            return `
+                <div
+                class="dashboard-device-card ${viaClass}"
+                id="device-${device.id}"
                 data-device-id="${escapeHtml(device.id)}"
-            >
-                ${entitiesHtml || '<div class="muted">Keine Entitäten</div>'}
-            </div>
-            </div>
-        `;
+                draggable="false"
+                >
+                <div class="dashboard-device-header">
+                    ${activeCustomDashboardId && dashboardEditMode ? `<div class="drag-handle" draggable="true" data-device-id="${escapeHtml(device.id)}" title="Verschieben">☰</div>` : ''}
+                    <div class="dashboard-device-icon">
+                    ${getDeviceIcons(device)}
+                    </div>
+
+                    <div class="dashboard-device-header-text">
+                    <div class="dashboard-device-name">
+                        ${escapeHtml(getDeviceDisplayName(device))}
+                    </div>
+                    <div class="dashboard-device-subtitle">
+                        Entitäten: ${escapeHtml(device.entityCount || 0)}
+                    </div>
+                    </div>
+
+                    ${activeCustomDashboardId && dashboardEditMode ? `
+                    <button
+                        class="btn secondary small-btn action-rename-device"
+                        data-device-id="${device.id}"
+                        title="Umbenennen"
+                    >
+                        ✏️
+                    </button>
+                    ` : ''}
+
+                    ${isZigbee ? `
+                    <div class="zigbee-badge">
+                        <img src="/icons/Zigbee2MqttLogo.png" alt="Zigbee2MQTT">
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div
+                    class="dashboard-device-body"
+                    data-device-id="${escapeHtml(device.id)}"
+                >
+                    ${entitiesHtml || '<div class="muted">Keine Entitäten</div>'}
+                </div>
+                </div>
+            `;
         }).join('');
 
         dashboardGrid.querySelectorAll('.climate-temp-range').forEach((slider) => {

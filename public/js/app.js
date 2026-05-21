@@ -301,8 +301,18 @@ function showView(viewName, options = {}) {
 
     // 🏠 HOME
     if (viewName === 'home') {
-        if(!isAdmin()) {
-            showView('dashboard');
+        if (!isAdmin()) {
+            const firstDashboard = getFirstAllowedDashboard();
+            if (firstDashboard) {
+                showView('dashboard', {
+                    customDashboardId: firstDashboard.id
+                });
+            } else {
+                // ❗ Fallback: KEIN Dashboard erlaubt
+                dashboardView.style.display = 'block';
+                dashboardView.innerHTML = '<p>Kein Dashboard verfügbar</p>';
+            }
+
             return;
         }
         activeCustomDashboardId = null;
@@ -414,6 +424,15 @@ function showView(viewName, options = {}) {
 
         return;
     }
+}
+
+function getFirstAllowedDashboard() {
+    if (!Array.isArray(customDashboards)) return null;
+
+    return customDashboards.find(d => {
+        if (d.adminOnly && !isAdmin()) return false;
+        return true;
+    });
 }
 
 async function ensureDevicesInitialized() {

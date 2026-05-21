@@ -115,6 +115,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.3 Useransicht verbessert
+* (BenAhrdt) User sieht kein Home und keione Home Geräte
+
 ### V1.6.2 Neues Benutzerkonzept (1. Step)
 * (BenAhrdt) Usermanagement Step 1
 * (BenAhrdt) Drag & Drop verbessert
