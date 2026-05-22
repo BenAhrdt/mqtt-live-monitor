@@ -7,6 +7,9 @@ const mqtt = require("mqtt");
 const packageJson = require("./package.json");
 const { exec } = require("child_process");
 const bcryptjs = require("bcryptjs");
+const rateLimit = require("express-rate-limit")
+
+require("dotenv").config();
 
 const LOGICAL_FILE = path.join(__dirname, 'data', 'logical-devices.json');
 
@@ -90,13 +93,22 @@ const isDev = process.env.DEV_MODE === "true";
 let allowedDiscoveryViaDevicePrefixes = [
   "lorawan"
 ];
-
+console.log('Test: ' + process.env.SESSION_SECRET);
 const app = express();
+app.set("trust proxy", 1)
+
 app.use(session({
-    secret: 'a8f7d2c9e1b4f6g8h0k2l9m3p5q7r1',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        secure: process.env.USE_HTTPS === "true",
+        sameSite: "lax"
+    }
 }));
+
+
 app.use(express.json({limit: '5mb'}));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -188,7 +200,17 @@ function writeCredentials(data) {
   }
 }
 
-app.post("/api/auth/login", async (req, res) => {
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.RATE_LIMIT),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        error: "Zu viele Loginversuche"
+    }
+});
+
+app.post("/api/auth/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   const data = readUsers();

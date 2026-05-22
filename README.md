@@ -17,6 +17,27 @@ In das Verzeichnis des mqtt-live-monitors wechseln
 ```bash
 cd mqtt-live-monitor
 ```
+Umgebungsvariablen anlegen
+```bash
+nano .env
+```
+Inhalt der Datei:
+```bash
+SESSION_SECRET=irgendeinLangesGeheimesSecret
+USE_HTTPS=false
+RATE_LIMIT=20
+```
+Erklärung:
+Den Key, könnt ihr euch wie folgt erzeugen und einfach einsetzen:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+USE_HTTPS:
+wenn Ihr das Tool online stellen wollt, dann nutzt am besten dieses wert = true
+
+Rate_LIMIT:
+Limit der Loginversuche innerhalb von 15 Minuten
+
 Installationsscript aufrufen
 ```bash
 bash install.sh
@@ -40,6 +61,9 @@ Installationsscript aufrufen
 bash install.sh
 ```
 ---
+
+
+
 
 ## 🚀 Update
 
@@ -114,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+
+### V1.6.5 Login sicherer gemacht
+* (BenAhrdt) Secutity eingebau bezüglich secret und rateLimit
 
 ### V1.6.4 Bugfix Entity virtuelles Gerät
 * (BenAhrdt) Entities können wirder ausgewählt werden.
