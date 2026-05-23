@@ -14,6 +14,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/users.css">
+  <link rel="stylesheet" href="/css/logic.css">
 </head>
 <body>
   <header class="app-header">
@@ -188,10 +189,10 @@
           </div>
 
         <div class="topbar-actions">
-        <button id="reconnectBtn" class="btn secondary">Reconnect</button>
-        <button id="pauseBtn" class="btn secondary">Pause</button>
-        <button id="clearBtn" class="btn danger">Leeren</button>
-      </div>
+          <button id="reconnectBtn" class="btn secondary">Reconnect</button>
+          <button id="pauseBtn" class="btn secondary">Pause</button>
+          <button id="clearBtn" class="btn danger">Leeren</button>
+        </div>
         </header>
 
         <section class="cards">
@@ -403,23 +404,7 @@
         </div>
       </section>
       <div id="usersView" style="display:none;"></div>
-      <section id="logicView" style="display:none;">
-        <div class="topbar">
-          <div>
-            <h1>Logiken</h1>
-            <p class="subtitle">Automatische Berechnungen & Regeln</p>
-          </div>
-        </div>
-
-        <div class="card panel">
-          <div class="panel-header">
-            <h2>Logiken</h2>
-            <button id="addLogicBtn" class="btn-primary">+ Neue Logik</button>
-          </div>
-
-          <div id="logicList"></div>
-          <button id="saveLogicBtn" class="btn-primary">💾 Speichern</button>
-        </div>
+      <section id="contentView">
       </section>      
     </main>
   </div>

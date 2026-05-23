@@ -1856,7 +1856,7 @@ function finalizeEntityUpdate(device, entity, mapping) {
     entity,
   });
 
-  logic.handleLogicUpdate(mapping.entityId, getCombinedStore(), io);
+//  logic.handleLogicUpdate(mapping.entityId, getCombinedStore(), io);
 }
 
 
@@ -2521,13 +2521,12 @@ function getCombinedStore() {
     };
 }
 
-
-const logic = require('./logic');
+// const logic = require('./logic');
 
 app.post('/api/logics', (req, res) => {
     const logics = req.body.logics || [];
 
-    logic.setLogicStore(logics); // 🔥 DAS FEHLT
+//    logic.setLogicStore(logics); // 🔥 DAS FEHLT
 
     console.log("Logiken gespeichert:", logics);
 
@@ -2535,11 +2534,11 @@ app.post('/api/logics', (req, res) => {
 });
 
 app.get('/api/logics', (req, res) => {
-    const logics = logic.getLogicStore();
-    res.json({ logics });
+/*    const logics = logic.getLogicStore();
+    res.json({ logics });*/
 });
 
-logic.loadLogicStore();
+// logic.loadLogicStore();
 
 // Restliche API Routen als unbekannt melden
 app.use('/api/',(req, res) => {
@@ -2622,4 +2621,4 @@ function saveLogicalDevices() {
     console.log("💾 Virtuelle Geräte gespeichert");
 }
 
-loadLogicalDevices();
+// loadLogicalDevices();

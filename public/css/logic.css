@@ -1,0 +1,106 @@
+.logic-builder {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.logic-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.logic-toolbox {
+  width: 220px;
+  padding: 12px;
+  border-right: 1px solid #ddd;
+  background: #f8fafc;
+}
+
+.logic-item {
+  padding: 10px;
+  margin-bottom: 10px;
+  background: white;
+  border-radius: 8px;
+  cursor: grab;
+  border: 1px solid #ddd;
+}
+
+.logic-canvas {
+  flex: 1;
+  position: relative;
+  background: #f1f5f9;
+}
+
+.logic-connections {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto
+}
+
+.logic-line {
+  stroke: #3b82f6;
+  stroke-width: 2;
+  fill: none;
+  cursor: pointer;
+}
+
+.logic-node {
+  position: absolute;
+  padding: 10px 20px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+
+/* Text */
+.node-label {
+  pointer-events: none;
+}
+
+/* 🔵 Output Punkt */
+.node-output {
+  width: 10px;
+  height: 10px;
+  background: #3b82f6;
+  border-radius: 50%;
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: crosshair;
+}
+
+.node-input {
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 50%;
+  position: absolute;
+  left: -5px;
+  cursor: crosshair;
+}
+
+.node-input.top {
+  top: 30%;
+}
+
+.node-input.bottom {
+  top: 70%;
+}
+
+.node-input.center {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.connecting .node-output {
+  opacity: 0.3;
+  pointer-events: none;   /* 🔥 kann nicht mehr geklickt werden */
+}
+
+.connecting .node-input {
+  opacity: 1;
+  cursor: crosshair;
+}

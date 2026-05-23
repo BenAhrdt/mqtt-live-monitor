@@ -1,6 +1,7 @@
 import socket from './socket.js';
 import { initSettings } from './settings.js';
 import { renderUsersView, openOwnProfile } from './views/users.js';
+import { renderLogicView } from './views/logic.js';
 import {
   escapeHtml,
   shortenMiddleSmart,
@@ -60,12 +61,12 @@ const showLiveMonitorBtn = document.getElementById('showLiveMonitorBtn');
 const showHomeBtn = document.getElementById('showHomeBtn');
 const liveMonitorView = document.getElementById('liveMonitorView');
 const dashboardView = document.getElementById('dashboardView');
+const contentView = document.getElementById('contentView');
 const showSettingsBtn = document.getElementById('showSettingsBtn');
+const showLogicBtn = document.getElementById('showLogicBtn');
 const showUsersBtn = document.getElementById('showUsersBtn');
 const settingsView = document.getElementById('settingsView');
 const usersView = document.getElementById('usersView');
-const logicView = document.getElementById('logicView');
-const showLogicBtn = document.getElementById('showLogicBtn');
 const appLayout = document.getElementById('appLayout');
 const entityFilterDropdown = document.getElementById('entityFilterDropdown');
 const entityFilterBtn = document.getElementById('entityFilterBtn');
@@ -290,8 +291,8 @@ function showView(viewName, options = {}) {
     liveMonitorView.style.display = 'none';
     dashboardView.style.display = 'none';
     settingsView.style.display = 'none';
-    logicView.style.display = 'none';
     usersView.style.display = 'none';
+    contentView.style.display = 'none';
 
     showHomeBtn.classList.remove('active');
     showLiveMonitorBtn.classList.remove('active');
@@ -413,14 +414,12 @@ function showView(viewName, options = {}) {
             return;
         }
 
-        logicView.style.display = 'block';
-        showLogicBtn.classList.add('active');
+        contentView.style.display = 'block';
+        renderLogicView(contentView);
 
         if (options.updateUrl !== false) {
             history.pushState(null, '', '/logic');
         }
-
-        renderLogicView(); // 🔥 wichtig
 
         return;
     }
@@ -2241,6 +2240,10 @@ showUsersBtn.addEventListener('click', () => {
     showView('users');
 });
 
+showLogicBtn.addEventListener('click', () => {
+    showView('logic');
+});
+
 entityFilterBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     entityFilterDropdown.classList.toggle('open');
@@ -2296,7 +2299,7 @@ document.addEventListener('click', async (e) => {
         const field = select.dataset.field;
         const value = select.value;
 
-        updateLogic(logicId, field, value);
+
 
         return;
     }
@@ -2710,6 +2713,8 @@ function getViewFromUrl() {
             return 'live';
         case '/settings':
             return 'settings';
+        case '/logic':
+            return 'logic';
         default:
         return 'home';
     }
@@ -3043,63 +3048,6 @@ async function saveLogicStore() {
     });
 }
 
-function updateLogic(id, field, value) {
-
-    const logic = window.logicStore.find(l => l.id === id);
-    if (!logic) return;
-
-    if (field === 'A' || field === 'B') {
-        logic.operands[field] = value;
-    } else if (field === 'operation') {
-        logic.operation = value;
-    } else if (field === 'target') {
-        logic.targetEntityId = value;
-    }
-
-    renderLogicView();
-}
-
-function renderLogicView() {
-
-    const list = document.getElementById("logicList");
-    const logics = window.logicStore || [];
-
-    if (!logics.length) {
-        list.innerHTML = `<div class="muted">Keine Logiken vorhanden</div>`;
-        return;
-    }
-
-    list.innerHTML = logics.map(l => `
-        <div class="logic-card">
-
-            <div class="logic-row">
-
-                <select class="logic-input" data-field="A" data-logic-id="${l.id}">
-                    ${buildEntityOptions(l.operands?.A)}
-                </select>
-
-                <span class="logic-operator">+</span>
-
-                <select class="logic-input" data-field="B" data-logic-id="${l.id}">
-                    ${buildEntityOptions(l.operands?.B)}
-                </select>
-
-                <span class="logic-operator">=</span>
-
-                <select class="logic-target" data-field="target" data-logic-id="${l.id}">
-                    ${buildTargetOptions(l.targetEntityId)}
-                </select>
-
-                <button class="btn-icon action-create-virtual-entity"
-                        data-logic-id="${l.id}">
-                    +
-                </button>
-
-            </div>
-        </div>
-    `).join('');
-}
-
 function getAllEntitiesFlat() {
     const result = [];
 
@@ -3183,8 +3131,6 @@ function createLogicEntity(logicId) {
 
     device.entities.push(entity);
 
-    updateLogic(logicId, 'target', entityId);
-
     syncLogicalDevices();
     renderLogicView();
 }
@@ -3239,9 +3185,10 @@ async function init() {
             showView('settings');
             return;
         }
-
+        console.log("Click");
         const logicBtn = e.target.closest('#showLogicBtn');
         if (logicBtn) {
+            
             showView('logic');
             return;
         }
