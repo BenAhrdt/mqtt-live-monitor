@@ -104,3 +104,13 @@
   opacity: 1;
   cursor: crosshair;
 }
+
+.operator-select {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.entity-select {
+  width: 220px;
+  max-width: 220px;
+}

@@ -1,7 +1,8 @@
 import socket from './socket.js';
 import { initSettings } from './settings.js';
 import { renderUsersView, openOwnProfile } from './views/users.js';
-import { renderLogicView } from './views/logic.js';
+import { renderLogicView, updateLogicView } from './views/logic.js';
+
 import {
   escapeHtml,
   shortenMiddleSmart,
@@ -122,6 +123,7 @@ let currentSelectedEntityIds = new Set();
 
     const currentUser = await res.json();
     window.currentUser = currentUser;
+
     updateHeader();
 
     document.body.style.display = 'block';
@@ -275,7 +277,7 @@ function applyInitialMobileSidebarState() {
     }
 }
 
-function showView(viewName, options = {}) {
+async function showView(viewName, options = {}) {
     currentView = viewName;
 
     // Aktivierungen deaktiviern
@@ -413,9 +415,9 @@ function showView(viewName, options = {}) {
             showView('dashboard');
             return;
         }
-
+        await loadDashboardDevices();
         contentView.style.display = 'block';
-        renderLogicView(contentView);
+        renderLogicView(contentView, dashboardDevices);
 
         if (options.updateUrl !== false) {
             history.pushState(null, '', '/logic');
@@ -2304,17 +2306,6 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
-    // Logik Entität hinzufügen
-    const createBtn = e.target.closest('.action-create-virtual-entity');
-
-    if (createBtn) {
-        const logicId = createBtn.dataset.logicId;
-
-        createLogicEntity(logicId);
-
-        return;
-    }
-
     // 🔥 ENTITY MODAL SAVE
     const saveBtn = e.target.closest('.action-save-entities');
     if (saveBtn) {
@@ -3022,139 +3013,14 @@ function closeEntityModal() {
     currentEntitySelectContext = null;
 }
 
-async function loadLogics() {
-
-    const res = await fetch('/api/logics');
-    const data = await res.json();
-
-    window.logicStore = data.logics || [];
-
-    console.log("📥 Logiken geladen:", window.logicStore);
-
-    renderLogicView();
-}
-
-
-/*******************************************************************************
- * ************************* Logic *********************************************
- * *************************************************************************** */
-const LOGIC_DEVICE_ID = 'logic_device';
-
-async function saveLogicStore() {
-    await fetch('/api/logics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logics: window.logicStore || [] })
-    });
-}
-
-function getAllEntitiesFlat() {
-    const result = [];
-
-    (dashboardDevices || []).forEach(device => {
-        (device.entities || []).forEach(entity => {
-            result.push({
-                id: entity.id,
-                name: entity.name,
-                type: entity.type,
-                value: entity.value,
-                deviceName: device.name,
-                deviceId: device.id,
-                deviceIsVirtual: device.isVirtual
-            });
-        });
-    });
-
-    return result;
-}
-
-function buildEntityOptions(selectedId = '') {
-
-    const allowedTypes = ['sensor', 'number', 'power'];
-
-    const entities = getAllEntitiesFlat()
-        .filter(e => allowedTypes.includes(e.type) && !e.deviceIsVirtual);
-
-    return `
-        <option value="">-- wählen --</option>
-        ${entities.map(e => `
-            <option value="${e.id}" ${e.id === selectedId ? 'selected' : ''}>
-                ${e.deviceName}: ${e.name}
-            </option>
-        `).join('')}
-    `;
-}
-
-function buildTargetOptions(selectedId = '') {
-
-    const device = (dashboardDevices || [])
-        .find(d => d.isLogical);
-    if (!device || !device.entities?.length) {
-        return `<option value="">⚠ Keine Logik-Entities vorhanden</option>`;
-    }
-
-    return `
-        <option value="">-- Ziel wählen --</option>
-        ${device.entities.map(e => `
-            <option value="${e.id}" ${e.id === selectedId ? 'selected' : ''}>
-                ${e.name}
-            </option>
-        `).join('')}
-    `;
-}
-
-function createLogicEntity(logicId) {
-    const name = prompt("Name der neuen virtuellen Entity:");
-    if (!name) return;
-
-    let device = dashboardDevices.find(d => d.id === LOGIC_DEVICE_ID);
-
-    if (!device) {
-        device = {
-            id: LOGIC_DEVICE_ID,
-            name: "Logik",
-            isLogical: true,
-            entities: []
-        };
-        dashboardDevices.push(device);
-    }
-
-    const entityId = `logic_${Date.now()}`;
-
-    const entity = {
-        id: entityId,
-        name: name,
-        type: "sensor",
-        value: 0,
-        isLogical: true
-    };
-
-    device.entities.push(entity);
-
-    syncLogicalDevices();
-    renderLogicView();
-}
-
-async function syncLogicalDevices() {
-
-    await fetch('/api/logical-devices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            devices: dashboardDevices.filter(d => d.isLogical)
-        })
-    });
-
-}
-
-
 async function init() {
+
     // 1️⃣ Daten laden (WICHTIG!)
     await loadConfig();
-    await loadLogics();
 
     // 2️⃣ Danach View anzeigen
     const customId = getCustomDashboardIdFromUrl();
+
     if (customId) {
         showView('dashboard', {
             customDashboardId: customId,
@@ -3185,21 +3051,11 @@ async function init() {
             showView('settings');
             return;
         }
-        console.log("Click");
+
         const logicBtn = e.target.closest('#showLogicBtn');
         if (logicBtn) {
             
             showView('logic');
-            return;
-        }
-
-        const saveLogicBtn = e.target.closest('#saveLogicBtn');
-        if (saveLogicBtn) {
-
-            await saveLogicStore();
-
-            alert("Logiken gespeichert");
-
             return;
         }
 
@@ -3222,31 +3078,6 @@ async function init() {
             duplicateDashboard(duplicateBtn.dataset.dashboardId);
             return;
         }
-
-        const addLogicBtn = e.target.closest('#addLogicBtn');
-        if (addLogicBtn) {
-
-            if (!window.logicStore) window.logicStore = [];
-
-            window.logicStore.push({
-                id: "logic_" + Date.now(),
-
-                targetEntityId: "",
-
-                operands: {
-                    A: "",
-                    B: ""
-                },
-
-                operation: "add"
-            });
-
-            renderLogicView();
-            saveLogicStore();
-
-            return;
-        }
-
     });
 
 }

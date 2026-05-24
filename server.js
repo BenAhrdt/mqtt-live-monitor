@@ -11,8 +11,6 @@ const rateLimit = require("express-rate-limit")
 
 require("dotenv").config();
 
-const LOGICAL_FILE = path.join(__dirname, 'data', 'logical-devices.json');
-
 let CONFIG_PATH;
 const USER_FILE = path.join(__dirname, "usercredentials.json");
 
@@ -1855,8 +1853,6 @@ function finalizeEntityUpdate(device, entity, mapping) {
     entityId: mapping.entityId,
     entity,
   });
-
-//  logic.handleLogicUpdate(mapping.entityId, getCombinedStore(), io);
 }
 
 
@@ -2521,24 +2517,21 @@ function getCombinedStore() {
     };
 }
 
-// const logic = require('./logic');
+const LOGIC_FILE = path.join(__dirname, './data/logics.json');
 
 app.post('/api/logics', (req, res) => {
-    const logics = req.body.logics || [];
-
-//    logic.setLogicStore(logics); // 🔥 DAS FEHLT
-
-    console.log("Logiken gespeichert:", logics);
-
-    res.json({ success: true });
+  fs.writeFileSync(LOGIC_FILE, JSON.stringify(req.body, null, 2));
+  res.json({ success: true });
 });
 
 app.get('/api/logics', (req, res) => {
-/*    const logics = logic.getLogicStore();
-    res.json({ logics });*/
-});
+  if (!fs.existsSync(LOGIC_FILE)) {
+    return res.json({ nodes: [], connections: [] });
+  }
 
-// logic.loadLogicStore();
+  const data = JSON.parse(fs.readFileSync(LOGIC_FILE, 'utf-8'));
+  res.json(data);
+});
 
 // Restliche API Routen als unbekannt melden
 app.use('/api/',(req, res) => {
