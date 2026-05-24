@@ -8,6 +8,7 @@ const packageJson = require("./package.json");
 const { exec } = require("child_process");
 const bcryptjs = require("bcryptjs");
 const rateLimit = require("express-rate-limit")
+const logicEngine = require('./logicEngine');
 
 require("dotenv").config();
 
@@ -659,11 +660,6 @@ function emitStatus(status) {
   io.emit("mqtt-status", mqttStatus);
 }
 
-function emitStores() {
-  // io.emit("device-store", deviceStore);
-  // io.emit("topic-store", topicStore);
-}
-
 function resetStores() {
   for (const key of Object.keys(deviceStore)) {
     delete deviceStore[key];
@@ -673,7 +669,6 @@ function resetStores() {
     delete topicStore[key];
   }
 
-  emitStores();
 }
 
 function isDiscoveryTopic(topic) {
@@ -1480,7 +1475,6 @@ function handleDiscoveryMessage(topic, message) {
   registerEntityTopics(entity, deviceId);
 
   applyPendingStateMessagesForEntity(entity);
-  emitStores();
 
   return {
     handled: true,
@@ -1846,13 +1840,14 @@ function finalizeEntityUpdate(device, entity, mapping) {
   entity.lastUpdate = new Date().toISOString();
   device.updatedAt = new Date().toISOString();
 
-  emitStores();
-
   io.emit("entity-update", {
     deviceId: mapping.deviceId,
     entityId: mapping.entityId,
     entity,
   });
+
+  // Logik anstoßen
+  logicEngine.runLogicEngine(mapping.entityId);
 }
 
 
@@ -2375,6 +2370,34 @@ app.post("/api/mqtt/publish", (req, res) => {
   });
 });
 
+// Mqtt Publisch auch in anderen Backend Dateien nutzen
+function publishMqttDirect(topic, payload) {
+
+  if (!mqttClient) {
+    console.warn('MQTT nicht verbunden');
+    return;
+  }
+
+  if (!topic) {
+    console.warn('Kein Topic angegeben');
+    return;
+  }
+
+  const finalPayload =
+    typeof payload === 'string' || typeof payload === 'number'
+      ? String(payload)
+      : JSON.stringify(payload);
+
+  mqttClient.publish(String(topic), finalPayload, (err) => {
+    if (err) {
+      console.error('MQTT Fehler:', err.message);
+    }
+  });
+}
+
+// FUnktion an LogicEngine übergeben
+logicEngine.setMqttPublisher(publishMqttDirect);
+
 app.post("/api/friendly-names", (req, res) => {
   const { friendlyNames, deviceId, name, entityId, entityName } = req.body;
 
@@ -2520,7 +2543,13 @@ function getCombinedStore() {
 const LOGIC_FILE = path.join(__dirname, './data/logics.json');
 
 app.post('/api/logics', (req, res) => {
+  const dir = path.dirname(LOGIC_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   fs.writeFileSync(LOGIC_FILE, JSON.stringify(req.body, null, 2));
+  logicEngine.setLogics(req.body);
   res.json({ success: true });
 });
 
@@ -2614,4 +2643,25 @@ function saveLogicalDevices() {
     console.log("💾 Virtuelle Geräte gespeichert");
 }
 
-// loadLogicalDevices();
+
+// Logiken laden
+if (fs.existsSync(LOGIC_FILE)) {
+  const data = JSON.parse(fs.readFileSync(LOGIC_FILE, 'utf-8'));
+  logicEngine.setLogics(data);
+}
+
+function findEntityById(entityId) {
+  for (const deviceId in deviceStore) {
+    const device = deviceStore[deviceId];
+
+    if (!device.entities) continue;
+
+    if (device.entities[entityId]) {
+      return device.entities[entityId];
+    }
+  }
+
+  return null;
+}
+
+logicEngine.setEntityGetter(findEntityById);

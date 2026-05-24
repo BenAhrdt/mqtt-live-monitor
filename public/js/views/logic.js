@@ -754,3 +754,26 @@ export function importLogic(data) {
   updateLiveValues();
   calculateFlow();
 }
+
+import socket from '../socket.js';
+socket.on('entity-update', (data) => {
+
+  document.querySelectorAll('.logic-node').forEach(node => {
+
+    if (node.dataset.type !== 'entity_input') return;
+
+    const select = node.querySelector('.entity-select');
+    if (!select) return;
+
+    if (select.value !== data.entityId) return;
+
+    const val = Number(data.entity?.value ?? data.entity?.state ?? 0);
+
+    node._value = val;
+
+    const el = node.querySelector('.node-result');
+    if (el) {
+      el.textContent = val.toFixed(2);
+    }
+  });
+});
