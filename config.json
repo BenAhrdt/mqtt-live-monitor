@@ -1,13 +1,17 @@
 {
   "webPort": 3000,
-  "host": "192.168.2.243",
   "port": 1883,
   "topic": "#",
-  "username": "",
-  "password": "",
-  "clientId": "LiveMonitor",
+  "clientId": "LiveMonitor_d",
   "discoveryViaPrefixes": [
-    "lorawan"
+    {
+      "value": "lorawan",
+      "enabled": true
+    },
+    {
+      "value": "zigbe",
+      "enabled": false
+    }
   ],
   "enabledEntityTypes": [
     "light",
@@ -23,9 +27,101 @@
     "number",
     "text"
   ],
-  "customDashboards": [],
+  "customDashboards": [
+    {
+      "id": "messungen",
+      "name": "Messungen",
+      "adminOnly": false,
+      "devices": [
+        {
+          "deviceId": "netzbezug",
+          "entityIds": [
+            "netzbezug_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzbezug_consumed"
+          ],
+          "isVirtual": false
+        },
+        {
+          "deviceId": "netzlieferung",
+          "entityIds": [
+            "netzlieferung_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzlieferung_consumed"
+          ],
+          "isVirtual": false
+        },
+        {
+          "deviceId": "hauptmessungen",
+          "entityIds": [
+            "hauptmessungen_alias_0_allgemein_leistung_wirkleistunggesamt"
+          ],
+          "isVirtual": false
+        }
+      ]
+    }
+  ],
   "friendlyNames": {
-    "devices": {},
-    "entities": {}
-  }
+    "netzbezug": {
+      "name": "Netz",
+      "entities": {
+        "netzbezug_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzbezug_consumed": "Netzbezug"
+      }
+    },
+    "netzlieferung": {
+      "name": "Netz",
+      "entities": {
+        "netzlieferung_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzlieferung_consumed": "Netzlieferung"
+      }
+    },
+    "hauptmessungen": {
+      "name": "Netz",
+      "entities": {
+        "hauptmessungen_alias_0_allgemein_leistung_wirkleistunggesamt": "Netzleistung"
+      }
+    }
+  },
+  "auth": {
+    "enabled": true
+  },
+  "history": {
+    "enabled": true,
+    "entities": {
+      "hauptmessungen_alias_0_allgemein_leistung_wirkleistunggesamt": {
+        "enabled": true,
+        "bucketMinutes": 5
+      },
+      "vd_pv_garage_janitza-gridvis_0_devices_177_onlinevalues_poweractive_sum13": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "hauptverteilung_1b___umg801-4700-0433___untermessungen_janitza-gridvis_0_devices_41_onlinevalues_poweractive_input05": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "hauptverteilung_1b___umg801-4700-0433___untermessungen_janitza-gridvis_0_devices_41_onlinevalues_poweractive_input06": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "hauptverteilung_1b___umg801-4700-0433___untermessungen_janitza-gridvis_0_devices_41_onlinevalues_poweractive_input07": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "hauptverteilung_1b___umg801-4700-0433___untermessungen_janitza-gridvis_0_devices_41_onlinevalues_poweractive_input08": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "netzbezug_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzbezug_consumed": {
+        "enabled": true,
+        "bucketMinutes": 15
+      },
+      "vd_stromspeicher_janitza-gridvis_0_devices_176_onlinevalues_poweractive_sum13": {
+        "enabled": false,
+        "bucketMinutes": 5
+      },
+      "netzlieferung_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzlieferung_consumed": {
+        "enabled": true,
+        "bucketMinutes": 15
+      }
+    }
+  },
+  "host": "192.168.2.243",
+  "username": "mqttuser",
+  "password": "MQTTpass1"
 }

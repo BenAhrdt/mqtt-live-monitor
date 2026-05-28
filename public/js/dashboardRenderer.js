@@ -199,8 +199,12 @@ export function createDashboardRenderer(deps) {
         const activeCustomDashboardId = getActiveCustomDashboardId();
         const dashboardEditMode = getDashboardEditMode();
 
+        const history = window.config?.history;
+        const cfg = history?.entities?.[entity.id];
+        const hasHistory = history?.enabled && cfg && cfg.enabled;
+
         return wrapDashboardEntity(entity, `
-            <div class="sensor-row-line">
+            <div class="sensor-row-line ${hasHistory ? 'has-history' : ''}" data-entity-id="${entity.id}">
 
                 <div class="sensor-name-wrap">
                     <span
@@ -528,13 +532,22 @@ export function createDashboardRenderer(deps) {
             <span>${p.value}</span>
 
             <div class="prefix-actions">
-            <button class="btn secondary" onclick="togglePrefix(${index})">
-                ${p.enabled ? 'Aktiv' : 'Inaktiv'}
-            </button>
+                <label class="switch">
+                    <input 
+                        type="checkbox" 
+                        class="prefix-toggle"
+                        data-index="${index}"
+                        ${p.enabled ? 'checked' : ''}
+                    >
+                    <span class="slider">
+                        <span class="switch-label on">Aktiv</span>
+                        <span class="switch-label off">Inaktiv</span>
+                    </span>
+                </label>
 
-            <button class="btn danger" onclick="removePrefix(${index})">
-                Entfernen
-            </button>
+                <button class="btn danger" onclick="removePrefix(${index})">
+                    Entfernen
+                </button>
             </div>
         `;
 

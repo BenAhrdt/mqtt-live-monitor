@@ -107,8 +107,32 @@ let currentSelectedEntityIds = new Set();
 // 🔐 Auth Check beim Start
 (async () => {
 
+    // Laden der Info, ob authentifizierung Notwendig
+    await loadAuthEnabled();
+
+  // 🔥 wenn Auth AUS → direkt reinlassen
+  if (!window.config.auth.enabled) {
+    console.log("Auth deaktiviert → kein Login nötig");
+
+    document.body.style.display = 'block';
+
+    window.currentUser = {
+      username: 'local',
+      roles: ['admin']
+    };
+    document.querySelector('.user-menu')
+        ?.classList.add('hidden');
+
+    updateHeader();
+    initHeader(window.currentUser);
+    init();
+
+    return;
+  }
+
+  // 🔥 Login-Seite direkt anzeigen
   if (window.location.pathname === '/login.html') {
-    document.body.style.display = 'block'; // 🔥 login sichtbar
+    document.body.style.display = 'block';
     return;
   }
 
@@ -117,7 +141,7 @@ let currentSelectedEntityIds = new Set();
 
     if (!res.ok) {
       console.log("Nicht eingeloggt → redirect");
-      window.location.href = '/login.html'; // 🔥 wichtig: href
+      window.location.href = '/login.html';
       return;
     }
 
@@ -125,11 +149,9 @@ let currentSelectedEntityIds = new Set();
     window.currentUser = currentUser;
 
     updateHeader();
-
     document.body.style.display = 'block';
 
     initHeader(currentUser);
-
     init();
 
   } catch (err) {
@@ -139,6 +161,11 @@ let currentSelectedEntityIds = new Set();
 })();
 
 export function isAdmin() {
+
+  if (!window.config?.auth.enabled) {
+    return true;
+  }
+
   return window.currentUser?.roles?.includes('admin');
 }
 
@@ -392,6 +419,8 @@ async function showView(viewName, options = {}) {
             history.pushState(null, '', '/settings');
         }
         ensureDevicesInitialized();
+        initHistorySettings();
+        generateClickhandler();
         return;
     }
 
@@ -439,6 +468,9 @@ function getFirstAllowedDashboard() {
 async function ensureDevicesInitialized() {
     await loadDashboardDevices();
     dashboardRenderer.renderCustomDashboards();
+
+    populateHistoryDropdown();
+    renderSelectedHistoryEntities();
 }
 
 function getLightStateValue(value) {
@@ -654,10 +686,10 @@ async function setTextEntity(entityId, value) {
 }
 
 function findEntityById(id) {
-    for (const device of devices) {
-    for (const entity of device.entities) {
-        if (entity.id === id) return entity;
-    }
+    for (const device of dashboardDevices) {
+        for (const entity of device.entities) {
+            if (entity.id === id) return entity;
+        }
     }
     return null;
 }
@@ -1430,6 +1462,7 @@ async function loadDashboardDevices() {
     }
 }
 
+
 function updateDashboardEntity(update) {
     if (dashboardEditMode) return;
 
@@ -1882,6 +1915,51 @@ socket.on('entity-update', (data) => {
     }
 
     updateDashboardEntity(data);
+
+    // 🔥 ===== LIVE VALUE =====
+    if (data.entityId === currentEntityId) {
+        const el = document.getElementById('historyLiveValue');
+
+        if (el) {
+            const value = Number(data.entity.value);
+
+            if (!isNaN(value)) {
+                el.innerHTML = `<b>${value.toFixed(2)}</b> ${data.entity.unit || ''}`;
+            }
+        }
+    }
+/*
+    // Ab hier chart update
+    if (data.entityId !== currentEntityId) return;
+    if (!historyChart) return;
+
+    const value = Number(data.entity.value);
+    if (isNaN(value)) return;
+
+    const now = Math.floor(Date.now() / 1000);
+
+    const labels = historyChart.data.labels;
+    const dataset = historyChart.data.datasets[0].data;
+
+    const lastIndex = labels.length - 1;
+    const lastTs = labels[lastIndex];
+
+    // 🔥 gleicher Bucket → überschreiben
+    if (Math.floor(lastTs / 300) === Math.floor(now / 300)) {
+        dataset[lastIndex] = value;
+    } else {
+        // 🔥 neuer Punkt
+        labels.push(now);
+        dataset.push(value);
+
+        // optional: limit
+        if (labels.length > 300) {
+            labels.shift();
+            dataset.shift();
+        }
+    }
+
+    historyChart.update('none');*/
 });
 
 function updateTopicList() {
@@ -2127,6 +2205,8 @@ async function loadConfig() {
     const res = await fetch('/api/config');
     const config = await res.json();
 
+    window.config = config;
+
     mqttHostInput.value = config.host || '';
     mqttPortInput.value = config.port || 1883;
     mqttTopicInput.value = config.topic || '#';
@@ -2153,6 +2233,16 @@ async function loadConfig() {
 
     brokerTextEl.textContent = `${config.host}:${config.port}`;
     topicTextEl.textContent = config.topic;
+}
+
+async function loadAuthEnabled() {
+
+    const res = await fetch('/api/auth/enabled');
+    const auth = await res.json();
+
+    window.config = {
+        auth: auth
+    };
 }
 
 function handleDashboardSliderStart(input) {
@@ -2279,6 +2369,30 @@ document.addEventListener('click', async (e) => {
             window.location.href = '/login.html';
         }
         return;
+    }
+
+    // 🔥 HISTORY POPUP für Sensoren
+    const sensor = e.target.closest('.sensor-row-line.has-history');
+
+    if (sensor) {
+
+        // ❗ nichts tun wenn UI-Element geklickt wurde
+        if (!e.target.closest('input, button, select')) {
+
+            const entityId = sensor.dataset.entityId;
+            if (!entityId) return;
+
+            const history = window.config?.history;
+            const cfg = history?.entities?.[entityId];
+
+            // 🔥 HIER BLOCKEN
+            if (!history?.enabled || !cfg || !cfg.enabled) {
+                return;
+            }
+
+            openHistory(entityId);
+            return;
+        }
     }
 
     // 🔥 ADD ENTITY (Virtuelles Gerät)
@@ -2897,7 +3011,6 @@ let currentEntitySelectContext = {
 };
 
 function openEntitySelectModal(dashboardId, deviceId) {
-    console.log('Erreicht');
     currentEntitySelectContext = { dashboardId, deviceId };
 
     const modal = document.getElementById('entitySelectModal');
@@ -3015,10 +3128,10 @@ function closeEntityModal() {
 
 async function init() {
 
-    // 1️⃣ Daten laden (WICHTIG!)
+    // 🔥 zuerst config laden
     await loadConfig();
 
-    // 2️⃣ Danach View anzeigen
+    // View anzeigen
     const customId = getCustomDashboardIdFromUrl();
 
     if (customId) {
@@ -3080,6 +3193,43 @@ async function init() {
         }
     });
 
+    // Laden des Zustands der Auth zuweisen der checkbox
+    document.getElementById('authEnabled').checked = window.config.auth?.enabled ?? false;
+}
+
+function initHistorySettings() {
+
+  const history = window.config?.history || {};
+
+  // 🔥 1. GLOBAL CHECKBOX setzen
+  const enabledCheckbox = document.getElementById('historyEnabled');
+  if (enabledCheckbox) {
+    enabledCheckbox.checked = history.enabled ?? false;
+
+    // 🔥 Änderung speichern
+    enabledCheckbox.onchange = (e) => {
+      window.config.history.enabled = e.target.checked;
+      saveHistoryConfig();
+    };
+  }
+
+  // 🔥 2. ADD BUTTON (dein bestehender Code)
+  const btn = document.getElementById('addHistoryEntityBtn');
+  if (btn) {
+    btn.onclick = () => {
+      const select = document.getElementById('historyEntitySelect');
+      const id = select.value;
+
+      if (!id) return;
+
+      addHistoryEntity(id);
+      populateHistoryDropdown();
+      select.value = '';
+    };
+  }
+
+  // 🔥 3. LISTE RENDERN
+  renderSelectedHistoryEntities();
 }
 
 // Header für avatarBtn
@@ -3114,23 +3264,6 @@ function initHeader(currentUser) {
   // ❌ Klick außerhalb → schließen
   document.addEventListener('click', () => {
     dropdown.classList.add('hidden');
-  });
-
-  // 🔘 Dropdown Aktionen
-  dropdown.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.dropdown-item');
-    if (!btn) return;
-
-    const action = btn.dataset.action;
-
-    if (action === 'logout') {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login.html';
-    }
-
-    if (action === 'profile') {
-      openUsersView(); // nutzt deine bestehende Logik
-    }
   });
 
   // 🔔 Glocke klick (placeholder)
@@ -3205,4 +3338,707 @@ if (bell && dropdown) {
   document.addEventListener('click', () => {
     dropdown.classList.add('hidden');
   });
+}
+
+///////////////////////////////////////////////////////////////////
+// Chart Modal //
+///////////////////////////////////////////////////////////////////
+
+let historyChart = null;
+
+async function openHistory(entityId) {
+
+  currentEntityId = entityId;
+
+  const modal = document.getElementById('historyModal');
+  modal.classList.remove('hidden');
+
+  // 🔧 Entity Infos
+  const entity = findEntityById(entityId);
+
+    let chartData;
+    let chartLabel;
+    // Deside Aggregation and Type of Chart
+    if (entity.deviceClass && entity.deviceClass === 'energy') {
+        currentType = 'bar';
+
+        if (currentHistoryHours <= 24) {
+            currentAggregation = 15 * 60;
+        } else if (currentHistoryHours <= 24 * 7) {
+            currentAggregation = 60 * 60;
+        } else {
+            currentAggregation = 24 * 60 * 60;
+        }
+    } else {
+        currentType = 'line';
+
+        if (currentHistoryHours <= 24) {
+            currentAggregation = 5 * 60;
+        } else if (currentHistoryHours <= 24 * 7) {
+            currentAggregation = 15 * 60;
+        } else {
+            currentAggregation = 60 * 60;
+        }
+    }
+
+  const res = await fetch(`/api/history/${entityId}?hours=${currentHistoryHours}&aggregation=${currentAggregation}`);
+  const data = await res.json();
+
+  const ctx = document.getElementById('historyChart');
+
+  // More Entity Infos
+  const unit = entity?.unit || '';
+    const device = dashboardDevices.find(
+    d => d.id === entity.deviceId
+    );
+  const deviceName = getDeviceDisplayName(device);
+  const entitName = entity
+    ? getEntityDisplayName(entity, entity.deviceId)
+    : entityId;
+
+  document.getElementById('historyTitle').textContent = `${deviceName}: ${entitName}`;
+
+  // 🔧 Daten vorbereiten
+  const labels = data.map(d => d.t); // UNIX Sekunden!
+    const avgs = data.map(d => d.avg);
+    const mins = data.map(d => d.min);
+    const maxs = data.map(d => d.max);
+
+    const firsts =
+    data.map(d => d.first || 0);
+
+    const lasts =
+    data.map(d => d.last || 0);
+
+    const positiveChanges =
+    data.map(d => d.positive_change || 0);
+
+    const negativeChanges =
+    data.map(d => d.negative_change || 0);
+
+
+    const totalPositive =
+    positiveChanges.reduce(
+        (a, b) => a + b,
+        0
+    );
+
+    const totalNegative =
+    negativeChanges.reduce(
+        (a, b) => a + b,
+        0
+    );
+
+
+  // 🔧 Gesamtwerte
+    const valuesOnly =
+        avgs.filter(v => !isNaN(v));
+    const min = Math.min(...valuesOnly);
+    const max = Math.max(...valuesOnly);
+
+    let infoHtml = '';
+
+    if (
+    entity.deviceClass
+    && entity.deviceClass === 'energy'
+    ) {
+
+    const totalPositive =
+        positiveChanges.reduce(
+        (a, b) => a + b,
+        0
+        );
+
+    const totalNegative =
+        negativeChanges.reduce(
+        (a, b) => a + b,
+        0
+        );
+
+    infoHtml = `
+        <div class="history-header">
+
+        <div class="history-values">
+
+            <div class="history-live">
+            Live:
+            <b id="historyLiveValue">
+                -- ${unit}
+            </b>
+            </div>
+
+            <div class="history-minmax">
+
+            Positiv:
+            <b>
+                ${totalPositive.toFixed(2)} ${unit}
+            </b>
+
+            ${totalNegative > 0 ? `
+
+                |
+
+                Negativ:
+                <b>
+                ${totalNegative.toFixed(2)} ${unit}
+                </b>
+
+            ` : ''}
+
+            </div>
+
+        </div>
+
+        <div class="history-range-buttons">
+            <button data-hours="12">12 Stunden</button>
+            <button data-hours="24">Tag</button>
+            <button data-hours="168">Woche</button>
+            <button data-hours="336">2 Wochen</button>
+            <button data-hours="720">Monat</button>
+        </div>
+
+        </div>
+    `;
+
+    } else {
+
+    infoHtml = `
+        <div class="history-header">
+
+        <div class="history-values">
+
+            <div class="history-live">
+            Live:
+            <b id="historyLiveValue">
+                -- ${unit}
+            </b>
+            </div>
+
+            <div class="history-minmax">
+            Min:
+            <b>${min.toFixed(2)} ${unit}</b>
+
+            |
+
+            Max:
+            <b>${max.toFixed(2)} ${unit}</b>
+            </div>
+
+        </div>
+
+        <div class="history-range-buttons">
+            <button data-hours="12">12 Stunden</button>
+            <button data-hours="24">Tag</button>
+            <button data-hours="168">Woche</button>
+            <button data-hours="336">2 Wochen</button>
+            <button data-hours="720">Monat</button>
+        </div>
+
+        </div>
+    `;
+
+    }
+
+    document.getElementById('historyInfo').innerHTML =  infoHtml;
+
+  // 🔥 alten Chart zerstören
+  if (historyChart) {
+    historyChart.destroy();
+  }
+
+
+
+    // Assign data
+    if (entity.deviceClass && entity.deviceClass === 'energy') {
+        chartData = positiveChanges;
+        chartLabel = 'Verbrauch';
+    } else {
+        chartData = avgs;
+        chartLabel = 'Verlauf';
+    }
+
+
+  // 🔧 Chart erstellen
+  historyChart = new Chart(ctx, {
+    type: currentType,
+    data: {
+    labels: labels,
+
+    datasets:
+
+        entity.deviceClass === 'energy'
+
+        ? [
+
+            // 🔥 Verbrauch
+            {
+            label: 'Positiv',
+
+            data: positiveChanges,
+
+            backgroundColor:
+                'rgba(59,130,246,0.5)',
+
+            borderColor:
+                'rgba(59,130,246,1)',
+
+            borderWidth: 1
+            },
+
+            // 🔥 Einspeisung
+            {
+            label: 'Negativ',
+
+            data: negativeChanges,
+
+            backgroundColor:
+                'rgba(239,68,68,0.5)',
+
+            borderColor:
+                'rgba(239,68,68,1)',
+
+            borderWidth: 1
+            }
+
+        ]
+
+        : [
+
+            {
+            label: chartLabel,
+
+            data: chartData,
+
+            borderColor: '#3b82f6',
+
+            backgroundColor:
+                'rgba(59,130,246,0.15)',
+
+            tension: 0.3,
+
+            fill: true,
+
+            pointRadius: 0
+            }
+
+        ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+
+      plugins: {
+        legend: { display: false },
+
+        tooltip: {
+          callbacks: {
+
+            // 🔥 Titel = vollständige Zeit
+            title: (ctx) => {
+              const ts = labels[ctx[0].dataIndex] * 1000;
+              return new Date(ts).toLocaleString('de-DE');
+            },
+
+            // 🔥 Werte
+            label: (ctx) => {
+
+            const i = ctx.dataIndex;
+
+            // 🔥 Energy
+            if (
+                entity.deviceClass
+                && entity.deviceClass === 'energy'
+            ) {
+
+                if (ctx.raw <= 0) {
+                return null;
+                }
+
+                return `
+                ${ctx.dataset.label}:
+                ${ctx.raw.toFixed(2)} ${unit}
+                `;
+
+                return rows;
+
+            }
+
+            // 🔥 Standard / Power
+            return [
+
+                `Ø: ${avgs[i].toFixed(2)} ${unit}`,
+
+                `Min: ${mins[i].toFixed(2)} ${unit}`,
+
+                `Max: ${maxs[i].toFixed(2)} ${unit}`
+
+            ];
+
+            }
+          }
+        }
+      },
+
+      scales: {
+        x: {
+          ticks: {
+            maxTicksLimit: currentHistoryHours > 48 ? 6 : 10,
+
+            // 🔥 HIER passiert die HA-Magie
+            callback: function(value, index) {
+
+              const ts = labels[index] * 1000;
+              const d = new Date(ts);
+
+              const hours = d.getHours().toString().padStart(2, '0');
+              const minutes = d.getMinutes().toString().padStart(2, '0');
+
+              // 🔥 Mitternacht → Datum anzeigen
+              if (hours === "00" && minutes === "00") {
+                return d.toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit'
+                });
+              }
+
+              return `${hours}:${minutes}`;
+            }
+          }
+        },
+
+        y: {
+          ticks: {
+            callback: (v) => `${v.toFixed(0)} ${unit}`
+          }
+        }
+      }
+    }
+  });
+
+  // 🔥 Resize fix
+  setTimeout(() => {
+    historyChart.resize();
+  }, 0);
+
+
+    document.querySelectorAll('.history-range-buttons button')
+    .forEach(btn => {
+        btn.addEventListener('click', () => {
+
+        currentHistoryHours = Number(btn.dataset.hours);
+
+        // Active Style
+        document.querySelectorAll('.history-range-buttons button')
+            .forEach(b => b.classList.remove('active'));
+
+        btn.classList.add('active');
+
+        // 🔥 neu laden
+        openHistory(currentEntityId);
+        });
+    });
+
+}
+
+document.getElementById('closeHistoryModal')
+  .addEventListener('click', () => {
+    document.getElementById('historyModal').classList.add('hidden');
+    currentEntityId = null;
+  });
+
+document.getElementById('historyModal')
+  ?.addEventListener('click', (e) => {
+    if (e.target.id === 'historyModal') {
+      e.currentTarget.classList.add('hidden');
+      currentEntityId = null;
+    }
+});
+
+let currentHistoryHours = 24;
+let currentAggregation = 5 * 60;
+let currentType = 'line';
+let currentEntityId = null;
+
+
+
+function generateClickhandler() {
+    // Neustart beim Speichern des Benutzerlogins
+    document
+    .getElementById('save-and-reboot')
+    .addEventListener('click', async () => {
+
+        const btn =
+        document.getElementById(
+            'save-and-reboot'
+        );
+
+        // 🔥 Button sperren
+        btn.disabled = true;
+
+        // 🔥 Auth Status holen
+        const enabled =
+        document.getElementById(
+            'authEnabled'
+        ).checked;
+
+        // 🔥 An Backend senden
+        await fetch('/api/settings/auth', {
+
+        method: 'POST',
+
+        headers: {
+            'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify({
+            enabled
+        })
+
+        });
+
+        // 🔥 Countdown starten
+        let seconds = 5;
+
+        btn.textContent =
+        `Neustart in ${seconds}s...`;
+
+        const interval = setInterval(() => {
+
+        seconds--;
+
+        btn.textContent =
+            `Neustart in ${seconds}s...`;
+
+        if (seconds <= 0) {
+
+            clearInterval(interval);
+
+            location.reload();
+
+        }
+
+        }, 1000);
+
+    });
+}
+
+function getAllSensorEntities() {
+
+  const list = [];
+
+  dashboardDevices.forEach(device => {
+    device.entities.forEach(entity => {
+
+      if (entity.type !== 'sensor') return;
+
+      list.push({
+        id: entity.id,
+        label: `${getDeviceDisplayName(device)}: ${getEntityDisplayName(entity, device.id)}`
+      });
+    });
+  });
+
+  return list.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function addHistoryEntity(entityId) {
+
+  const history = window.config.history;
+
+  if (!history.entities) history.entities = {};
+
+  const entity = findEntityById(entityId);
+
+  let bucket = 5;
+
+  // 🔥 hier prüfen
+  if (entity?.deviceClass === 'energy') {
+    bucket = 15;
+  }
+
+  history.entities[entityId] = {
+    enabled: true,
+    bucketMinutes: bucket
+  };
+
+  renderSelectedHistoryEntities();
+  saveHistoryConfig();
+}
+
+function renderSelectedHistoryEntities() {
+
+  const container = document.getElementById('selectedHistoryEntities');
+  container.innerHTML = '';
+
+    const history = window.config?.history;
+    
+    if (!history || !history.entities) return;
+
+    Object.entries(history.entities).forEach(([entityId, cfg]) => {
+
+    const entity = findEntityById(entityId);
+    if (!entity) return;
+
+    const device = dashboardDevices.find(d =>
+      d.entities.some(e => e.id === entityId)
+    );
+
+    const deviceName = device
+      ? getDeviceDisplayName(device)
+      : 'Unbekannt';
+
+    const entityName = getEntityDisplayName(entity, device?.id);
+
+    const row = document.createElement('div');
+    row.className = 'history-row';
+
+    row.innerHTML = `
+    <div class="history-left">
+        <div class="history-device">${deviceName}</div>
+        <div class="history-entity">${entityName}</div>
+    </div>
+
+    <div class="history-toggle">
+        <label class="switch">
+        <input 
+            type="checkbox"
+            class="history-toggle-input"
+            data-entity="${entityId}"
+            ${cfg.enabled ? 'checked' : ''}
+        >
+        <span class="slider">
+            <span class="switch-label on">Aktiv</span>
+            <span class="switch-label off">Inaktiv</span>
+        </span>
+        </label>
+    </div>
+
+    <div class="history-aggregation">
+        <label>Aggregation</label>
+        <select class="history-bucket" data-entity="${entityId}">
+            <option value="5"${cfg.bucketMinutes == 5 ? 'selected' : ''}>5 min</option>
+            <option value="15"${cfg.bucketMinutes == 15 ? 'selected' : ''}>15 min</option>
+            <option value="60"${cfg.bucketMinutes == 60 ? 'selected' : ''}>60 min</option>
+        </select>
+    </div>
+
+    <div class="history-remove">
+        <button class="btn danger small-btn history-remove-btn" data-entity="${entityId}">
+            Entfernen
+        </button>
+    </div>
+    `;
+
+    // Select Handler
+    const select = row.querySelector('.history-bucket');
+    select.onchange = (e) => {
+        const entityId = e.target.dataset.entity;
+        window.config.history.entities[entityId].bucketMinutes = Number(e.target.value);
+        saveHistoryConfig();
+    };
+
+    // Toggle Switch
+    document.addEventListener('change', (e) => {
+
+    if (!e.target.classList.contains('history-toggle-input')) return;
+
+    const entityId = e.target.dataset.entity;
+
+    window.config.history.entities[entityId].enabled = e.target.checked;
+
+    saveHistoryConfig();
+    });
+
+    document.addEventListener('click', (e) => {
+
+    const btn = e.target.closest('.history-remove-btn');
+    if (!btn) return;
+
+    const entityId = btn.dataset.entity;
+
+    delete window.config.history.entities[entityId];
+
+        populateHistoryDropdown();
+        renderSelectedHistoryEntities();
+        saveHistoryConfig();
+    });
+
+    container.appendChild(row);
+  });
+}
+
+function populateHistoryDropdown() {
+  const selected = window.config?.history?.entities || {};
+
+  const select = document.getElementById('historyEntitySelect');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">Entität auswählen...</option>';
+
+  const entities = [];
+
+  dashboardDevices.forEach(device => {
+
+    const deviceName = getDeviceDisplayName(device);
+
+    (device.entities || []).forEach(entity => {
+
+        if (entity.type !== 'sensor') return;
+
+      if (selected[entity.id]) return;
+        if (isNaN(Number(entity.value))) return;
+
+      const entityName = getEntityDisplayName(entity, device.id);
+
+      // 🔥 HIER sammeln statt appenden
+      entities.push({
+        id: entity.id,
+        label: `${deviceName}: ${entityName}`
+      });
+
+    });
+
+  });
+
+  // 🔥 JETZT sortieren
+  entities.sort((a, b) =>
+    a.label.localeCompare(b.label, 'de', { sensitivity: 'base' })
+  );
+
+  // 🔥 UND dann erst einfügen
+  entities.forEach(e => {
+    const option = document.createElement('option');
+    option.value = e.id;
+    option.textContent = e.label;
+    select.appendChild(option);
+  });
+}
+
+async function saveHistoryConfig() {
+  try {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...window.config
+      })
+    });
+
+    console.log('History gespeichert');
+
+  } catch (err) {
+    console.error('Fehler beim Speichern', err);
+  }
+}
+
+
+
+// Vorläufig History nur durch Freischalten
+if (localStorage.getItem('historyUnlocked') === '1') {
+  document.getElementById('historyPanel')?.classList.remove('hidden');
 }

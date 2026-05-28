@@ -29,7 +29,9 @@ export function initSettings(deps) {
       discoveryViaPrefixes: getDiscoveryPrefixes(),
       enabledEntityTypes: Array.from(
         entityFilterMenu.querySelectorAll('input[type="checkbox"]:checked')
-      ).map((input) => input.value)
+      ).map((input) => input.value),
+      auth: window.config.auth,
+      history: window.config.history
     };
 
     configMessageEl.textContent = 'Speichere...';
@@ -80,4 +82,14 @@ export function initSettings(deps) {
 
   saveConfigBtn?.addEventListener('click', saveConfig);
   disconnectBtn?.addEventListener('click', disconnectBroker);
+
+  document.addEventListener('change', (e) => {
+
+    if (!e.target.classList.contains('prefix-toggle')) return;
+
+    const index = Number(e.target.dataset.index);
+
+    window.togglePrefix(index);
+  });
+
 }

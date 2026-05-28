@@ -372,6 +372,45 @@
         </div>
 
         <div class="card panel">
+          <h2>Sicherheit</h2>
+          <label class="checkbox-row">
+            <input
+              type="checkbox"
+              id="authEnabled"
+            >
+            Benutzerlogin aktivieren
+          </label>
+          <div class="safty-row">
+            <p>Wenn deaktiviert, ist das System ohne Anmeldung erreichbar.</p>
+            <button id="save-and-reboot" class="btn primary">Speichern und neustarten</button>
+          </div>
+        </div>
+
+        <div class="card panel hidden" id="historyPanel">
+          <div class="panel-header">
+            <h2>History / Aufzeichnung</h2>
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="historyEnabled">
+            Aufzeichnung aktivieren
+          </label>
+
+          <p style="margin-bottom: 10px;">
+            Nur ausgewählte Entitäten werden gespeichert.
+          </p>
+
+          <div class="add-history-row">
+            <select id="historyEntitySelect">
+              <option value="">Entität auswählen...</option>
+            </select>
+            <button id="addHistoryEntityBtn" class="btn primary">Hinzufügen</button>
+          </div>
+
+          <div id="selectedHistoryEntities"></div>
+        </div>
+
+        <div class="card panel">
           <div class="panel-header">
             <h2>Discovery Prefixe</h2>
           </div>
@@ -410,6 +449,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/chart.js"></script>
   <script type="module" src="/js/app.js"></script>
 
 <div id="loginModal" class="modal hidden">
@@ -493,6 +533,17 @@
     <div class="modal-actions">
       <button id="closeUserModal" class="secondary">Abbrechen</button>
       <button id="saveUserBtn" class="primary">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div id="historyModal" class="modal hidden" >
+  <div class="modal-content-chart">
+    <button id="closeHistoryModal" class="modal-close">✖</button>
+    <h3 id="historyTitle"></h3>
+    <div class="history-info" id="historyInfo"></div>
+    <div class="chart-container">
+      <canvas id="historyChart"></canvas>
     </div>
   </div>
 </div>

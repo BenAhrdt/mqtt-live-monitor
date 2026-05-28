@@ -9,8 +9,11 @@ const { exec } = require("child_process");
 const bcryptjs = require("bcryptjs");
 const rateLimit = require("express-rate-limit")
 const logicEngine = require('./logicEngine');
+const historyStore = require('./historyStore');
+const { db } = require('./historyStore');
 
-require("dotenv").config();
+const dotenv = require("dotenv");
+dotenv.config();
 
 let CONFIG_PATH;
 const USER_FILE = path.join(__dirname, "usercredentials.json");
@@ -43,19 +46,137 @@ if (isElectron) {
 
     CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
 } else {
-    const CONFIG_DEFAULT_PATH = path.join(__dirname, "config.json");
-    const CONFIG_DEV_PATH = path.join(__dirname, "config-dev.json");
-    CONFIG_PATH = fs.existsSync(CONFIG_DEV_PATH)
-      ? CONFIG_DEV_PATH
-      : CONFIG_DEFAULT_PATH;
+    CONFIG_PATH = path.join(__dirname, "config.json");
 }
 
-console.log("Verwende Config:", path.basename(CONFIG_PATH));
-console.log("CONFIG PATH:", CONFIG_PATH);
+const CONFIG_EXAMPLE_PATH = path.join(__dirname, "config-example.json");
 
-if (!fs.existsSync(CONFIG_PATH)) {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify({}, null, 2));
+
+
+/**************************************************************
+ * ************************************************************
+ * ***********************************************************/
+// COnfig und .env laden und mergen
+
+// 🔥 config initialisieren + erweitern
+try {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    console.log("⚠️ config.json fehlt → erstelle aus config-example.json");
+
+    if (fs.existsSync(CONFIG_EXAMPLE_PATH)) {
+      fs.copyFileSync(CONFIG_EXAMPLE_PATH, CONFIG_PATH);
+    } else {
+      console.warn("⚠️ config-example.json fehlt → fallback auf leere config");
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify({}, null, 2));
+    }
+  } else {
+
+      // 🔥 Alte Auth erkennen
+    const hasEnv =
+      fs.existsSync(
+        path.join(process.cwd(), '.env')
+      );
+    
+    // Nur wenn .env da ist, muss auth aktiviert werden (migration)
+    if(hasEnv) {
+      // 🔥 Bestehende Config laden
+      const userConfig = JSON.parse(
+        fs.readFileSync(CONFIG_PATH, "utf8")
+      );
+
+      let changed = false;
+
+      // 🔥 auth Objekt fehlt
+      if (!userConfig.auth) {
+        userConfig.auth = {};
+        changed = true;
+      }
+      // 🔥 auth.enabled fehlt
+      if (userConfig.auth.enabled === undefined) {
+        userConfig.auth.enabled = hasEnv;
+        changed = true;
+      }
+
+      // 🔥 Nur speichern wenn geändert
+      if (changed) {
+        fs.writeFileSync(
+          CONFIG_PATH,
+          JSON.stringify(userConfig, null, 2)
+        );
+
+      }
+    }
 }
+
+  // 🔥 merge defaults
+  if (fs.existsSync(CONFIG_EXAMPLE_PATH)) {
+    const userConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+    const defaultConfig = JSON.parse(fs.readFileSync(CONFIG_EXAMPLE_PATH, "utf8"));
+
+    const merged = deepMergeDefaults(defaultConfig, userConfig);
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
+  }
+
+} catch (err) {
+  console.error("❌ Fehler beim Initialisieren der config:", err.message);
+}
+
+
+
+
+
+const ENV_PATH = path.join(__dirname, '.env');
+const ENV_EXAMPLE_PATH = path.join(__dirname, '.env.example');
+
+try {
+  if (!fs.existsSync(ENV_PATH)) {
+    console.log('⚠️ .env fehlt → erstelle aus .env.example');
+
+    if (fs.existsSync(ENV_EXAMPLE_PATH)) {
+      fs.copyFileSync(ENV_EXAMPLE_PATH, ENV_PATH);
+      dotenv.config();
+    } else {
+      console.warn('⚠️ Keine .env.example gefunden');
+    }
+  } else {
+    // 🔥 vergleichen & ergänzen
+    if (fs.existsSync(ENV_EXAMPLE_PATH)) {
+
+      const envContent = fs.readFileSync(ENV_PATH, 'utf8');
+      const exampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
+
+      const env = parseEnv(envContent);
+      const example = parseEnv(exampleContent);
+
+      let updated = false;
+      let newEnvContent = envContent.trim() + '\n';
+
+      for (const key in example) {
+        if (!(key in env)) {
+          console.log(`🔧 Ergänze ENV Key: ${key}`);
+          newEnvContent += `${key}=${example[key]}\n`;
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        fs.writeFileSync(ENV_PATH, newEnvContent);
+        dotenv.config();
+        console.log('🔧 .env wurde erweitert');
+      }
+    }
+  }
+
+} catch (err) {
+  console.error('❌ Fehler bei .env Handling:', err.message);
+}
+
+/**************************************************************
+ * ************************************************************
+ * ***********************************************************/
+
+
 
 const { Server } = require("socket.io");
 
@@ -92,7 +213,7 @@ const isDev = process.env.DEV_MODE === "true";
 let allowedDiscoveryViaDevicePrefixes = [
   "lorawan"
 ];
-console.log('Test: ' + process.env.SESSION_SECRET);
+
 const app = express();
 app.set("trust proxy", 1)
 
@@ -119,10 +240,17 @@ function requireAuth(req, res, next) {
 }
 
 app.use('/api', (req, res, next) => {
+
+  // 🔥 NEU: Auth komplett deaktiviert → alles erlauben
+  if (!mqttConfig.auth?.enabled) {
+    return next();
+  }
+
   // 🔥 diese Routen bleiben öffentlich
   if (
     req.path.startsWith('/auth/login') ||
-    req.path.startsWith('/auth/me')
+    req.path.startsWith('/auth/me') ||
+    req.path.startsWith('/auth/enabled')
   ) {
     return next();
   }
@@ -246,6 +374,12 @@ app.post("/api/auth/login", loginLimiter, async (req, res) => {
   });
 });
 
+app.get('/api/auth/enabled', (req, res) => {
+  res.json({
+    enabled: mqttConfig.auth?.enabled ?? false
+  });
+});
+
 app.get('/api/auth/me', (req, res) => {
   if (!req.session.user) {
     return res.status(401).end();
@@ -271,6 +405,54 @@ app.post('/api/auth/logout', (req, res) => {
     res.clearCookie('connect.sid'); // 🔥 wichtig
     res.json({ success: true });
   });
+});
+
+app.post('/api/settings/auth', (req, res) => {
+
+  try {
+
+    const enabled =
+      !!req.body.enabled;
+
+    // 🔥 Config laden
+    const config = JSON.parse(
+      fs.readFileSync(
+        CONFIG_PATH,
+        'utf8'
+      )
+    );
+
+    config.auth ??= {};
+
+    config.auth.enabled = enabled;
+
+    // 🔥 speichern
+    fs.writeFileSync(
+      CONFIG_PATH,
+      JSON.stringify(config, null, 2)
+    );
+
+    res.json({
+      success: true
+    });
+
+    // 🔥 verzögert neustarten
+    setTimeout(() => {
+
+      process.exit(0);
+
+    }, 1000);
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
+
 });
 
 app.get('/api/users', (req, res) => {
@@ -569,6 +751,13 @@ let mqttConfig = {
   enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
   customDashboards: [],
   friendlyNames: {},
+  auth: {
+    enabled: false
+  },
+  history: {
+    enabled: false,
+    entities: {}
+  }
 }
 
 allowedDiscoveryViaDevicePrefixes = Array.isArray(mqttConfig.discoveryViaPrefixes) && mqttConfig.discoveryViaPrefixes.length
@@ -1443,9 +1632,6 @@ function handleDiscoveryMessage(topic, message) {
     entity = createLawnMowerEntity(topic, payload, deviceId);
   } else if (entityType === "sensor") {
     entity = createSensorEntity(topic, payload, deviceId);
-    if(entity.id.includes('0x0017880100db5a10')) {
-      BrowserLog(JSON.stringify(entity));
-    }
   } else if (entityType === "binary_sensor") {
     entity = createBinarySensorEntity(topic, payload, deviceId);
   } else if (entityType === "switch") {
@@ -1846,6 +2032,10 @@ function finalizeEntityUpdate(device, entity, mapping) {
     entity,
   });
 
+  // History-Store schreiben
+  const cfg = getHistoryConfig(mapping.entityId);
+  historyStore.writeHistory(mapping.entityId, entity.value, cfg);
+
   // Logik anstoßen
   logicEngine.runLogicEngine(mapping.entityId);
 }
@@ -1965,7 +2155,7 @@ async function connectMqtt() {
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
 
-    mqttClient.subscribe(topic, { qos: 1 }, (err) => {
+    mqttClient.subscribe(topic, { qos: 0 }, (err) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
@@ -2159,6 +2349,10 @@ function getPublicConfig() {
     authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
     customDashboards: mqttConfig.customDashboards || [],
     friendlyNames: mqttConfig.friendlyNames || {},
+    auth: {
+      enabled: mqttConfig.auth?.enabled ?? false
+    },
+    history: mqttConfig.history || { enabled: false, entities: {} }
   };
 }
 
@@ -2166,7 +2360,27 @@ app.get("/api/config", (req, res) => {
   res.json(getPublicConfig());
 });
 
-app.post("/api/config", (req, res) => {
+
+// Middleware zum config schreiben
+function requireAdmin(req, res, next) {
+
+  // 🔓 Auth deaktiviert → alles erlaubt
+  if (!mqttConfig.auth?.enabled) {
+    return next();
+  }
+
+  const user = req.session?.user;
+
+  if (!user || !user.roles?.includes('admin')) {
+    return res.status(403).json({
+      error: 'Forbidden'
+    });
+  }
+
+  next();
+}
+
+app.post("/api/config", requireAdmin, (req, res) => {
   const oldConfig = { ...mqttConfig };
   const {
   webPort,
@@ -2177,7 +2391,9 @@ app.post("/api/config", (req, res) => {
   password,
   clientId,
   discoveryViaPrefixes,
-  enabledEntityTypes
+  enabledEntityTypes,
+  auth,
+  history
 } = req.body;
 
   if (!host || !port || !topic) {
@@ -2215,6 +2431,22 @@ app.post("/api/config", (req, res) => {
           : ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"]),
   };
 
+  // 🔥 AUTH übernehmen
+  if (auth && typeof auth.enabled !== 'undefined') {
+    mqttConfig.auth = {
+      ...mqttConfig.auth,
+      enabled: !!auth.enabled
+    };
+  }
+
+  // 🔥 HISTORY übernehmen
+  if (history && typeof history === 'object') {
+    mqttConfig.history = {
+      enabled: !!history.enabled,
+      entities: typeof history.entities === 'object' ? history.entities : {}
+    };
+  }
+
   allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
   .filter(p => p.enabled)
   .map(p => p.value);
@@ -2246,7 +2478,11 @@ app.post("/api/config", (req, res) => {
       clientId: mqttConfig.clientId,
       discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
       enabledEntityTypes: mqttConfig.enabledEntityTypes,
-      authConfigured: Boolean(mqttConfig.username || mqttConfig.password)
+      authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
+      auth: {
+        enabled: mqttConfig.auth?.enabled ?? false
+      },
+      history: mqttConfig.history || { enabled: false, entities: {} }
     }
   });
 });
@@ -2562,6 +2798,74 @@ app.get('/api/logics', (req, res) => {
   res.json(data);
 });
 
+app.get('/api/history/:entityId', (req, res) => {
+
+  const { entityId } = req.params;
+
+  const hours = parseFloat(req.query.hours) || 24;
+
+  // 🔥 Aggregation in Sekunden
+  const aggregation =
+    parseInt(req.query.aggregation) || 300;
+  // cutoff berechnen
+  const cutoff =
+    Math.floor(Date.now() / 1000) - (hours * 60 * 60);
+
+  db.all(`
+
+    SELECT
+
+      ((bucket / ?) * ?) as t,
+
+      MIN(min) as min,
+      MAX(max) as max,
+
+      AVG(avg) as avg,
+
+      MIN(first) as first,
+      MAX(last) as last,
+
+      SUM(positive_change)
+        as positive_change,
+
+      SUM(negative_change)
+        as negative_change,
+
+      SUM(count) as count
+
+    FROM history
+
+    WHERE entityId = ?
+      AND bucket >= ?
+
+    GROUP BY t
+
+    ORDER BY t ASC
+
+  `, [
+
+    aggregation,
+    aggregation,
+
+    entityId,
+    cutoff
+
+  ], (err, rows) => {
+
+    if (err) {
+      console.error(err);
+
+      return res.status(500).json({
+        error: err.message
+      });
+    }
+
+    res.json(rows);
+
+  });
+
+});
+
 // Restliche API Routen als unbekannt melden
 app.use('/api/',(req, res) => {
   return res.status(401).json({ error: "API unbekannt"});
@@ -2665,3 +2969,47 @@ function findEntityById(entityId) {
 }
 
 logicEngine.setEntityGetter(findEntityById);
+
+// Anstoßen des Datenbank cleanups
+historyStore.startCleanup();
+
+// Mergen der config.json
+function deepMergeDefaults(defaults, target) {
+  for (const key in defaults) {
+    if (typeof defaults[key] === 'object' && defaults[key] !== null && !Array.isArray(defaults[key])) {
+      if (!target[key]) {
+        target[key] = {};
+      }
+      deepMergeDefaults(defaults[key], target[key]);
+    } else {
+      if (target[key] === undefined) {
+        target[key] = defaults[key];
+      }
+    }
+  }
+  return target;
+}
+
+function parseEnv(content) {
+  const lines = content.split('\n');
+  const result = {};
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) return;
+
+    const [key, ...rest] = trimmed.split('=');
+    result[key] = rest.join('=');
+  });
+
+  return result;
+}
+
+// Configuration der Entity für die db
+function getHistoryConfig(entityId) {
+  // 🔥 global deaktiviert
+  if (!mqttConfig.history?.enabled) return null;
+
+  return mqttConfig.history?.entities?.[entityId];
+}

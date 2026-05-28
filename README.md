@@ -139,6 +139,10 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.6 CHecks für spätere history Store
+* (BenAhrdt) Erste Chartdarstellungen für Sensorwerte.
+* (BenAhrdt) Erste Logiken / Berechnungen möglich. AKtuell nur number Zuweisungen.
+
 ### V1.6.5 Login sicherer gemacht
 * (BenAhrdt) Secutity eingebau bezüglich secret und rateLimit
 
