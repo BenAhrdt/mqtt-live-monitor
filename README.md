@@ -139,6 +139,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.7 Cconfig removed
+* (BenAhrdt) config.json entfernt
+
 ### V1.6.6 CHecks für spätere history Store
 * (BenAhrdt) Erste Chartdarstellungen für Sensorwerte.
 * (BenAhrdt) Erste Logiken / Berechnungen möglich. AKtuell nur number Zuweisungen.
