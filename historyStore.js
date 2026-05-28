@@ -1,6 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 const lastValues = {};
+const dataDir = path.join(__dirname, './data');
+// Ordner automatisch anlegen
+fs.mkdirSync(dataDir, { recursive: true });
 
 const DB_PATH = path.join(__dirname, './data/history.db');
 

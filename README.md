@@ -139,6 +139,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.8 data Ordner anlegen
+* (BenAhrdt) Ordner anlegen für die Sqlite datenbank
+
 ### V1.6.7 Cconfig removed
 * (BenAhrdt) config.json entfernt
 
