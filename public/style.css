@@ -2954,7 +2954,7 @@ code {
 .history-row {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: 1fr 80px 80px 80px;
+  grid-template-columns: 1fr 90px 90px 90px;
   align-items: center;
   gap: 12px;
 }
@@ -3005,8 +3005,7 @@ code {
   justify-content: space-between;
 }
 
-.history-toggle-btn {
-  min-width: 80px;
+.history-toggle {
   text-align: center;
 }
 

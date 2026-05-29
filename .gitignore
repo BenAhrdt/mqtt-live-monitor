@@ -2,6 +2,7 @@ node_modules/
 data/
 credentials.json
 usercredentials.json
+config1.json
 .env
 .DS_Store
 npm-debug.log*

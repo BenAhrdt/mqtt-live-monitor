@@ -3435,6 +3435,7 @@ async function openHistory(entityId) {
         avgs.filter(v => !isNaN(v));
     const min = Math.min(...valuesOnly);
     const max = Math.max(...valuesOnly);
+    const range = max - min;
 
     let infoHtml = '';
 
@@ -3463,7 +3464,7 @@ async function openHistory(entityId) {
             <div class="history-live">
             Live:
             <b id="historyLiveValue">
-                -- ${unit}
+                ${entity.value} ${unit}
             </b>
             </div>
 
@@ -3510,7 +3511,7 @@ async function openHistory(entityId) {
             <div class="history-live">
             Live:
             <b id="historyLiveValue">
-                -- ${unit}
+                ${entity.value} ${unit}
             </b>
             </div>
 
@@ -3556,7 +3557,6 @@ async function openHistory(entityId) {
         chartData = avgs;
         chartLabel = 'Verlauf';
     }
-
 
   // 🔧 Chart erstellen
   historyChart = new Chart(ctx, {
@@ -3712,9 +3712,16 @@ async function openHistory(entityId) {
         },
 
         y: {
-          ticks: {
-            callback: (v) => `${v.toFixed(0)} ${unit}`
-          }
+        ticks: {
+            callback: (v) => {
+
+            if (range < 2) return `${v.toFixed(2)} ${unit}`;
+            if (range < 5) return `${v.toFixed(1)} ${unit}`;
+            if (range < 50) return `${v.toFixed(0)} ${unit}`;
+
+            return `${Math.round(v)} ${unit}`;
+            }
+        }
         }
       }
     }
@@ -4034,11 +4041,4 @@ async function saveHistoryConfig() {
   } catch (err) {
     console.error('Fehler beim Speichern', err);
   }
-}
-
-
-
-// Vorläufig History nur durch Freischalten
-if (localStorage.getItem('historyUnlocked') === '1') {
-  document.getElementById('historyPanel')?.classList.remove('hidden');
 }

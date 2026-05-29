@@ -139,6 +139,11 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### V1.6.9 History Funktion
+* (BenAhrdt) Livewert direkt beim öffnen des Charts sichtbar
+* (BenAhrdt) Scaling angepasst
+* (BenAhrdt) History für Sensorenwerte type number
+
 ### V1.6.8 data Ordner anlegen
 * (BenAhrdt) Ordner anlegen für die Sqlite datenbank
 
