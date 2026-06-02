@@ -3698,12 +3698,12 @@ async function openHistory(entityId) {
               const hours = d.getHours().toString().padStart(2, '0');
               const minutes = d.getMinutes().toString().padStart(2, '0');
 
-              // 🔥 Mitternacht → Datum anzeigen
-              if (hours === "00" && minutes === "00") {
-                return d.toLocaleDateString('de-DE', {
+              if (currentHistoryHours > 48) {
+                return [`${hours}:${minutes}`,
+                d.toLocaleDateString('de-DE', {
                   day: '2-digit',
                   month: '2-digit'
-                });
+                })];
               }
 
               return `${hours}:${minutes}`;

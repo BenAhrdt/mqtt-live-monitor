@@ -139,6 +139,9 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 
+### In Arbeit
+* (BenAhrdt) Tagesanzeige in Chart, bei Wochenansicht
+
 ### V1.6.9 History Funktion
 * (BenAhrdt) Livewert direkt beim öffnen des Charts sichtbar
 * (BenAhrdt) Scaling angepasst
