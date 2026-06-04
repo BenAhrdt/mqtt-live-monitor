@@ -1517,12 +1517,12 @@ code {
 }
 
 .sensor-name-wrap {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    position: relative;
 
     flex: 1;
     min-width: 0;
+
+    padding-left: 20px;
 }
 
 .sensor-name {
@@ -1982,13 +1982,6 @@ code {
   flex: 0 0 auto;
 }
 
-.sensor-name-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
 .sensor-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2209,14 +2202,15 @@ code {
 
 .header-tabs {
     display: flex;
-    gap: 6px;
-    align-items: flex-end;
-    
-    margin-top: 6px;
-    margin-left: 120px;
-    padding-bottom: 2px;
+    align-items: center;
+    gap: 8px 16px;
 
-    flex-wrap: wrap;   /* 👈 NEU hinzufügen */
+    margin-top: 0;
+    margin-left: 0;
+    padding: 0;
+
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
 
 /* einzelne Tabs */
@@ -2726,15 +2720,6 @@ code {
   align-items: center;
 }
 
-/* Tabs selbst */
-.header-tabs {
-  display: flex;
-  flex-wrap: wrap;   /* 🔥 wichtig für später */
-  gap: 8px 16px;     /* horizontal / vertikal */
-  margin-left: 0 !important;
-  padding-left: 0 !important;
-}
-
 /* Rechte actionsbuttons */
 .header-right {
   display: flex;
@@ -3081,7 +3066,7 @@ select {
     display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1300px) {
 
     .header-tabs {
         display: none;
@@ -3111,4 +3096,18 @@ select {
     font-size: 0.95rem !important;
   }
 
+}
+
+.history-icon {
+    position: absolute;
+    left: 0;
+
+    height: 100%;
+    width: 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    opacity: 0.8;
 }

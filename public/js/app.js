@@ -3514,27 +3514,15 @@ async function openHistory(entityId) {
         </div>
 
         <div class="history-range-buttons">
-
-            ${
-                window.innerWidth <= 1300
-                ? `
-                    <select id="historyRangeSelect">
-                        <option value="12">12 Stunden</option>
-                        <option value="24">Tag</option>
-                        <option value="168">Woche</option>
-                        <option value="336">2 Wochen</option>
-                        <option value="720">Monat</option>
-                    </select>
-                `
-                : `
-                    <button data-hours="12">12 Stunden</button>
-                    <button data-hours="24">Tag</button>
-                    <button data-hours="168">Woche</button>
-                    <button data-hours="336">2 Wochen</button>
-                    <button data-hours="720">Monat</button>
-                `
-            }
-
+            <div class="history-range-buttons">
+                <select id="historyRangeSelect">
+                    <option value="12">12 Stunden</option>
+                    <option value="24">Tag</option>
+                    <option value="168">Woche</option>
+                    <option value="336">2 Wochen</option>
+                    <option value="720">Monat</option>
+                </select>
+            </div>
         </div>
 
         </div>
@@ -3567,27 +3555,15 @@ async function openHistory(entityId) {
         </div>
 
         <div class="history-range-buttons">
-
-            ${
-                window.innerWidth <= 1300
-                ? `
-                    <select id="historyRangeSelect">
-                        <option value="12">12 Stunden</option>
-                        <option value="24">Tag</option>
-                        <option value="168">Woche</option>
-                        <option value="336">2 Wochen</option>
-                        <option value="720">Monat</option>
-                    </select>
-                `
-                : `
-                    <button data-hours="12">12 Stunden</button>
-                    <button data-hours="24">Tag</button>
-                    <button data-hours="168">Woche</button>
-                    <button data-hours="336">2 Wochen</button>
-                    <button data-hours="720">Monat</button>
-                `
-            }
-
+            <div class="history-range-buttons">
+                <select id="historyRangeSelect">
+                    <option value="12">12 Stunden</option>
+                    <option value="24">Tag</option>
+                    <option value="168">Woche</option>
+                    <option value="336">2 Wochen</option>
+                    <option value="720">Monat</option>
+                </select>
+            </div>
         </div>
 
         </div>
@@ -3767,11 +3743,10 @@ async function openHistory(entityId) {
               const minutes = d.getMinutes().toString().padStart(2, '0');
 
               if (currentHistoryHours > 48) {
-                return [`${hours}:${minutes}`,
-                d.toLocaleDateString('de-DE', {
-                  day: '2-digit',
-                  month: '2-digit'
-                })];
+                return d.toLocaleDateString('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit'
+                });
               }
 
               return `${hours}:${minutes}`;
@@ -3799,37 +3774,6 @@ async function openHistory(entityId) {
   setTimeout(() => {
     historyChart.resize();
   }, 0);
-
-
-    document.querySelectorAll('.history-range-buttons button')
-    .forEach(btn => {
-        const select = document.getElementById('historyRangeSelect');
-
-        if (select) {
-
-            select.value = currentHistoryHours;
-
-            select.addEventListener('change', () => {
-
-                currentHistoryHours = Number(select.value);
-
-                openHistory(currentEntityId);
-            });
-        }
-        btn.addEventListener('click', () => {
-
-        currentHistoryHours = Number(btn.dataset.hours);
-
-        // Active Style
-        document.querySelectorAll('.history-range-buttons button')
-            .forEach(b => b.classList.remove('active'));
-
-        btn.classList.add('active');
-
-        // 🔥 neu laden
-        openHistory(currentEntityId);
-        });
-    });
 
 }
 

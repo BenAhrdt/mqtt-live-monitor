@@ -138,6 +138,12 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.11 Anpassungen dropdowns
+* (BenAhrdt) Icons zu History ENtites hinzugefügt
+* (BenAhrdt) Dropdown Breite für Tabs angepasst (Dashboards)
+* (BenAhrdt) Im CHart immer Dropdown für die Zeit
+* (BenAhrdt) Im Chart > 48h nur noch Datum
+
 ### V1.6.10 Optische Anpassungen
 * (BenAhrdt) Tabsteuerung auf Mobilen Geräten angepasst
 * (BenAhrdt) Chartansicht verbessert

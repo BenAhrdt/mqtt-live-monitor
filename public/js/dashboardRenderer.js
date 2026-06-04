@@ -202,12 +202,23 @@ export function createDashboardRenderer(deps) {
         const history = window.config?.history;
         const cfg = history?.entities?.[entity.id];
         const hasHistory = history?.enabled && cfg && cfg.enabled;
+        const historyIcon = hasHistory
+        ? (
+            entity.deviceClass === 'energy'
+            ? '📊'
+            : '📈'
+        )
+        : '';
 
         return wrapDashboardEntity(entity, `
             <div class="sensor-row-line ${hasHistory ? 'has-history' : ''}" data-entity-id="${entity.id}">
 
                 <div class="sensor-name-wrap">
-                    <span
+                ${historyIcon
+                    ? `<span class="history-icon">${historyIcon}</span>`
+                    : ''
+                }    
+                <span
                         class="sensor-name"
                     >
                         ${escapeHtml(shortenMiddleSmart(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId), 200))}
