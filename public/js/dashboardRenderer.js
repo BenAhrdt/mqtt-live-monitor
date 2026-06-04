@@ -1706,6 +1706,41 @@ export function createDashboardRenderer(deps) {
             .join('');
 
     container.innerHTML = html;
+
+    const mobileContainer =
+        document.getElementById('mobile-dashboard-switcher');
+
+    if (mobileContainer) {
+
+        const currentDashboard =
+            customDashboards.find(d => d.id === activeId);
+
+        const currentName =
+            currentDashboard?.name || 'Home';
+
+        mobileContainer.innerHTML = `
+            <select id="mobileDashboardSelect">
+                ${isAdmin() ? `
+                    <option value="home"
+                        ${!activeId ? 'selected' : ''}>
+                        Home
+                    </option>
+                ` : ''}
+
+                ${customDashboards
+                    .filter(d => !d.adminOnly || isAdmin())
+                    .map(d => `
+                        <option
+                            value="${escapeHtml(d.id)}"
+                            ${activeId === d.id ? 'selected' : ''}
+                        >
+                            ${escapeHtml(d.name)}
+                        </option>
+                    `)
+                    .join('')}
+            </select>
+        `;
+    }
     }
 
     function wrapDashboardEntity(entity, innerHtml) {

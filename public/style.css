@@ -2739,7 +2739,7 @@ code {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 4px;
   margin-left: auto;
 }
 
@@ -2882,8 +2882,8 @@ code {
 
 .modal-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 12px;
+  right: 12px;
   border: none;
   background: transparent;
   font-size: 18px;
@@ -3031,4 +3031,84 @@ select {
   background-repeat: no-repeat;
   background-position: right 8px center;
   padding-right: 28px;
+}
+
+@media (max-width: 768px) {
+
+  .history-header {
+    display: block;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
+  }
+
+  .history-values {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .history-range-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .history-range-buttons button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .modal {
+    padding: 0;
+  }
+
+  .modal-content-chart {
+    width: 95vw;
+    height: 85vh;
+
+    border-radius: 12px;
+    padding: 12px;
+
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-container {
+    height: 55vh;
+    flex: none;
+  }
+}
+
+.mobile-dashboard-switcher {
+    display: none;
+}
+
+@media (max-width: 768px) {
+
+    .header-tabs {
+        display: none;
+    }
+
+    .mobile-dashboard-switcher {
+        display: block;
+    }
+}
+
+#openSettingsBtn,
+#dashboardEditModeBtn,
+.entity-filter-btn,
+.theme-toggle-btn {
+    border:none;
+    background:transparent;
+    box-shadow:none;
+    padding:4px;
+}
+
+@media (max-width: 768px) {
+
+  .history-info button {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 4px 8px !important;
+    font-size: 0.95rem !important;
+  }
+
 }

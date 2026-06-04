@@ -26,6 +26,9 @@
     <!-- Tabs -->
     <div class="header-center">
       <div id="header-tabs" class="header-tabs"></div>
+      <div id="mobile-dashboard-switcher"
+          class="mobile-dashboard-switcher">
+      </div>
     </div>
 
     <div class="header-right">
@@ -43,11 +46,11 @@
           class="btn secondary hidden"
           id="dashboardEditModeBtn"
         >
-          Bearbeiten
+          🛠️
         </button>
         <div class="entity-filter-dropdown" id="entityFilterDropdown">
           <button type="button" class="entity-filter-btn" id="entityFilterBtn">
-            Entitätstypen
+            🏷️
           </button>
           <div class="entity-filter-menu" id="entityFilterMenu">
             <div class="entity-filter-actions">
@@ -110,32 +113,29 @@
           </div>
         </div>
         
-          <!-- 🔥 RIGHT SIDE -->
-        <div class="header-right">
-            <button id="themeToggleBtn" class="theme-toggle-btn" title="Theme wechseln">
-              🌙
-            </button>
-          <!-- 🔔 Glocke -->
-          <div id="notificationBell" class="icon-btn hidden">
-            🔔
-            <span id="notificationDot" class="notification-dot hidden"></span>
-              <div id="notificationDropdown" class="dropdown hidden">
-                <div class="dropdown-item">Passwort ändern</div>
-                <div class="dropdown-item">Neue Nachricht</div>
-            </div>
+        <button id="themeToggleBtn" class="theme-toggle-btn" title="Theme wechseln">
+          🌙
+        </button>
+        <!-- 🔔 Glocke -->
+        <div id="notificationBell" class="icon-btn hidden">
+          🔔
+          <span id="notificationDot" class="notification-dot hidden"></span>
+            <div id="notificationDropdown" class="dropdown hidden">
+              <div class="dropdown-item">Passwort ändern</div>
+              <div class="dropdown-item">Neue Nachricht</div>
           </div>
-
-          <!-- 👤 Avatar -->
-          <div class="user-menu">
-            <div id="avatarBtn" class="avatar"></div>
-
-            <div id="avatarDropdown" class="dropdown hidden">
-              <div class="dropdown-item" data-action="profile">Profil</div>
-              <div class="dropdown-item" data-action="logout">Logout</div>
-            </div>
-          </div>
-
         </div>
+
+        <!-- 👤 Avatar -->
+        <div class="user-menu">
+          <div id="avatarBtn" class="avatar"></div>
+
+          <div id="avatarDropdown" class="dropdown hidden">
+            <div class="dropdown-item" data-action="profile">Profil</div>
+            <div class="dropdown-item" data-action="logout">Logout</div>
+          </div>
+        </div>
+
       </div>
 
   </header>

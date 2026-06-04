@@ -2547,12 +2547,35 @@ document.addEventListener('click', async (e) => {
 
 });
 
+// Clickhandler mobile dashboard Tab
+document.addEventListener('change', (e) => {
+
+    if (e.target.id !== 'mobileDashboardSelect') {
+        return;
+    }
+
+    const id = e.target.value;
+
+    if (id === 'home') {
+        showView('home');
+        return;
+    }
+
+    showView('dashboard', {
+        customDashboardId: id
+    });
+
+});
+
+
+
+
 dashboardEditModeBtn.addEventListener('click', () => {
     dashboardEditMode = !dashboardEditMode;
 
     dashboardEditModeBtn.textContent = dashboardEditMode
-    ? 'Fertig'
-    : 'Bearbeiten';
+    ? '✓'
+    : '🛠️';
 
     dashboardRenderer.renderDashboard();
 });
@@ -3491,11 +3514,27 @@ async function openHistory(entityId) {
         </div>
 
         <div class="history-range-buttons">
-            <button data-hours="12">12 Stunden</button>
-            <button data-hours="24">Tag</button>
-            <button data-hours="168">Woche</button>
-            <button data-hours="336">2 Wochen</button>
-            <button data-hours="720">Monat</button>
+
+            ${
+                window.innerWidth <= 1300
+                ? `
+                    <select id="historyRangeSelect">
+                        <option value="12">12 Stunden</option>
+                        <option value="24">Tag</option>
+                        <option value="168">Woche</option>
+                        <option value="336">2 Wochen</option>
+                        <option value="720">Monat</option>
+                    </select>
+                `
+                : `
+                    <button data-hours="12">12 Stunden</button>
+                    <button data-hours="24">Tag</button>
+                    <button data-hours="168">Woche</button>
+                    <button data-hours="336">2 Wochen</button>
+                    <button data-hours="720">Monat</button>
+                `
+            }
+
         </div>
 
         </div>
@@ -3528,11 +3567,27 @@ async function openHistory(entityId) {
         </div>
 
         <div class="history-range-buttons">
-            <button data-hours="12">12 Stunden</button>
-            <button data-hours="24">Tag</button>
-            <button data-hours="168">Woche</button>
-            <button data-hours="336">2 Wochen</button>
-            <button data-hours="720">Monat</button>
+
+            ${
+                window.innerWidth <= 1300
+                ? `
+                    <select id="historyRangeSelect">
+                        <option value="12">12 Stunden</option>
+                        <option value="24">Tag</option>
+                        <option value="168">Woche</option>
+                        <option value="336">2 Wochen</option>
+                        <option value="720">Monat</option>
+                    </select>
+                `
+                : `
+                    <button data-hours="12">12 Stunden</button>
+                    <button data-hours="24">Tag</button>
+                    <button data-hours="168">Woche</button>
+                    <button data-hours="336">2 Wochen</button>
+                    <button data-hours="720">Monat</button>
+                `
+            }
+
         </div>
 
         </div>
@@ -3542,12 +3597,25 @@ async function openHistory(entityId) {
 
     document.getElementById('historyInfo').innerHTML =  infoHtml;
 
+    const select = document.getElementById('historyRangeSelect');
+
+    if (select) {
+
+        select.value = String(currentHistoryHours);
+
+        select.addEventListener('change', () => {
+
+            currentHistoryHours = Number(select.value);
+
+            openHistory(currentEntityId);
+        });
+    }
+
+
   // 🔥 alten Chart zerstören
   if (historyChart) {
     historyChart.destroy();
   }
-
-
 
     // Assign data
     if (entity.deviceClass && entity.deviceClass === 'energy') {
@@ -3735,6 +3803,19 @@ async function openHistory(entityId) {
 
     document.querySelectorAll('.history-range-buttons button')
     .forEach(btn => {
+        const select = document.getElementById('historyRangeSelect');
+
+        if (select) {
+
+            select.value = currentHistoryHours;
+
+            select.addEventListener('change', () => {
+
+                currentHistoryHours = Number(select.value);
+
+                openHistory(currentEntityId);
+            });
+        }
         btn.addEventListener('click', () => {
 
         currentHistoryHours = Number(btn.dataset.hours);

@@ -138,8 +138,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
-
-### In Arbeit
+### V1.6.10 Optische Anpassungen
+* (BenAhrdt) Tabsteuerung auf Mobilen Geräten angepasst
+* (BenAhrdt) Chartansicht verbessert
+* (BenAhrdt) Icons im Header angepasst
 * (BenAhrdt) Tagesanzeige in Chart, bei Wochenansicht
 
 ### V1.6.9 History Funktion
