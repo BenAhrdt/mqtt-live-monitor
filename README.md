@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### In Arbeit Anpassungen an der History Funktion
+* (BenAhrdt) Lange Texte als Wert führen zu einer mehrzeiligen Ansicht
+
 ### V1.6.11 Anpassungen dropdowns
 * (BenAhrdt) Icons zu History ENtites hinzugefügt
 * (BenAhrdt) Dropdown Breite für Tabs angepasst (Dashboards)

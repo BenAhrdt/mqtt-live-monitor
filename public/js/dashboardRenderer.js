@@ -210,8 +210,14 @@ export function createDashboardRenderer(deps) {
         )
         : '';
 
+        const valueText = formatSensorValue(entity);
+
+        const multiline =
+            typeof valueText === 'string' &&
+            valueText.length > 30;
+
         return wrapDashboardEntity(entity, `
-            <div class="sensor-row-line ${hasHistory ? 'has-history' : ''}" data-entity-id="${entity.id}">
+            <div class="${multiline ? 'sensor-row-multiline' : 'sensor-row-line'} ${hasHistory ? 'has-history' : ''}" data-entity-id="${entity.id}">
 
                 <div class="sensor-name-wrap">
                 ${historyIcon

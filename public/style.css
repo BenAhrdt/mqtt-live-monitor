@@ -70,7 +70,10 @@ input {
   overflow-y: auto;
   overflow-x: hidden;
   width: 280px;
-  min-width: 280px;   /* 🔥 verhindert Schrumpfen */
+  min-width: 280px;
+
+  border-right: none;
+  border-bottom: 1px solid var(--border);
 }
 
 .update-form {
@@ -940,11 +943,6 @@ code {
     padding-left: 72px;
   }
 
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
   .cards {
     grid-template-columns: 1fr;
   }
@@ -1499,7 +1497,6 @@ code {
     align-items: center;
     gap: 10px;
     width: 100%;
-    cursor: default;
 }
 
 .sensor-row-line:hover {
@@ -1517,12 +1514,12 @@ code {
 }
 
 .sensor-name-wrap {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 
     flex: 1;
     min-width: 0;
-
-    padding-left: 20px;
 }
 
 .sensor-name {
@@ -1533,8 +1530,10 @@ code {
 
 .sensor-value {
     margin-left: auto;
-    white-space: nowrap;
     text-align: right;
+
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .sensor-row-line strong {
@@ -1980,12 +1979,6 @@ code {
 
 .custom-dashboard-add-device .btn {
   flex: 0 0 auto;
-}
-
-.sensor-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .rename-btn {
@@ -3099,15 +3092,29 @@ select {
 }
 
 .history-icon {
-    position: absolute;
-    left: 0;
+    position: static;
+    flex-shrink: 0;
 
-    height: 100%;
-    width: 16px;
-
+    width: 14px;
     display: flex;
-    align-items: center;
     justify-content: center;
+}
 
-    opacity: 0.8;
+.sensor-row-multiline {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+}
+
+.sensor-row-multiline .sensor-value {
+    margin-left: 0;
+    text-align: left;
+
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+
+    max-width: 100%;
 }
