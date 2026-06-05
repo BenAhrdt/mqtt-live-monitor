@@ -138,7 +138,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
-### In Arbeit Anpassungen an der History Funktion
+### V1.6.12 Anpassungen an der History Funktion
+* (BenAhrdt) Optische Anpassung der Chart bei flachen aber breiten Auflösungen
+* (BenAhrdt) Auswahl der History Entities über mehrfachauswahl
+* (BenAhrdt) Bugfix beim Entfernen von Entites aus der History
 * (BenAhrdt) Lange Texte als Wert führen zu einer mehrzeiligen Ansicht
 
 ### V1.6.11 Anpassungen dropdowns

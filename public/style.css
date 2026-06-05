@@ -2919,8 +2919,8 @@ code {
 
 .chart-container {
   position: relative;
-  width:100%;
-  height: 80%;
+  width: 100%;
+  height: calc(100% - 120px);
   flex: 1;
 }
 
@@ -3117,4 +3117,29 @@ select {
     word-break: break-word;
 
     max-width: 100%;
+}
+
+.add-history-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+#addHistoryEntityBtn {
+    min-width: 220px;
+}
+
+.entity-select-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.entity-select-header h3 {
+    margin: 0;
+}
+
+.entity-select-actions {
+    display: flex;
+    gap: 8px;
 }

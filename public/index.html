@@ -401,9 +401,6 @@
           </p>
 
           <div class="add-history-row">
-            <select id="historyEntitySelect">
-              <option value="">Entität auswählen...</option>
-            </select>
             <button id="addHistoryEntityBtn" class="btn primary">Hinzufügen</button>
           </div>
 
@@ -501,7 +498,29 @@
 <div id="entitySelectModal" class="modal hidden">
   <div class="modal-content">
 
-    <h3>Entitäten auswählen</h3>
+    <div class="entity-select-header">
+
+        <h3>Entitäten auswählen</h3>
+
+        <div class="entity-select-actions">
+          <button
+            type="button"
+            id="selectVisibleEntities"
+            class="btn secondary small-btn"
+          >
+            Alle auswählen
+          </button>
+
+          <button
+            type="button"
+            id="unselectVisibleEntities"
+            class="btn secondary small-btn"
+          >
+            Alle abwählen
+          </button>
+        </div>
+
+    </div>
 
     <input
       type="text"

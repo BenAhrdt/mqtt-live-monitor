@@ -26,6 +26,9 @@ socket.on("connect", () => {
 let discoveryPrefixes = [];
 let friendlyNames = {};
 let liveMessages = [];
+let currentSelectedEntityIds = new Set();
+let activeEntityModalType = null;
+let currentEntitySelectionSet = null;
 let liveMessageLimit = Number(localStorage.getItem('liveMessageLimit') || 2500);
 const topicFilterInput = document.getElementById('liveFilterInput');
 const messageTable = document.getElementById('messageTable');
@@ -101,8 +104,6 @@ let activeEntityTypes = new Set();
 let dashboardEditMode = false;
 
 let customDashboardsMenuOpen = false;
-
-let currentSelectedEntityIds = new Set();
 
 // 🔐 Auth Check beim Start
 (async () => {
@@ -2423,14 +2424,26 @@ document.addEventListener('click', async (e) => {
     // 🔥 ENTITY MODAL SAVE
     const saveBtn = e.target.closest('.action-save-entities');
     if (saveBtn) {
-        saveEntitySelection();
+
+        if (activeEntityModalType === 'history') {
+            saveHistoryEntitySelection();
+        } else {
+            saveEntitySelection();
+        }
+
         return;
     }
 
     // 🔥 ENTITY MODAL CANCEL
     const cancelBtn = e.target.closest('.action-cancel-entities');
     if (cancelBtn) {
-        closeEntityModal();
+
+        if (activeEntityModalType === 'history') {
+            closeHistoryEntityModal();
+        } else {
+            closeEntityModal();
+        }
+
         return;
     }
 
@@ -3034,6 +3047,7 @@ let currentEntitySelectContext = {
 };
 
 function openEntitySelectModal(dashboardId, deviceId) {
+    activeEntityModalType = 'virtual';
     currentEntitySelectContext = { dashboardId, deviceId };
 
     const modal = document.getElementById('entitySelectModal');
@@ -3047,6 +3061,8 @@ function openEntitySelectModal(dashboardId, deviceId) {
     const dashboardDevice = dashboard?.devices?.find(d => d.deviceId === deviceId);
 
     currentSelectedEntityIds = new Set(dashboardDevice?.entityIds || []);
+
+    currentEntitySelectionSet = currentSelectedEntityIds;
 
     const allEntities = dashboardDevices
         .filter(device => !device.isVirtual)
@@ -3119,6 +3135,8 @@ function openEntitySelectModal(dashboardId, deviceId) {
             list.appendChild(row);
         });
     }
+
+    initEntitySelectButtons(list);
 
     render();
 
@@ -3236,20 +3254,14 @@ function initHistorySettings() {
     };
   }
 
-  // 🔥 2. ADD BUTTON (dein bestehender Code)
-  const btn = document.getElementById('addHistoryEntityBtn');
-  if (btn) {
-    btn.onclick = () => {
-      const select = document.getElementById('historyEntitySelect');
-      const id = select.value;
+    // Entities zu History hinzufügen
+    const btn = document.getElementById('addHistoryEntityBtn');
 
-      if (!id) return;
-
-      addHistoryEntity(id);
-      populateHistoryDropdown();
-      select.value = '';
-    };
-  }
+    if (btn) {
+        btn.onclick = () => {
+            openHistoryEntitySelectModal();
+        };
+    }
 
   // 🔥 3. LISTE RENDERN
   renderSelectedHistoryEntities();
@@ -3975,79 +3987,32 @@ function renderSelectedHistoryEntities() {
     };
 
     // Toggle Switch
-    document.addEventListener('change', (e) => {
+    const toggle = row.querySelector('.history-toggle-input');
 
-    if (!e.target.classList.contains('history-toggle-input')) return;
+    toggle.onchange = (e) => {
 
-    const entityId = e.target.dataset.entity;
+        const entityId = e.target.dataset.entity;
 
-    window.config.history.entities[entityId].enabled = e.target.checked;
+        window.config.history.entities[entityId].enabled =
+            e.target.checked;
 
-    saveHistoryConfig();
-    });
+        saveHistoryConfig();
+    };
 
-    document.addEventListener('click', (e) => {
+    // Remove Button
+    const removeBtn =
+        row.querySelector('.history-remove-btn');
 
-    const btn = e.target.closest('.history-remove-btn');
-    if (!btn) return;
+    removeBtn.onclick = () => {
 
-    const entityId = btn.dataset.entity;
-
-    delete window.config.history.entities[entityId];
+        delete window.config.history.entities[entityId];
 
         populateHistoryDropdown();
         renderSelectedHistoryEntities();
         saveHistoryConfig();
-    });
+    };
 
     container.appendChild(row);
-  });
-}
-
-function populateHistoryDropdown() {
-  const selected = window.config?.history?.entities || {};
-
-  const select = document.getElementById('historyEntitySelect');
-  if (!select) return;
-
-  select.innerHTML = '<option value="">Entität auswählen...</option>';
-
-  const entities = [];
-
-  dashboardDevices.forEach(device => {
-
-    const deviceName = getDeviceDisplayName(device);
-
-    (device.entities || []).forEach(entity => {
-
-        if (entity.type !== 'sensor') return;
-
-      if (selected[entity.id]) return;
-        if (isNaN(Number(entity.value))) return;
-
-      const entityName = getEntityDisplayName(entity, device.id);
-
-      // 🔥 HIER sammeln statt appenden
-      entities.push({
-        id: entity.id,
-        label: `${deviceName}: ${entityName}`
-      });
-
-    });
-
-  });
-
-  // 🔥 JETZT sortieren
-  entities.sort((a, b) =>
-    a.label.localeCompare(b.label, 'de', { sensitivity: 'base' })
-  );
-
-  // 🔥 UND dann erst einfügen
-  entities.forEach(e => {
-    const option = document.createElement('option');
-    option.value = e.id;
-    option.textContent = e.label;
-    select.appendChild(option);
   });
 }
 
@@ -4066,4 +4031,229 @@ async function saveHistoryConfig() {
   } catch (err) {
     console.error('Fehler beim Speichern', err);
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+// History 
+/*********************************************************************************************** */
+
+let currentHistoryEntityIds = new Set();
+
+function openHistoryEntitySelectModal() {
+    activeEntityModalType = 'history';
+    const modal = document.getElementById('entitySelectModal');
+    const list = document.getElementById('entitySelectList');
+    const search = document.getElementById('entitySearch');
+
+    modal.classList.remove('hidden');
+    search.value = '';
+
+    currentHistoryEntityIds = new Set();
+
+    currentEntitySelectionSet = currentHistoryEntityIds;
+
+    const allEntities = getAvailableHistoryEntities();
+
+    function render(filter = '') {
+
+        list.innerHTML = '';
+
+        const term = filter.toLowerCase();
+
+        const filtered = allEntities.filter(e =>
+            e.label.toLowerCase().includes(term)
+        );
+
+        if (!filtered.length) {
+            list.innerHTML =
+                '<div class="empty">Keine Entitäten gefunden</div>';
+            return;
+        }
+
+        filtered.forEach(entity => {
+
+            const checked =
+                currentHistoryEntityIds.has(entity.id);
+
+            const row =
+                document.createElement('label');
+
+            row.className = 'entity-row-compact';
+
+            row.innerHTML = `
+                <input
+                    type="checkbox"
+                    value="${entity.id}"
+                    ${checked ? 'checked' : ''}
+                >
+
+                <span class="entity-name">
+                    ${entity.label}
+                </span>
+            `;
+
+            const checkbox =
+                row.querySelector('input');
+
+            checkbox.addEventListener('change', e => {
+
+                if (e.target.checked) {
+                    currentHistoryEntityIds.add(entity.id);
+                } else {
+                    currentHistoryEntityIds.delete(entity.id);
+                }
+
+            });
+
+            list.appendChild(row);
+
+        });
+
+    }
+
+    initEntitySelectButtons(list);
+    render();
+
+    search.oninput = () =>
+        render(search.value);
+}
+
+function initEntitySelectButtons(list) {
+    const selectAllBtn =
+        document.getElementById('selectVisibleEntities');
+
+    const unselectAllBtn =
+        document.getElementById('unselectVisibleEntities');
+
+    selectAllBtn.onclick = () => {
+
+        list.querySelectorAll('input[type="checkbox"]')
+            .forEach(cb => {
+
+                cb.checked = true;
+                currentEntitySelectionSet.add(cb.value);
+
+            });
+    };
+
+    unselectAllBtn.onclick = () => {
+
+        list.querySelectorAll('input[type="checkbox"]')
+            .forEach(cb => {
+
+                cb.checked = false;
+                currentEntitySelectionSet.delete(cb.value);
+
+            });
+    };
+}
+
+function getAvailableHistoryEntities() {
+
+    const selected = window.config?.history?.entities || {};
+
+    const entities = [];
+
+    dashboardDevices.forEach(device => {
+
+        const deviceName = getDeviceDisplayName(device);
+
+        (device.entities || []).forEach(entity => {
+
+            if (entity.type !== 'sensor') return;
+
+            if (selected[entity.id]) return;
+
+            if (isNaN(Number(entity.value))) return;
+
+            const entityName =
+                getEntityDisplayName(entity, device.id);
+
+            entities.push({
+                id: entity.id,
+                label: `${deviceName}: ${entityName}`,
+                entity,
+                device
+            });
+
+        });
+
+    });
+
+    entities.sort((a, b) =>
+        a.label.localeCompare(
+            b.label,
+            'de',
+            { sensitivity: 'base' }
+        )
+    );
+
+    return entities;
+}
+
+function populateHistoryDropdown() {
+
+    const select =
+        document.getElementById('historyEntitySelect');
+
+    if (!select) return;
+
+    select.innerHTML =
+        '<option value="">Entität auswählen...</option>';
+
+    getAvailableHistoryEntities()
+        .forEach(e => {
+
+            const option =
+                document.createElement('option');
+
+            option.value = e.id;
+            option.textContent = e.label;
+
+            select.appendChild(option);
+
+        });
+}
+
+const btn = document.getElementById('addHistoryEntityBtn');
+if (btn) {
+    btn.onclick = () => {
+        const select = document.getElementById('historyEntitySelect');
+        const id = select.value;
+
+        if (!id) return;
+
+        addHistoryEntity(id);
+        populateHistoryDropdown();
+        select.value = '';
+    };
+}
+
+function saveHistoryEntitySelection() {
+
+    currentHistoryEntityIds.forEach(id => {
+        addHistoryEntity(id);
+    });
+
+    populateHistoryDropdown();
+
+    closeHistoryEntityModal();
+}
+
+function closeHistoryEntityModal() {
+    document
+        .getElementById('entitySelectModal')
+        .classList.add('hidden');
+
+    currentHistoryEntityIds.clear();
 }
