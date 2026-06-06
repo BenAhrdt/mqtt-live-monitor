@@ -2194,7 +2194,7 @@ async function checkForUpdates() {
 
                 await fetch('/api/update/run', { method: 'POST' });
 
-                let rebootTimer = 10000;
+                let rebootTimer = 15000;
                 rebootCountdown(rebootTimer, updateBtn);
             };
         }
