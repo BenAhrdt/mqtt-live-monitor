@@ -3557,6 +3557,12 @@ async function openBooleanHistory(entityId) {
     const values =
         data.map(d => d.value);
 
+    const chartPoints =
+        data.map(d => ({
+            x: d.t,
+            y: d.value ? 1 : 0
+        }));
+
     document.getElementById(
         'historyInfo'
     ).innerHTML = `
@@ -3632,10 +3638,14 @@ async function openBooleanHistory(entityId) {
             ) {
 
                 const startX =
-                    xScale.getPixelForValue(labels[i]);
+                    xScale.getPixelForValue(
+                        chartPoints[i].x
+                    );
 
                 const endX =
-                    xScale.getPixelForValue(labels[i + 1]);
+                    xScale.getPixelForValue(
+                        chartPoints[i + 1].x
+                    );
 
                 ctx.fillStyle =
                     values[i]
@@ -3669,7 +3679,7 @@ async function openBooleanHistory(entityId) {
             datasets: [{
                 label: 'Status',
 
-                data: values,
+                data: chartPoints,
 
                 stepped: true,
 
@@ -3701,15 +3711,15 @@ async function openBooleanHistory(entityId) {
                 tooltip: {
 
                     displayColors: false,
-
+                    
                     callbacks: {
 
                         title: (ctx) => {
 
                             const ts =
-                                labels[
+                                chartPoints[
                                     ctx[0].dataIndex
-                                ] * 1000;
+                                ].x * 1000;
 
                             return new Date(ts)
                                 .toLocaleString('de-DE');
@@ -3721,10 +3731,10 @@ async function openBooleanHistory(entityId) {
                                 ctx.dataIndex;
 
                             const startTs =
-                                labels[i];
+                                chartPoints[i].x;
 
                             const endTs =
-                                labels[i + 1];
+                                chartPoints[i + 1]?.x;
 
                             const rows = [];
 
@@ -3754,6 +3764,47 @@ async function openBooleanHistory(entityId) {
                                 rows.push('Bis: Jetzt');
                             }
 
+                            const durationSeconds =
+                                endTs
+                                    ? endTs - startTs
+                                    : Math.floor(Date.now() / 1000) - startTs;
+
+                            let durationText = '';
+
+                            if (durationSeconds < 60) {
+
+                                durationText =
+                                    `${durationSeconds} Sekunden`;
+
+                            } else if (durationSeconds < 3600) {
+
+                                const minutes =
+                                    Math.floor(durationSeconds / 60);
+
+                                const seconds =
+                                    durationSeconds % 60;
+
+                                durationText =
+                                    `${minutes} Min ${seconds} Sek`;
+
+                            } else {
+
+                                const hours =
+                                    Math.floor(durationSeconds / 3600);
+
+                                const minutes =
+                                    Math.floor(
+                                        (durationSeconds % 3600) / 60
+                                    );
+
+                                durationText =
+                                    `${hours} Std ${minutes} Min`;
+                            }
+
+                            rows.push(
+                                `Dauer: ${durationText}`
+                            );
+
                             return rows;
                         }                        
                     }
@@ -3763,7 +3814,10 @@ async function openBooleanHistory(entityId) {
             scales: {
 
                 x: {
-
+                    type: 'linear',
+                    grid: {
+            display: false
+        },
                     ticks: {
 
                         maxTicksLimit:
@@ -3771,10 +3825,10 @@ async function openBooleanHistory(entityId) {
                                 ? 6
                                 : 10,
 
-                        callback: function(value, index) {
+                            callback: function(value) {
 
-                            const ts =
-                                labels[index] * 1000;
+                                const ts =
+                                    value * 1000;
 
                             const d =
                                 new Date(ts);
@@ -4064,7 +4118,6 @@ async function openNumericHistory(entityId) {
   historyChart = new Chart(ctx, {
     type: currentType,
     data: {
-    labels: labels,
 
     datasets:
 

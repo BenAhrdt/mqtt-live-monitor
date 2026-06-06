@@ -10,6 +10,38 @@ const DB_PATH = path.join(__dirname, './data/history.db');
 
 const db = new sqlite3.Database(DB_PATH);
 
+// Letzten Wetr laden
+function loadLastValues() {
+
+  db.all(`
+    SELECT entityId, value
+    FROM history_boolean
+    WHERE rowid IN (
+      SELECT MAX(rowid)
+      FROM history_boolean
+      GROUP BY entityId
+    )
+  `, (err, rows) => {
+
+    if (err) {
+      console.error(
+        'Fehler beim Laden der letzten History-Werte:',
+        err
+      );
+      return;
+    }
+
+    rows.forEach(row => {
+
+      lastValues[row.entityId] =
+        Boolean(row.value);
+
+    });
+
+  });
+
+}
+
 // 🔥 Tabelle erstellen (wenn nicht vorhanden)
 db.run(`
   CREATE TABLE IF NOT EXISTS history (
@@ -39,6 +71,8 @@ db.run(`
     value INTEGER
   );
 `);
+
+loadLastValues();
 
 function writeBooleanHistory(entityId, value, cfg) {
 

@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.14 Binary Sensor Zeitliche Darstellung verbessert
+* (BenAhrdt) Binäre Sensoren, werden jetzt besser in der Zeitachse dargestellt.
+
 ### V1.6.13 Rollen für Dashboards eingeführt
 * (BenAhrdt) Binary Sensor Werte können nun auch zur History hinzugefügt werden
 * (BenAhrdt) Dashboards können Rollen zugewiesen werden.
