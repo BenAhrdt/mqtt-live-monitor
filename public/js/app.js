@@ -3632,10 +3632,10 @@ async function openBooleanHistory(entityId) {
             ) {
 
                 const startX =
-                    xScale.getPixelForValue(i);
+                    xScale.getPixelForValue(labels[i]);
 
                 const endX =
-                    xScale.getPixelForValue(i + 1);
+                    xScale.getPixelForValue(labels[i + 1]);
 
                 ctx.fillStyle =
                     values[i]
@@ -3701,7 +3701,7 @@ async function openBooleanHistory(entityId) {
                 tooltip: {
 
                     displayColors: false,
-                    
+
                     callbacks: {
 
                         title: (ctx) => {
