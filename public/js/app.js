@@ -3660,9 +3660,40 @@ async function openBooleanHistory(entityId) {
                 );
             }
 
+            const lastIndex =
+                values.length - 1;
+
+            const startX =
+                xScale.getPixelForValue(
+                    chartPoints[lastIndex].x
+                );
+
+            const endX =
+                chartArea.right;
+
+            ctx.fillStyle =
+                values[lastIndex]
+                    ? 'rgba(34,197,94,1)'
+                    : 'rgba(239,68,68,1)';
+
+            ctx.fillRect(
+                startX,
+                chartArea.top,
+                endX - startX,
+                chartArea.bottom - chartArea.top
+            );
+
             ctx.restore();
         }
     };
+
+    const now =
+        Math.floor(Date.now() / 1000);
+
+    const minTime =
+        chartPoints.length
+            ? chartPoints[0].x
+            : now;
 
     historyChart = new Chart(ctx, {
 
@@ -3816,8 +3847,10 @@ async function openBooleanHistory(entityId) {
                 x: {
                     type: 'linear',
                     grid: {
-            display: false
-        },
+                        display: false
+                    },
+                    min: minTime,
+                    max: now,
                     ticks: {
 
                         maxTicksLimit:
