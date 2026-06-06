@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.18 Bugfix Charts
+* (BenAhrdt) Charts können wieder angezeigt werden
+
 ### V1.6.17 Binary Sensor Zeitliche Darstellung für aktuellen Wert verbessert
 * (BenAhrdt) Binäre Sensoren, werden jetzt besser in der Zeitachse dargestellt. (Aktuelle Werte)
 

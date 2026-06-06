@@ -2243,7 +2243,7 @@ document.addEventListener('keydown', async (event) => {
 
             await fetch('/api/update/run', { method: 'POST' });
 
-            let rebootTimer = 10000;
+            let rebootTimer = 15000;
             rebootCountdown(rebootTimer, updateBtn);
         } catch (err) {
             console.error('Update-Check fehlgeschlagen', err);
@@ -4151,6 +4151,8 @@ async function openNumericHistory(entityId) {
   historyChart = new Chart(ctx, {
     type: currentType,
     data: {
+
+    labels: labels,
 
     datasets:
 
