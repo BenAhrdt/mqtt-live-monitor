@@ -248,6 +248,17 @@ export function createDashboardRenderer(deps) {
         const isOn = Boolean(entity.value);
         const cls = String(entity.deviceClass || '').toLowerCase();
 
+        const history = window.config?.history;
+        const cfg = history?.entities?.[entity.id];
+
+        const hasHistory =
+            history?.enabled &&
+            cfg &&
+            cfg.enabled;
+
+        const historyIcon =
+            hasHistory ? '🔄' : '';
+
         let text = '';
         let colorClass = '';
 
@@ -277,8 +288,15 @@ export function createDashboardRenderer(deps) {
         }
         return wrapDashboardEntity(entity, `
         <div class="binary-sensor-entity-block">
-            <div class="sensor-row-line">
+            <div
+                class="sensor-row-line ${hasHistory ? 'has-history' : ''}"
+                data-entity-id="${entity.id}"
+            >
             <div class="sensor-name-wrap">
+                ${historyIcon
+                    ? `<span class="history-icon">${historyIcon}</span>`
+                    : ''
+                }
                 <span class="sensor-name">
                     ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                 </span>

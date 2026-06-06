@@ -31,15 +31,54 @@ db.run(`
   );
 `);
 
-function writeHistory(entityId, value, cfg) {
+// Binary
+db.run(`
+  CREATE TABLE IF NOT EXISTS history_boolean (
+    entityId TEXT,
+    timestamp INTEGER,
+    value INTEGER
+  );
+`);
+
+function writeBooleanHistory(entityId, value, cfg) {
+
+  if (!cfg) return;
+  if (!cfg.enabled) return;
+
+  const timestamp =
+    Math.floor(Date.now() / 1000);
+
+  const oldValue =
+    lastValues[entityId];
+
+  // Nur Zustandswechsel speichern
+  if (oldValue === value) {
+    return;
+  }
+
+  lastValues[entityId] = value;
+
+  db.run(`
+    INSERT INTO history_boolean (
+      entityId,
+      timestamp,
+      value
+    )
+    VALUES (?, ?, ?)
+  `, [
+    entityId,
+    timestamp,
+    value ? 1 : 0
+  ]);
+}
+
+function writeNumericHistory (entityId, value, cfg) {
 
     // 🔥 global aus
   if (!cfg) return;
 
   // 🔥 entity nicht aktiviert
   if (!cfg.enabled) return;
-
-  const timestamp = Math.floor(Date.now() / 1000);
 
   const bucketSize = (cfg.bucketMinutes || 5) * 60;
 
@@ -137,7 +176,23 @@ function writeHistory(entityId, value, cfg) {
     negativeChange
 
   ]);
+}
 
+function writeHistory(entityId, entity, cfg) {
+
+    if (entity.type === 'binary_sensor') {
+        return writeBooleanHistory(
+            entityId,
+            entity.value,
+            cfg
+        );
+    }
+
+    return writeNumericHistory(
+        entityId,
+        entity.value,
+        cfg
+    );
 }
 const config = {
   historyRetentionHours: 24 * 7,
@@ -157,6 +212,11 @@ function startCleanup() {
     db.run(`
       DELETE FROM history
       WHERE bucket < ?
+    `, [cutoff]);
+
+    db.run(`
+      DELETE FROM history_boolean
+      WHERE timestamp < ?
     `, [cutoff]);
 
   }, 60 * 1000);

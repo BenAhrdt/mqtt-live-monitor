@@ -3218,3 +3218,9 @@ select {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.history-binary-badge {
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
+}

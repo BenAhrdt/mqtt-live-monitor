@@ -585,6 +585,10 @@
       "netzbezug_bidirectional-counter_0_counted_values_alias_0_allgemein_zaehlerstaende_netzbezug_consumed": {
         "enabled": true,
         "bucketMinutes": 15
+      },
+      "buerofenster_lorawan_1_942ea85a-1ea8-4dff-8900-8141897f95b9_devices_a840418daa5e2d1a_uplink_decoded_openwindow": {
+        "enabled": true,
+        "bucketMinutes": 5
       }
     }
   },

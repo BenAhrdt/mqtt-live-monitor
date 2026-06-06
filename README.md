@@ -139,6 +139,7 @@ journalctl -u mqtt-live-monitor -f
 
 ## Changelog
 ### V1.6.13 Rollen für Dashboards eingeführt
+* (BenAhrdt) Binary Sensor Werte können nun auch zur History hinzugefügt werden
 * (BenAhrdt) Dashboards können Rollen zugewiesen werden.
              Ein User kann dann nur noch das Dashboard sehen, was auch seine ROlle enthält.
 

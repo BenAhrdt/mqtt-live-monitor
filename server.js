@@ -2034,7 +2034,7 @@ function finalizeEntityUpdate(device, entity, mapping) {
 
   // History-Store schreiben
   const cfg = getHistoryConfig(mapping.entityId);
-  historyStore.writeHistory(mapping.entityId, entity.value, cfg);
+  historyStore.writeHistory(mapping.entityId, entity, cfg);
 
   // Logik anstoßen
   logicEngine.runLogicEngine(mapping.entityId);
@@ -2805,6 +2805,10 @@ app.get('/api/logics', (req, res) => {
 app.get('/api/history/:entityId', (req, res) => {
 
   const { entityId } = req.params;
+  const entity = findEntityById(entityId);
+
+  const isBinarySensor =
+      entity?.type === 'binary_sensor';
 
   const hours = parseFloat(req.query.hours) || 24;
 
@@ -2814,6 +2818,42 @@ app.get('/api/history/:entityId', (req, res) => {
   // cutoff berechnen
   const cutoff =
     Math.floor(Date.now() / 1000) - (hours * 60 * 60);
+
+  if (isBinarySensor) {
+
+      db.all(`
+
+          SELECT
+              timestamp as t,
+              value
+
+          FROM history_boolean
+
+          WHERE entityId = ?
+            AND timestamp >= ?
+
+          ORDER BY timestamp ASC
+
+      `, [
+
+          entityId,
+          cutoff
+
+      ], (err, rows) => {
+
+          if (err) {
+              console.error(err);
+
+              return res.status(500).json({
+                  error: err.message
+              });
+          }
+
+          res.json(rows);
+      });
+
+      return;
+  }
 
   db.all(`
 

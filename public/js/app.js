@@ -1954,13 +1954,29 @@ socket.on('entity-update', (data) => {
 
     // 🔥 ===== LIVE VALUE =====
     if (data.entityId === currentEntityId) {
-        const el = document.getElementById('historyLiveValue');
+
+        const el =
+            document.getElementById('historyLiveValue');
 
         if (el) {
-            const value = Number(data.entity.value);
 
-            if (!isNaN(value)) {
-                el.innerHTML = `<b>${value.toFixed(2)}</b> ${data.entity.unit || ''}`;
+            if (data.entity.type === 'binary_sensor') {
+
+                el.textContent =
+                    data.entity.value
+                        ? 'true'
+                        : 'false';
+
+            } else {
+
+                const value =
+                    Number(data.entity.value);
+
+                if (!isNaN(value)) {
+
+                    el.innerHTML =
+                        `<b>${value.toFixed(2)}</b> ${data.entity.unit || ''}`;
+                }
             }
         }
     }
@@ -3482,7 +3498,336 @@ if (bell && dropdown) {
 
 let historyChart = null;
 
+
 async function openHistory(entityId) {
+
+    const entity = findEntityById(entityId);
+
+    if (entity?.type === 'binary_sensor') {
+        await openBooleanHistory(entityId);
+        return;
+    }
+
+    await openNumericHistory(entityId);
+}
+
+async function openBooleanHistory(entityId) {
+
+    currentEntityId = entityId;
+
+    const modal =
+        document.getElementById('historyModal');
+
+    modal.classList.remove('hidden');
+
+    const entity =
+        findEntityById(entityId);
+
+    const res = await fetch(
+        `/api/history/${entityId}?hours=${currentHistoryHours}`
+    );
+
+    const data = await res.json();
+
+    const ctx =
+        document.getElementById('historyChart');
+
+    const device =
+        dashboardDevices.find(
+            d => d.id === entity.deviceId
+        );
+
+    const deviceName =
+        getDeviceDisplayName(device);
+
+    const entityName =
+        getEntityDisplayName(
+            entity,
+            entity.deviceId
+        );
+
+    document.getElementById(
+        'historyTitle'
+    ).textContent =
+        `${deviceName}: ${entityName}`;
+
+    const labels =
+        data.map(d => d.t);
+
+    const values =
+        data.map(d => d.value);
+
+    document.getElementById(
+        'historyInfo'
+    ).innerHTML = `
+        <div class="history-header">
+
+            <div class="history-values">
+
+            <div class="history-live">
+                Status:
+                <b id="historyLiveValue">
+                    ${entity.value ? 'true' : 'false'}
+                </b>
+            </div>
+
+            </div>
+
+            <div class="history-range-buttons">
+
+                <select id="historyRangeSelect">
+                    <option value="12">12 Stunden</option>
+                    <option value="24">Tag</option>
+                    <option value="168">Woche</option>
+                    <option value="336">2 Wochen</option>
+                    <option value="720">Monat</option>
+                </select>
+
+            </div>
+
+        </div>
+    `;
+
+    const select =
+        document.getElementById(
+            'historyRangeSelect'
+        );
+
+    select.value =
+        String(currentHistoryHours);
+
+    select.addEventListener('change', () => {
+
+        currentHistoryHours =
+            Number(select.value);
+
+        openHistory(currentEntityId);
+
+    });
+
+    if (historyChart) {
+        historyChart.destroy();
+    }
+
+    const backgroundPlugin = {
+
+        id: 'booleanBackground',
+
+        beforeDraw(chart) {
+
+            const {
+                ctx,
+                chartArea,
+                scales
+            } = chart;
+
+            const xScale = scales.x;
+
+            ctx.save();
+
+            for (
+                let i = 0;
+                i < values.length - 1;
+                i++
+            ) {
+
+                const startX =
+                    xScale.getPixelForValue(i);
+
+                const endX =
+                    xScale.getPixelForValue(i + 1);
+
+                ctx.fillStyle =
+                    values[i]
+                        ? 'rgba(34,197,94,1)'
+                        : 'rgba(239,68,68,1)';
+
+                ctx.fillRect(
+                    startX,
+                    chartArea.top,
+                    endX - startX,
+                    chartArea.bottom - chartArea.top
+                );
+            }
+
+            ctx.restore();
+        }
+    };
+
+    historyChart = new Chart(ctx, {
+
+        plugins: [
+            backgroundPlugin
+        ],
+
+        type: 'line',
+
+        data: {
+
+            labels,
+
+            datasets: [{
+                label: 'Status',
+
+                data: values,
+
+                stepped: true,
+
+                borderColor: 'transparent',
+
+                fill: false,
+
+                pointRadius: 0
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+
+            plugins: {
+
+                legend: {
+                    display: false
+                },
+
+                tooltip: {
+
+                    displayColors: false,
+                    
+                    callbacks: {
+
+                        title: (ctx) => {
+
+                            const ts =
+                                labels[
+                                    ctx[0].dataIndex
+                                ] * 1000;
+
+                            return new Date(ts)
+                                .toLocaleString('de-DE');
+                        },
+
+                        label: (ctx) => {
+
+                            const i =
+                                ctx.dataIndex;
+
+                            const startTs =
+                                labels[i];
+
+                            const endTs =
+                                labels[i + 1];
+
+                            const rows = [];
+
+                            rows.push(
+                                values[i]
+                                    ? '🟩 true'
+                                    : '🟥 false'
+                            );
+
+                            rows.push(
+                                `Von: ${
+                                    new Date(startTs * 1000)
+                                        .toLocaleString('de-DE')
+                                }`
+                            );
+
+                            if (endTs) {
+
+                                rows.push(
+                                    `Bis: ${
+                                        new Date(endTs * 1000)
+                                            .toLocaleString('de-DE')
+                                    }`
+                                );
+                            } else {
+
+                                rows.push('Bis: Jetzt');
+                            }
+
+                            return rows;
+                        }                        
+                    }
+                }
+            },
+
+            scales: {
+
+                x: {
+
+                    ticks: {
+
+                        maxTicksLimit:
+                            currentHistoryHours > 48
+                                ? 6
+                                : 10,
+
+                        callback: function(value, index) {
+
+                            const ts =
+                                labels[index] * 1000;
+
+                            const d =
+                                new Date(ts);
+
+                            if (
+                                currentHistoryHours > 48
+                            ) {
+                                return d.toLocaleDateString(
+                                    'de-DE',
+                                    {
+                                        day: '2-digit',
+                                        month: '2-digit'
+                                    }
+                                );
+                            }
+
+                            return d.toLocaleTimeString(
+                                'de-DE',
+                                {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                }
+                            );
+                        }
+                    }
+                },
+
+                y: {
+
+                    min: 0,
+
+                    max: 1,
+
+                    ticks: {
+
+                        stepSize: 1,
+
+                        callback: (v) =>
+                            v === 1
+                                ? '🟩 true'
+                                : '🟥 false'
+                    }
+                }
+            }
+        }
+    });
+
+    setTimeout(() => {
+        historyChart.resize();
+    }, 0);
+}
+
+async function openNumericHistory(entityId) {
 
   currentEntityId = entityId;
 
@@ -4042,6 +4387,8 @@ function renderSelectedHistoryEntities() {
     const row = document.createElement('div');
     row.className = 'history-row';
 
+    const isBinarySensor = entity.type === 'binary_sensor';
+
     row.innerHTML = `
     <div class="history-left">
         <div class="history-device">${deviceName}</div>
@@ -4063,6 +4410,7 @@ function renderSelectedHistoryEntities() {
         </label>
     </div>
 
+    ${!isBinarySensor ? `
     <div class="history-aggregation">
         <label>Aggregation</label>
         <select class="history-bucket" data-entity="${entityId}">
@@ -4071,6 +4419,14 @@ function renderSelectedHistoryEntities() {
             <option value="60"${cfg.bucketMinutes == 60 ? 'selected' : ''}>60 min</option>
         </select>
     </div>
+    ` : `
+    <div class="history-aggregation">
+        <label>Typ</label>
+        <div class="history-binary-badge">
+            Zustandswechsel
+        </div>
+    </div>
+    `}
 
     <div class="history-remove">
         <button class="btn danger small-btn history-remove-btn" data-entity="${entityId}">
@@ -4080,12 +4436,22 @@ function renderSelectedHistoryEntities() {
     `;
 
     // Select Handler
-    const select = row.querySelector('.history-bucket');
-    select.onchange = (e) => {
-        const entityId = e.target.dataset.entity;
-        window.config.history.entities[entityId].bucketMinutes = Number(e.target.value);
-        saveHistoryConfig();
-    };
+    const select =
+        row.querySelector('.history-bucket');
+
+    if (select) {
+
+        select.onchange = (e) => {
+
+            const entityId =
+                e.target.dataset.entity;
+
+            window.config.history.entities[entityId].bucketMinutes =
+                Number(e.target.value);
+
+            saveHistoryConfig();
+        };
+    }
 
     // Toggle Switch
     const toggle = row.querySelector('.history-toggle-input');
@@ -4271,11 +4637,21 @@ function getAvailableHistoryEntities() {
 
         (device.entities || []).forEach(entity => {
 
-            if (entity.type !== 'sensor') return;
+            const isNumericSensor =
+                entity.type === 'sensor' &&
+                !isNaN(Number(entity.value));
+
+            const isBinarySensor =
+                entity.type === 'binary_sensor';
+
+            if (
+                !isNumericSensor &&
+                !isBinarySensor
+            ) {
+                return;
+            }
 
             if (selected[entity.id]) return;
-
-            if (isNaN(Number(entity.value))) return;
 
             const entityName =
                 getEntityDisplayName(entity, device.id);
