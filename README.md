@@ -138,6 +138,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.20 Login Konfetti
+* (BenAhrdt) Nach erfolgreichem Benutzerlogin wird auf der Startseite kurz Konfetti angezeigt.
+* (BenAhrdt) Das Konfetti blendet weich aus und respektiert reduzierte Bewegungseinstellungen.
+
 ### V1.6.19 Bugfix Charts
 * (BenAhrdt) Absicherung bei Charts, wenn noch keine Daten da sind.
 

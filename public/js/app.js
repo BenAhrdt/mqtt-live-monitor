@@ -106,6 +106,106 @@ let dashboardEditMode = false;
 
 let customDashboardsMenuOpen = false;
 
+function showLoginConfetti() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
+  const pieces = [];
+  const duration = 3200;
+  const fadeDuration = 900;
+  const start = performance.now();
+  const pixelRatio = window.devicePixelRatio || 1;
+  let secondBurstShown = false;
+
+  canvas.setAttribute('aria-hidden', 'true');
+  canvas.style.position = 'fixed';
+  canvas.style.inset = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = '9999';
+  document.body.appendChild(canvas);
+
+  function resizeCanvas() {
+    canvas.width = Math.floor(window.innerWidth * pixelRatio);
+    canvas.height = Math.floor(window.innerHeight * pixelRatio);
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  }
+
+  function addBurst(count, yOffset = 0) {
+    for (let i = 0; i < count; i++) {
+      pieces.push({
+        x: Math.random() * window.innerWidth,
+        y: yOffset - 30 - Math.random() * window.innerHeight * 0.25,
+        size: 6 + Math.random() * 9,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: 2.5 + Math.random() * 4.5,
+        drift: -2 + Math.random() * 4,
+        rotation: Math.random() * Math.PI,
+        rotationSpeed: -0.18 + Math.random() * 0.36
+      });
+    }
+  }
+
+  resizeCanvas();
+  addBurst(150);
+
+  function draw(now) {
+    const elapsed = now - start;
+    const fadeStart = duration - fadeDuration;
+    const opacity = elapsed > fadeStart
+      ? Math.max(0, 1 - (elapsed - fadeStart) / fadeDuration)
+      : 1;
+
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.globalAlpha = opacity;
+
+    if (!secondBurstShown && elapsed > 800) {
+      secondBurstShown = true;
+      addBurst(45, -80);
+    }
+
+    pieces.forEach((piece) => {
+      piece.x += piece.drift;
+      piece.y += piece.speed;
+      piece.rotation += piece.rotationSpeed;
+
+      ctx.save();
+      ctx.translate(piece.x, piece.y);
+      ctx.rotate(piece.rotation);
+      ctx.fillStyle = piece.color;
+      ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 0.55);
+      ctx.restore();
+    });
+
+    ctx.globalAlpha = 1;
+
+    if (elapsed < duration) {
+      requestAnimationFrame(draw);
+      return;
+    }
+
+    window.removeEventListener('resize', resizeCanvas);
+    canvas.remove();
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  requestAnimationFrame(draw);
+}
+
+function showLoginConfettiIfRequested() {
+  if (sessionStorage.getItem('showLoginConfetti') !== '1') {
+    return;
+  }
+
+  sessionStorage.removeItem('showLoginConfetti');
+  showLoginConfetti();
+}
+
 // 🔐 Auth Check beim Start
 (async () => {
 
@@ -155,6 +255,7 @@ let customDashboardsMenuOpen = false;
 
     initHeader(currentUser);
     init();
+    showLoginConfettiIfRequested();
 
   } catch (err) {
     window.location.href = '/login.html';

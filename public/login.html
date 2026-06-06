@@ -122,6 +122,7 @@
       margin-top: 10px;
       text-align: center;
     }
+
   </style>
 </head>
 <body>
@@ -160,6 +161,7 @@
     });
 
     if (res.ok) {
+      sessionStorage.setItem('showLoginConfetti', '1');
       window.location = '/';
     } else {
       document.getElementById('error').innerText = 'Login fehlgeschlagen';
