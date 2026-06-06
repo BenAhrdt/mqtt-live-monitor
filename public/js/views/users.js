@@ -1,13 +1,6 @@
 let users = [];
 const usersView = document.getElementById('usersView');
-const ALL_ROLES = [
-  'admin',
-  'Benutzergruppe 1',
-  'Benutzergruppe 2',
-  'Benutzergruppe 3',
-  'Benutzergruppe 4',
-  'Benutzergruppe 5'
-];
+import { ALL_ROLES } from '../roles.js';
 
 function renderRoleMultiSelect(containerId, selectedRoles = []) {
   const container = document.getElementById(containerId);

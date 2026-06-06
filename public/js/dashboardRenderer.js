@@ -35,7 +35,8 @@ export function createDashboardRenderer(deps) {
     moveDashboard,
     moveEntity,
     getOriginalDeviceName,
-    isAdmin
+    isAdmin,
+    canAccessDashboard
   } = deps;
 
     function setupSettingsDragAndDrop(container, dashboardId) {
@@ -1392,21 +1393,33 @@ export function createDashboardRenderer(deps) {
                     >
                         ☰
                     </div>
-                    <div>
-                    <strong>${escapeHtml(dashboard.name)}</strong><br>
-                    <small class="muted">/dashboard/custom/${escapeHtml(dashboard.id)}</small>
+                    <div class="dashboard-info">
+                        <strong>${escapeHtml(dashboard.name)}</strong><br>
+                        <small class="muted">
+                            /dashboard/custom/${escapeHtml(dashboard.id)}
+                        </small>
                     </div>
 
                     <div class="prefix-actions">
-                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
-                            <input 
-                                type="checkbox"
-                                class="action-toggle-admin-only"
+                        <div
+                            class="dashboard-role-select"
+                            data-dashboard-id="${escapeHtml(dashboard.id)}"
+                        >
+                            <span>
+                                ${
+                                    dashboard.allowedRoles.length
+                                        ? dashboard.allowedRoles.join('<br>')
+                                        : 'Alle Benutzer'
+                                }
+                            </span>
+
+                            <button
+                                class="btn secondary small-btn action-edit-dashboard-roles"
                                 data-dashboard-id="${escapeHtml(dashboard.id)}"
-                                ${dashboard.adminOnly ? 'checked' : ''}
-                            />
-                            Nur Admin
-                        </label>
+                            >
+                                Rollen
+                            </button>
+                        </div>
                         <button 
                             class="btn secondary open-dashboard-btn"
                             data-dashboard-id="${escapeHtml(dashboard.id)}"
@@ -1711,7 +1724,7 @@ export function createDashboardRenderer(deps) {
 
         // 📊 Custom Dashboards
         html += customDashboards
-            .filter(d => (!d.adminOnly || isAdmin())) // 🔥 HIER IST DIE MAGIE
+            .filter(canAccessDashboard)
             .map(d => `
                 <button
                     class="dashboard-tab ${activeId === d.id ? 'active' : ''}"
@@ -1745,7 +1758,7 @@ export function createDashboardRenderer(deps) {
                 ` : ''}
 
                 ${customDashboards
-                    .filter(d => !d.adminOnly || isAdmin())
+                    .filter(canAccessDashboard)
                     .map(d => `
                         <option
                             value="${escapeHtml(d.id)}"

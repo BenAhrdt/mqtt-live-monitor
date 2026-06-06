@@ -2,6 +2,7 @@ import socket from './socket.js';
 import { initSettings } from './settings.js';
 import { renderUsersView, openOwnProfile } from './views/users.js';
 import { renderLogicView, updateLogicView } from './views/logic.js';
+import { ALL_ROLES } from './roles.js';
 
 import {
   escapeHtml,
@@ -201,7 +202,8 @@ const dashboardRenderer = createDashboardRenderer({
     moveDashboard,
     moveEntity,
     getOriginalDeviceName,
-    isAdmin
+    isAdmin,
+    canAccessDashboard
 });
 
 liveMessageLimitInput.value = liveMessageLimit;
@@ -457,13 +459,34 @@ async function showView(viewName, options = {}) {
     }
 }
 
-function getFirstAllowedDashboard() {
-    if (!Array.isArray(customDashboards)) return null;
+function canAccessDashboard(dashboard) {
 
-    return customDashboards.find(d => {
-        if (d.adminOnly && !isAdmin()) return false;
+    // System-Admin sieht immer alles
+    if (window.currentUser?.username === 'admin') {
         return true;
-    });
+    }
+
+    const roles = dashboard.allowedRoles || [];
+
+    // keine Rollen gesetzt = öffentlich
+    if (!roles.length) {
+        return true;
+    }
+
+    const userRoles = window.currentUser?.roles || [];
+
+    return userRoles.some(role =>
+        roles.includes(role)
+    );
+}
+
+function getFirstAllowedDashboard() {
+
+    if (!Array.isArray(customDashboards)) {
+        return null;
+    }
+
+    return customDashboards.find(canAccessDashboard);
 }
 
 async function ensureDevicesInitialized() {
@@ -1019,10 +1042,10 @@ async function addCustomDashboard() {
     }
 
     customDashboards.push({
-    id,
-    name,
-    adminOnly: false,
-    devices: []
+        id,
+        name,
+        allowedRoles: [],
+        devices: []
     });
 
     input.value = '';
@@ -1122,6 +1145,18 @@ async function toggleDashboardAdminOnly(dashboardId, value) {
     const dashboard = customDashboards.find(d => d.id === dashboardId);
     if (!dashboard) return;
     dashboard.adminOnly = value;
+    await saveCustomDashboards();
+}
+
+async function saveDashboardRoles(dashboardId, roles) {
+
+    const dashboard =
+        customDashboards.find(d => d.id === dashboardId);
+
+    if (!dashboard) return;
+
+    dashboard.allowedRoles = [...roles];
+
     await saveCustomDashboards();
 }
 
@@ -2218,6 +2253,19 @@ async function loadConfig() {
     mqttClientIdInput.value = config.clientId || '';
     discoveryPrefixes = config.discoveryViaPrefixes || [];
     customDashboards = config.customDashboards || [];
+
+    // Migration adminOnly -> allowedRoles
+    customDashboards.forEach(dashboard => {
+
+        if (dashboard.adminOnly === true && !dashboard.allowedRoles) {
+            dashboard.allowedRoles = ['admin'];
+        }
+
+        if (!dashboard.allowedRoles) {
+            dashboard.allowedRoles = [];
+        }
+
+    });
     friendlyNames = config.friendlyNames || {};
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
@@ -2486,6 +2534,59 @@ document.addEventListener('click', async (e) => {
 
         return;
     }
+
+    // Rollen Modal für Dashboards
+    const rolesBtn =
+        e.target.closest('.action-edit-dashboard-roles');
+
+    if (rolesBtn) {
+
+        const dashboardId =
+            rolesBtn.dataset.dashboardId;
+
+        openDashboardRolesModal(dashboardId);
+
+        return;
+    }
+
+    const saveDashboardRolesBtn =
+        e.target.closest('#saveDashboardRolesBtn');
+
+    if (saveDashboardRolesBtn) {
+
+        const dashboard =
+            customDashboards.find(
+                d => d.id === currentDashboardRolesId
+            );
+
+        if (!dashboard) return;
+
+        dashboard.allowedRoles =
+            [...currentDashboardRoles];
+
+        await saveCustomDashboards();
+
+        document
+            .getElementById('dashboardRolesModal')
+            .classList.add('hidden');
+
+        dashboardRenderer.renderCustomDashboards();
+
+        return;
+    }
+
+    const cancelDashboardRolesBtn =
+        e.target.closest('#cancelDashboardRolesBtn');
+
+    if (cancelDashboardRolesBtn) {
+
+        document
+            .getElementById('dashboardRolesModal')
+            .classList.add('hidden');
+
+        return;
+    }
+
 
     // 🔥 RENAME DEVICE  ← HIER!
     const renameDeviceBtn = e.target.closest('.action-rename-device');
@@ -4256,4 +4357,79 @@ function closeHistoryEntityModal() {
         .classList.add('hidden');
 
     currentHistoryEntityIds.clear();
+}
+
+let currentDashboardRolesId = null;
+let currentDashboardRoles = new Set();
+function openDashboardRolesModal(dashboardId) {
+
+    const dashboard =
+        customDashboards.find(
+            d => d.id === dashboardId
+        );
+
+    if (!dashboard) return;
+
+    currentDashboardRolesId = dashboardId;
+
+    currentDashboardRoles = new Set(
+        dashboard.allowedRoles || []
+    );
+
+    document
+        .getElementById('dashboardRolesModal')
+        .classList.remove('hidden');
+
+    document
+        .getElementById('dashboardRolesTitle')
+        .textContent =
+            `Dashboard Rollen: ${dashboard.name}`;
+
+    const list =
+        document.getElementById(
+            'dashboardRolesList'
+        );
+
+    list.innerHTML = '';
+
+    ALL_ROLES.forEach(role => {
+
+        const checked =
+            currentDashboardRoles.has(role);
+
+        const row =
+            document.createElement('label');
+
+        row.className =
+            'dashboard-role-row';
+
+        row.innerHTML = `
+            <input
+                type="checkbox"
+                value="${role}"
+                ${checked ? 'checked' : ''}
+            >
+            <span>${role}</span>
+        `;
+
+        const checkbox =
+            row.querySelector('input');
+
+        checkbox.addEventListener(
+            'change',
+            e => {
+
+                if (e.target.checked) {
+                    currentDashboardRoles.add(role);
+                } else {
+                    currentDashboardRoles.delete(role);
+                }
+
+            }
+        );
+
+        list.appendChild(row);
+
+    });
+
 }

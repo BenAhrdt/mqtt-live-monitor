@@ -2538,7 +2538,11 @@ app.post("/api/custom-dashboards", (req, res) => {
   mqttConfig.customDashboards = customDashboards.map(dashboard => ({
     id: String(dashboard.id || "").trim(),
     name: String(dashboard.name || "").trim(),
-    adminOnly: Boolean(dashboard.adminOnly),
+    allowedRoles: Array.isArray(dashboard.allowedRoles)
+        ? dashboard.allowedRoles
+            .map(role => String(role).trim())
+            .filter(Boolean)
+        : [],
     devices: Array.isArray(dashboard.devices)
       ? dashboard.devices.map(device => ({
           deviceId: String(device.deviceId || "").trim(),

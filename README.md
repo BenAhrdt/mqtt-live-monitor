@@ -138,6 +138,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.13 Rollen für Dashboards eingeführt
+* (BenAhrdt) Dashboards können Rollen zugewiesen werden.
+             Ein User kann dann nur noch das Dashboard sehen, was auch seine ROlle enthält.
+
 ### V1.6.12 Anpassungen an der History Funktion
 * (BenAhrdt) Optische Anpassung der Chart bei flachen aber breiten Auflösungen
 * (BenAhrdt) Auswahl der History Entities über mehrfachauswahl

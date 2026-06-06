@@ -1756,11 +1756,6 @@ code {
   padding: 8px 0;
 }
 
-.prefix-actions {
-  display: flex;
-  gap: 8px;
-}
-
 .prefix-actions .btn {
   min-width: 90px;
   padding: 6px 10px;
@@ -3142,4 +3137,84 @@ select {
 .entity-select-actions {
     display: flex;
     gap: 8px;
+}
+
+.dashboard-roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dashboard-roles-modal {
+    width: 500px;
+    max-width: 90vw;
+}
+
+.dashboard-role-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    width: 100%;
+
+    padding: 6px 0;
+}
+
+.dashboard-role-row input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.dashboard-role-container {
+    font-size: 12px;
+    color: #666;
+}
+
+.dashboard-role-container {
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.dashboard-role-select {
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    min-width: 120px;
+}
+
+.dashboard-role-select span {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.prefix-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    flex-shrink: 0;
+}
+
+.dashboard-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.dashboard-info small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
