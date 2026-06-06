@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.19 Bugfix Charts
+* (BenAhrdt) Absicherung bei Charts, wenn noch keine Daten da sind.
+
 ### V1.6.18 Bugfix Charts
 * (BenAhrdt) Charts können wieder angezeigt werden
 

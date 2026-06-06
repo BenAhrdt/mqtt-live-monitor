@@ -3563,6 +3563,24 @@ async function openBooleanHistory(entityId) {
             y: d.value ? 1 : 0
         }));
 
+    if (chartPoints.length === 0) {
+
+        document.getElementById(
+            'historyInfo'
+        ).innerHTML = `
+            <div class="history-empty">
+                Noch keine Verlaufsdaten vorhanden.
+            </div>
+        `;
+
+        if (historyChart) {
+            historyChart.destroy();
+            historyChart = null;
+        }
+
+        return;
+    }
+
     document.getElementById(
         'historyInfo'
     ).innerHTML = `
