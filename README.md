@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.22 Boolscher chart zeigt anzahl und Länge der Zustände an
+* (BenAhrdt) Im Boolschen Chart kann man nun erkennen, wie oft und wie lange ein Zustand im ausgewählten Zeitbereich anstand.
+
 ### V1.6.21 Login Konfetti
 * (BenAhrdt) Nach erfolgreichem Benutzerlogin wird auf der Startseite kurz Konfetti angezeigt.
 * (BenAhrdt) Das Konfetti blendet weich aus und respektiert reduzierte Bewegungseinstellungen.

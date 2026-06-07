@@ -2821,7 +2821,36 @@ app.get('/api/history/:entityId', (req, res) => {
 
   if (isBinarySensor) {
 
-      db.all(`
+      db.get(`
+
+          SELECT
+              value
+
+          FROM history_boolean
+
+          WHERE entityId = ?
+            AND timestamp < ?
+
+          ORDER BY timestamp DESC
+
+          LIMIT 1
+
+      `, [
+
+          entityId,
+          cutoff
+
+      ], (previousErr, previousRow) => {
+
+          if (previousErr) {
+              console.error(previousErr);
+
+              return res.status(500).json({
+                  error: previousErr.message
+              });
+          }
+
+          db.all(`
 
           SELECT
               timestamp as t,
@@ -2849,7 +2878,19 @@ app.get('/api/history/:entityId', (req, res) => {
               });
           }
 
-          res.json(rows);
+          const booleanRows =
+              previousRow
+                  ? [
+                      {
+                          t: cutoff,
+                          value: previousRow.value
+                      },
+                      ...rows
+                  ]
+                  : rows;
+
+          res.json(booleanRows);
+      });
       });
 
       return;

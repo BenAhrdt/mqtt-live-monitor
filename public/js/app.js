@@ -3599,6 +3599,135 @@ if (bell && dropdown) {
 
 let historyChart = null;
 
+const booleanHistoryHours = [
+    1,
+    2,
+    3,
+    6,
+    12,
+    24,
+    168,
+    336,
+    720
+];
+
+const numericHistoryHours = [
+    12,
+    24,
+    168,
+    336,
+    720
+];
+
+const historyHourLabels = {
+    1: '1 Stunde',
+    2: '2 Stunden',
+    3: '3 Stunden',
+    6: '6 Stunden',
+    12: '12 Stunden',
+    24: 'Tag',
+    168: 'Woche',
+    336: '2 Wochen',
+    720: 'Monat'
+};
+
+function formatHistoryDuration(seconds) {
+
+    const durationSeconds =
+        Math.max(
+            0,
+            Math.floor(seconds)
+        );
+
+    if (durationSeconds < 60) {
+
+        return `${durationSeconds} Sekunden`;
+    }
+
+    if (durationSeconds < 3600) {
+
+        const minutes =
+            Math.floor(durationSeconds / 60);
+
+        const remainingSeconds =
+            durationSeconds % 60;
+
+        return `${minutes} Min ${remainingSeconds} Sek`;
+    }
+
+    const hours =
+        Math.floor(durationSeconds / 3600);
+
+    const minutes =
+        Math.floor(
+            (durationSeconds % 3600) / 60
+        );
+
+    return `${hours} Std ${minutes} Min`;
+}
+
+function ensureHistoryHoursAvailable(availableHours) {
+
+    if (
+        availableHours.includes(
+            Number(currentHistoryHours)
+        )
+    ) {
+        return;
+    }
+
+    currentHistoryHours =
+        availableHours[0];
+}
+
+function getHistoryRangeOptionsHtml(availableHours) {
+
+    return availableHours
+        .map(hours => `
+            <option value="${hours}">
+                ${historyHourLabels[hours]}
+            </option>
+        `)
+        .join('');
+}
+
+function setupHistoryRangeSelect() {
+
+    const select =
+        document.getElementById(
+            'historyRangeSelect'
+        );
+
+    if (!select) {
+        return;
+    }
+
+    const options =
+        Array.from(select.options);
+
+    const selectedOption =
+        options.find(
+            option =>
+                Number(option.value) === Number(currentHistoryHours)
+        );
+
+    if (!selectedOption && options[0]) {
+        currentHistoryHours =
+            Number(options[0].value);
+    }
+
+    select.value =
+        String(currentHistoryHours);
+
+    select.addEventListener('change', () => {
+
+        currentHistoryHours =
+            Number(select.value);
+
+        openHistory(currentEntityId);
+    });
+}
+
 
 async function openHistory(entityId) {
 
@@ -3615,6 +3744,10 @@ async function openHistory(entityId) {
 async function openBooleanHistory(entityId) {
 
     currentEntityId = entityId;
+
+    ensureHistoryHoursAvailable(
+        booleanHistoryHours
+    );
 
     const modal =
         document.getElementById('historyModal');
@@ -3652,27 +3785,140 @@ async function openBooleanHistory(entityId) {
     ).textContent =
         `${deviceName}: ${entityName}`;
 
+    const now =
+        Math.floor(Date.now() / 1000);
+
+    const windowStart =
+        now - (currentHistoryHours * 60 * 60);
+
+    const rawBooleanRows =
+        data.map(d => ({
+            t: Math.max(
+                windowStart,
+                Number(d.t)
+            ),
+            value: Boolean(d.value)
+        }));
+
+    const booleanRows = [];
+
+    rawBooleanRows.forEach(row => {
+
+        const lastRow =
+            booleanRows[booleanRows.length - 1];
+
+        if (lastRow && lastRow.t === row.t) {
+            lastRow.value =
+                row.value;
+            return;
+        }
+
+        booleanRows.push(row);
+    });
+
+    const currentValue =
+        Boolean(entity.value);
+
+    if (
+        booleanRows.length > 0
+        && booleanRows[booleanRows.length - 1].value !== currentValue
+    ) {
+
+        const lastRow =
+            booleanRows[booleanRows.length - 1];
+
+        if (lastRow.t === now) {
+            lastRow.value =
+                currentValue;
+        } else {
+
+            booleanRows.push({
+                t: now,
+                value: currentValue
+            });
+        }
+    }
+
     const labels =
-        data.map(d => d.t);
+        booleanRows.map(d => d.t);
 
     const values =
-        data.map(d => d.value);
+        booleanRows.map(d => d.value);
 
     const chartPoints =
-        data.map(d => ({
+        booleanRows.map(d => ({
             x: d.t,
             y: d.value ? 1 : 0
         }));
+
+    const booleanStats = {
+        true: {
+            count: 0,
+            duration: 0
+        },
+        false: {
+            count: 0,
+            duration: 0
+        }
+    };
+
+    for (
+        let i = 0;
+        i < chartPoints.length;
+        i++
+    ) {
+
+        const startTs =
+            Math.max(
+                chartPoints[i].x,
+                windowStart
+            );
+
+        const endTs =
+            Math.min(
+                chartPoints[i + 1]?.x ?? now,
+                now
+            );
+
+        if (endTs < windowStart || startTs > now) {
+            continue;
+        }
+
+        const key =
+            values[i] ? 'true' : 'false';
+
+        booleanStats[key].count++;
+
+        booleanStats[key].duration +=
+            Math.max(
+                0,
+                endTs - startTs
+            );
+    }
 
     if (chartPoints.length === 0) {
 
         document.getElementById(
             'historyInfo'
         ).innerHTML = `
-            <div class="history-empty">
-                Noch keine Verlaufsdaten vorhanden.
+            <div class="history-header">
+
+                <div class="history-values">
+                    <div class="history-empty">
+                        Noch keine Verlaufsdaten vorhanden.
+                    </div>
+                </div>
+
+                <div class="history-range-buttons">
+                    <select id="historyRangeSelect">
+                        ${getHistoryRangeOptionsHtml(booleanHistoryHours)}
+                    </select>
+                </div>
+
             </div>
         `;
+
+        setupHistoryRangeSelect();
 
         if (historyChart) {
             historyChart.destroy();
@@ -3696,16 +3942,28 @@ async function openBooleanHistory(entityId) {
                 </b>
             </div>
 
+            <div class="history-minmax">
+                true:
+                <b>
+                    ${booleanStats.true.count}
+                    (${formatHistoryDuration(booleanStats.true.duration)})
+                </b>
+
+                |
+
+                false:
+                <b>
+                    ${booleanStats.false.count}
+                    (${formatHistoryDuration(booleanStats.false.duration)})
+                </b>
+            </div>
+
             </div>
 
             <div class="history-range-buttons">
 
                 <select id="historyRangeSelect">
-                    <option value="12">12 Stunden</option>
-                    <option value="24">Tag</option>
-                    <option value="168">Woche</option>
-                    <option value="336">2 Wochen</option>
-                    <option value="720">Monat</option>
+                    ${getHistoryRangeOptionsHtml(booleanHistoryHours)}
                 </select>
 
             </div>
@@ -3713,22 +3971,7 @@ async function openBooleanHistory(entityId) {
         </div>
     `;
 
-    const select =
-        document.getElementById(
-            'historyRangeSelect'
-        );
-
-    select.value =
-        String(currentHistoryHours);
-
-    select.addEventListener('change', () => {
-
-        currentHistoryHours =
-            Number(select.value);
-
-        openHistory(currentEntityId);
-
-    });
+    setupHistoryRangeSelect();
 
     if (historyChart) {
         historyChart.destroy();
@@ -3806,13 +4049,8 @@ async function openBooleanHistory(entityId) {
         }
     };
 
-    const now =
-        Math.floor(Date.now() / 1000);
-
     const minTime =
-        chartPoints.length
-            ? chartPoints[0].x
-            : now;
+        windowStart;
 
     historyChart = new Chart(ctx, {
 
@@ -3919,40 +4157,8 @@ async function openBooleanHistory(entityId) {
                                     ? endTs - startTs
                                     : Math.floor(Date.now() / 1000) - startTs;
 
-                            let durationText = '';
-
-                            if (durationSeconds < 60) {
-
-                                durationText =
-                                    `${durationSeconds} Sekunden`;
-
-                            } else if (durationSeconds < 3600) {
-
-                                const minutes =
-                                    Math.floor(durationSeconds / 60);
-
-                                const seconds =
-                                    durationSeconds % 60;
-
-                                durationText =
-                                    `${minutes} Min ${seconds} Sek`;
-
-                            } else {
-
-                                const hours =
-                                    Math.floor(durationSeconds / 3600);
-
-                                const minutes =
-                                    Math.floor(
-                                        (durationSeconds % 3600) / 60
-                                    );
-
-                                durationText =
-                                    `${hours} Std ${minutes} Min`;
-                            }
-
                             rows.push(
-                                `Dauer: ${durationText}`
+                                `Dauer: ${formatHistoryDuration(durationSeconds)}`
                             );
 
                             return rows;
@@ -4036,6 +4242,10 @@ async function openBooleanHistory(entityId) {
 async function openNumericHistory(entityId) {
 
   currentEntityId = entityId;
+
+  ensureHistoryHoursAvailable(
+    numericHistoryHours
+  );
 
   const modal = document.getElementById('historyModal');
   modal.classList.remove('hidden');
@@ -4180,11 +4390,7 @@ async function openNumericHistory(entityId) {
         <div class="history-range-buttons">
             <div class="history-range-buttons">
                 <select id="historyRangeSelect">
-                    <option value="12">12 Stunden</option>
-                    <option value="24">Tag</option>
-                    <option value="168">Woche</option>
-                    <option value="336">2 Wochen</option>
-                    <option value="720">Monat</option>
+                    ${getHistoryRangeOptionsHtml(numericHistoryHours)}
                 </select>
             </div>
         </div>
@@ -4221,11 +4427,7 @@ async function openNumericHistory(entityId) {
         <div class="history-range-buttons">
             <div class="history-range-buttons">
                 <select id="historyRangeSelect">
-                    <option value="12">12 Stunden</option>
-                    <option value="24">Tag</option>
-                    <option value="168">Woche</option>
-                    <option value="336">2 Wochen</option>
-                    <option value="720">Monat</option>
+                    ${getHistoryRangeOptionsHtml(numericHistoryHours)}
                 </select>
             </div>
         </div>
@@ -4237,19 +4439,7 @@ async function openNumericHistory(entityId) {
 
     document.getElementById('historyInfo').innerHTML =  infoHtml;
 
-    const select = document.getElementById('historyRangeSelect');
-
-    if (select) {
-
-        select.value = String(currentHistoryHours);
-
-        select.addEventListener('change', () => {
-
-            currentHistoryHours = Number(select.value);
-
-            openHistory(currentEntityId);
-        });
-    }
+    setupHistoryRangeSelect();
 
 
   // 🔥 alten Chart zerstören
