@@ -98,6 +98,7 @@ const topics = new Map();
 let dashboardDevices = [];
 let currentView = 'dashboard';
 let customDashboards = [];
+let chartConfigs = [];
 let activeCustomDashboardId = null;
 let dashboardRenderScheduled = false;
 let activeEntityTypes = new Set();
@@ -2392,6 +2393,9 @@ async function loadConfig() {
     mqttClientIdInput.value = config.clientId || '';
     discoveryPrefixes = config.discoveryViaPrefixes || [];
     customDashboards = config.customDashboards || [];
+    chartConfigs = Array.isArray(config.chartConfigs)
+        ? config.chartConfigs
+        : [];
 
     // Migration adminOnly -> allowedRoles
     customDashboards.forEach(dashboard => {
@@ -3673,6 +3677,7 @@ if (bell && dropdown) {
 
 let historyChart = null;
 let historyCompareEntityIds = [];
+let currentChartConfigId = null;
 
 const historyCompareColors = [
     '#3b82f6',
@@ -3805,7 +3810,8 @@ function setupHistoryRangeSelect() {
             Number(select.value);
 
         openHistory(currentEntityId, {
-            preserveCompare: true
+            preserveCompare: true,
+            preserveChartConfig: true
         });
     });
 }
@@ -4152,20 +4158,374 @@ function renderHistoryCompareControls(primaryEntityId) {
     `;
 }
 
-function getNumericHistoryAggregation(entity) {
-    if (entity.deviceClass && entity.deviceClass === 'energy') {
-        if (currentHistoryHours <= 0.5) return 60;
-        if (currentHistoryHours <= 3) return 5 * 60;
-        if (currentHistoryHours <= 24) return 15 * 60;
-        if (currentHistoryHours <= 24 * 7) return 60 * 60;
-        return 24 * 60 * 60;
+function getChartConfigOptionsHtml() {
+    const configs = getVisibleChartConfigs();
+
+    return `
+        <option value="">Ansicht laden</option>
+        ${configs.map(config => `
+            <option
+                value="${escapeHtml(config.id)}"
+                ${config.id === currentChartConfigId ? 'selected' : ''}
+            >
+                ${escapeHtml(config.name)}
+            </option>
+        `).join('')}
+    `;
+}
+
+function canUseChartConfig(config) {
+    if (!config?.primaryEntityId && !Array.isArray(config?.entityIds)) return false;
+
+    const allowedEntityIds =
+        getAllowedDashboardEntityIds();
+    const configEntityIds = Array.isArray(config.entityIds)
+        ? config.entityIds
+        : [config.primaryEntityId];
+
+    return configEntityIds.some(entityId =>
+        allowedEntityIds.has(entityId)
+    );
+}
+
+function getVisibleChartConfigs() {
+    return (Array.isArray(chartConfigs) ? chartConfigs : [])
+        .filter(canUseChartConfig);
+}
+
+function canManageChartConfig(config) {
+    if (!config) return false;
+    if (isAdmin()) return true;
+
+    return config.createdBy
+        && config.createdBy === window.currentUser?.username;
+}
+
+function renderHistoryChartConfigControls() {
+    const activeConfig =
+        currentChartConfigId
+            ? chartConfigs.find(config => config.id === currentChartConfigId)
+            : null;
+    const canManageActiveConfig =
+        activeConfig && canManageChartConfig(activeConfig);
+    const showSaveButton =
+        !activeConfig || canManageActiveConfig;
+
+    return `
+        <div class="history-chart-configs">
+            <select id="historyChartConfigSelect">
+                ${getChartConfigOptionsHtml()}
+            </select>
+            ${showSaveButton ? `
+            <button
+                id="saveHistoryChartConfigBtn"
+                class="btn secondary small-btn"
+                type="button"
+            >
+                Speichern
+            </button>
+            ` : ''}
+            <button
+                id="saveHistoryChartConfigAsBtn"
+                class="btn secondary small-btn"
+                type="button"
+            >
+                Speichern als
+            </button>
+            ${canManageActiveConfig ? `
+            <button
+                id="deleteHistoryChartConfigBtn"
+                class="btn danger small-btn"
+                type="button"
+            >
+                Löschen
+            </button>
+            ` : ''}
+        </div>
+    `;
+}
+
+function renderHistoryHeaderActions() {
+    return `
+        <div class="history-range-buttons">
+            ${renderHistoryChartConfigControls()}
+            <select id="historyRangeSelect">
+                ${getHistoryRangeOptionsHtml(historyRangeHours)}
+            </select>
+        </div>
+    `;
+}
+
+function createChartConfigId(name) {
+    const base =
+        slugifyDashboardName(name || 'chart')
+            || 'chart';
+
+    let id = `chart_${base}`;
+    let counter = 2;
+
+    while (chartConfigs.some(config => config.id === id)) {
+        id = `chart_${base}_${counter}`;
+        counter++;
     }
 
-    if (currentHistoryHours <= 0.5) return 30;
-    if (currentHistoryHours <= 3) return 60;
-    if (currentHistoryHours <= 24) return 5 * 60;
-    if (currentHistoryHours <= 24 * 7) return 15 * 60;
-    return 60 * 60;
+    return id;
+}
+
+function getCurrentChartConfigPayload(name, existingId = currentChartConfigId) {
+    const uniqueEntityIds = [
+        currentEntityId,
+        ...historyCompareEntityIds.filter(id => id !== currentEntityId)
+    ].filter((id, index, ids) =>
+        id
+        && ids.indexOf(id) === index
+    );
+
+    return {
+        id: existingId || createChartConfigId(name),
+        name: name.trim(),
+        primaryEntityId: currentEntityId,
+        entityIds: uniqueEntityIds,
+        hours: currentHistoryHours,
+        updatedAt: new Date().toISOString()
+    };
+}
+
+async function saveChartConfig(config) {
+    const res = await fetch('/api/chart-configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config })
+    });
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Chart-Ansicht konnte nicht gespeichert werden');
+    }
+
+    const data = await res.json();
+
+    chartConfigs = Array.isArray(data.chartConfigs)
+        ? data.chartConfigs
+        : chartConfigs;
+
+    window.config.chartConfigs = chartConfigs;
+
+    return data.chartConfig;
+}
+
+async function saveCurrentChartConfig({ saveAs = false } = {}) {
+    if (!currentEntityId) return;
+
+    const existingConfig =
+        !saveAs && currentChartConfigId
+            ? chartConfigs.find(config => config.id === currentChartConfigId)
+            : null;
+
+    const defaultName =
+        existingConfig?.name
+        || document.getElementById('historyTitle')?.textContent
+        || 'Chart Ansicht';
+
+    const name =
+        existingConfig
+            ? existingConfig.name
+            : prompt('Name für diese Chart-Ansicht:', defaultName);
+
+    if (!name || !name.trim()) return;
+
+    const config =
+        getCurrentChartConfigPayload(
+            name,
+            existingConfig?.id
+        );
+
+    const existingIndex =
+        chartConfigs.findIndex(item => item.id === config.id);
+    const previousChartConfigs = [...chartConfigs];
+
+    if (existingIndex >= 0) {
+        chartConfigs[existingIndex] = config;
+    } else {
+        chartConfigs.push(config);
+    }
+
+    currentChartConfigId = config.id;
+    try {
+        const savedConfig =
+            await saveChartConfig(config);
+        currentChartConfigId = savedConfig.id;
+    } catch (err) {
+        chartConfigs = previousChartConfigs;
+        window.config.chartConfigs = chartConfigs;
+        alert(err.message);
+        return;
+    }
+
+    refreshHistoryChartConfigControls();
+}
+
+function refreshHistoryChartConfigControls() {
+    const controls =
+        document.querySelector('.history-chart-configs');
+
+    if (!controls) return;
+
+    controls.outerHTML = renderHistoryChartConfigControls();
+    setupHistoryChartConfigControls();
+}
+
+async function loadChartConfig(configId) {
+    const config =
+        getVisibleChartConfigs()
+            .find(item => item.id === configId);
+
+    if (!config) return;
+
+    const allowedEntityIds =
+        getAllowedDashboardEntityIds();
+    const allowedConfigEntityIds = (
+        Array.isArray(config.entityIds)
+            ? config.entityIds
+            : [config.primaryEntityId]
+    ).filter(id =>
+        findEntityById(id)
+        && allowedEntityIds.has(id)
+    );
+    const primaryEntityId =
+        allowedEntityIds.has(config.primaryEntityId)
+            ? config.primaryEntityId
+            : allowedConfigEntityIds[0];
+
+    if (!primaryEntityId) {
+        alert('Keine Entität dieser Ansicht ist für deinen Benutzer verfügbar.');
+        return;
+    }
+
+    currentChartConfigId = config.id;
+    currentHistoryHours = Number(config.hours) || currentHistoryHours;
+    historyCompareEntityIds = [
+        primaryEntityId,
+        ...allowedConfigEntityIds.filter(id => id !== primaryEntityId)
+    ];
+
+    await openNumericHistory(primaryEntityId, {
+        preserveCompare: true,
+        preserveChartConfig: true
+    });
+}
+
+async function deleteCurrentChartConfig() {
+    if (!currentChartConfigId) return;
+
+    const config =
+        chartConfigs.find(item => item.id === currentChartConfigId);
+
+    if (!config || !canManageChartConfig(config)) return;
+
+    if (!confirm(`Chart-Ansicht "${config.name}" löschen?`)) {
+        return;
+    }
+
+    const res = await fetch(
+        `/api/chart-configs/${encodeURIComponent(config.id)}`,
+        { method: 'DELETE' }
+    );
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Chart-Ansicht konnte nicht gelöscht werden');
+        return;
+    }
+
+    const data = await res.json();
+
+    chartConfigs = Array.isArray(data.chartConfigs)
+        ? data.chartConfigs
+        : chartConfigs.filter(item => item.id !== config.id);
+    window.config.chartConfigs = chartConfigs;
+    currentChartConfigId = null;
+
+    await openNumericHistory(currentEntityId, {
+        preserveCompare: true
+    });
+}
+
+function setupHistoryChartConfigControls() {
+    const select =
+        document.getElementById('historyChartConfigSelect');
+    const saveBtn =
+        document.getElementById('saveHistoryChartConfigBtn');
+    const saveAsBtn =
+        document.getElementById('saveHistoryChartConfigAsBtn');
+    const deleteBtn =
+        document.getElementById('deleteHistoryChartConfigBtn');
+
+    select?.addEventListener('change', () => {
+        if (!select.value) return;
+        loadChartConfig(select.value);
+    });
+
+    saveBtn?.addEventListener('click', () => {
+        saveCurrentChartConfig();
+    });
+
+    saveAsBtn?.addEventListener('click', () => {
+        saveCurrentChartConfig({ saveAs: true });
+    });
+
+    deleteBtn?.addEventListener('click', () => {
+        deleteCurrentChartConfig();
+    });
+}
+
+function getHistoryEntityBucketSeconds(entityId) {
+    const bucketMinutes =
+        Number(
+            window.config?.history?.entities?.[entityId]?.bucketMinutes
+        );
+
+    return Number.isFinite(bucketMinutes) && bucketMinutes > 0
+        ? bucketMinutes * 60
+        : 5 * 60;
+}
+
+function getNumericHistoryAggregation(entity, chartEntity = entity) {
+    const entityBucketSeconds =
+        getHistoryEntityBucketSeconds(entity.id);
+
+    if (chartEntity.deviceClass && chartEntity.deviceClass === 'energy') {
+        let desiredAggregation = 24 * 60 * 60;
+
+        if (currentHistoryHours <= 3) {
+            desiredAggregation = 5 * 60;
+        } else if (currentHistoryHours <= 24) {
+            desiredAggregation = 15 * 60;
+        } else if (currentHistoryHours <= 24 * 7) {
+            desiredAggregation = 60 * 60;
+        }
+
+        return Math.max(desiredAggregation, entityBucketSeconds);
+    }
+
+    return entityBucketSeconds;
+}
+
+function isHistoryDayAggregation() {
+    return currentAggregation >= 24 * 60 * 60;
+}
+
+function getLocalDayStartSeconds(timestampSeconds) {
+    const date = new Date(timestampSeconds * 1000);
+    date.setHours(0, 0, 0, 0);
+    return Math.floor(date.getTime() / 1000);
+}
+
+function getNextLocalDayStartSeconds(timestampSeconds) {
+    const date = new Date(timestampSeconds * 1000);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 1);
+    return Math.floor(date.getTime() / 1000);
 }
 
 async function fetchNumericHistoryData(entityId, aggregation) {
@@ -4253,7 +4613,8 @@ function addHistoryCompareEntity(entityId) {
     }
 
     openNumericHistory(currentEntityId, {
-        preserveCompare: true
+        preserveCompare: true,
+        preserveChartConfig: true
     });
 }
 
@@ -4264,7 +4625,8 @@ function removeHistoryCompareEntity(entityId) {
         historyCompareEntityIds.filter(id => id !== entityId);
 
     openNumericHistory(currentEntityId, {
-        preserveCompare: true
+        preserveCompare: true,
+        preserveChartConfig: true
     });
 }
 
@@ -4795,14 +5157,27 @@ async function openNumericHistory(entityId, options = {}) {
         historyCompareEntityIds = [entityId];
     }
 
+    if (!options.preserveChartConfig) {
+        currentChartConfigId = null;
+    }
+
     ensureHistoryCompareSelection(entityId);
 
   const historyResponses = await Promise.all(
-    historyCompareEntityIds.map(async comparedEntityId => ({
-        entityId: comparedEntityId,
-        entity: findEntityById(comparedEntityId),
-        data: await fetchNumericHistoryData(comparedEntityId, currentAggregation)
-    }))
+    historyCompareEntityIds.map(async comparedEntityId => {
+        const comparedEntity = findEntityById(comparedEntityId);
+
+        return {
+            entityId: comparedEntityId,
+            entity: comparedEntity,
+            data: await fetchNumericHistoryData(
+                comparedEntityId,
+                comparedEntity
+                    ? getNumericHistoryAggregation(comparedEntity, entity)
+                    : currentAggregation
+            )
+        };
+    })
   );
 
   const data = historyResponses.find(row => row.entityId === entityId)?.data || [];
@@ -4923,13 +5298,7 @@ async function openNumericHistory(entityId, options = {}) {
 
         </div>
 
-        <div class="history-range-buttons">
-            <div class="history-range-buttons">
-                <select id="historyRangeSelect">
-                    ${getHistoryRangeOptionsHtml(historyRangeHours)}
-                </select>
-            </div>
-        </div>
+        ${renderHistoryHeaderActions()}
 
         </div>
 
@@ -4962,13 +5331,7 @@ async function openNumericHistory(entityId, options = {}) {
 
         </div>
 
-        <div class="history-range-buttons">
-            <div class="history-range-buttons">
-                <select id="historyRangeSelect">
-                    ${getHistoryRangeOptionsHtml(historyRangeHours)}
-                </select>
-            </div>
-        </div>
+        ${renderHistoryHeaderActions()}
 
         </div>
 
@@ -4980,6 +5343,7 @@ async function openNumericHistory(entityId, options = {}) {
     document.getElementById('historyInfo').innerHTML =  infoHtml;
 
     setupHistoryRangeSelect();
+    setupHistoryChartConfigControls();
 
 
   // 🔥 alten Chart zerstören
@@ -5119,7 +5483,17 @@ async function openNumericHistory(entityId, options = {}) {
 	            // 🔥 Titel = vollständige Zeit
 		            title: (ctx) => {
 		              const ts = ctx[0].parsed.x * 1000;
-		              return new Date(ts).toLocaleString('de-DE');
+                      const date = new Date(ts);
+
+                      if (isHistoryDayAggregation()) {
+                        return date.toLocaleDateString('de-DE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+                      }
+
+		              return date.toLocaleString('de-DE');
 	            },
 
             // 🔥 Werte
@@ -5158,8 +5532,14 @@ async function openNumericHistory(entityId, options = {}) {
       scales: {
 	        x: {
 	          type: 'linear',
-	          min: Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60),
-	          max: Math.floor(Date.now() / 1000),
+	          min: isHistoryDayAggregation()
+                ? getLocalDayStartSeconds(
+                    Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60)
+                )
+                : Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60),
+	          max: isHistoryDayAggregation()
+                ? getNextLocalDayStartSeconds(Math.floor(Date.now() / 1000))
+                : Math.floor(Date.now() / 1000),
           ticks: {
             maxTicksLimit: currentHistoryHours > 48 ? 6 : 10,
 
@@ -5544,7 +5924,7 @@ function renderSelectedHistoryEntities() {
   });
 }
 
-async function saveHistoryConfig() {
+async function saveAppConfig() {
   try {
     await fetch('/api/config', {
       method: 'POST',
@@ -5554,11 +5934,14 @@ async function saveHistoryConfig() {
       })
     });
 
-    console.log('History gespeichert');
-
   } catch (err) {
     console.error('Fehler beim Speichern', err);
   }
+}
+
+async function saveHistoryConfig() {
+  await saveAppConfig();
+  console.log('History gespeichert');
 }
 
 

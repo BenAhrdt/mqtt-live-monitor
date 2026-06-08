@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.26 Charterweiterungen
+* (BenAhrdt) Speichern und Laden von Charts möglich
+
 ### V1.6.25 Weiter Features
 * (BenAhrdt) Zweite Achse in den Charts möglich
 * (BenAhrdt) Einklappen von Dashboards und History in den EInstellungen

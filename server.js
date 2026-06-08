@@ -750,6 +750,7 @@ let mqttConfig = {
   discoveryViaPrefixes: ["lorawan"],
   enabledEntityTypes: ["light", "climate", "cover", "lock", "humidifier", "lawn_mower", "sensor", "binary_sensor", "switch", "button", "number", "text"],
   customDashboards: [],
+  chartConfigs: [],
   friendlyNames: {},
   auth: {
     enabled: false
@@ -800,6 +801,16 @@ function loadConfigFromFile() {
           : [],
       devices: Array.isArray(d.devices) ? d.devices : []
     }));
+
+    mqttConfig.chartConfigs = Array.isArray(mqttConfig.chartConfigs)
+      ? mqttConfig.chartConfigs.map(config => ({
+          ...config,
+          createdBy: config.createdBy || 'admin',
+          createdAt: config.createdAt || config.updatedAt || new Date().toISOString(),
+          updatedBy: config.updatedBy || config.createdBy || 'admin',
+          updatedAt: config.updatedAt || new Date().toISOString()
+        }))
+      : [];
 
     allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
       .filter(p => p.enabled)
@@ -2354,6 +2365,7 @@ function getPublicConfig() {
     enabledEntityTypes: mqttConfig.enabledEntityTypes,
     authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
     customDashboards: mqttConfig.customDashboards || [],
+    chartConfigs: mqttConfig.chartConfigs || [],
     friendlyNames: mqttConfig.friendlyNames || {},
     auth: {
       enabled: mqttConfig.auth?.enabled ?? false
@@ -2386,6 +2398,47 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function isAdminUser(req) {
+  if (!mqttConfig.auth?.enabled) {
+    return true;
+  }
+
+  return req.session?.user?.roles?.includes('admin');
+}
+
+function getRequestUsername(req) {
+  if (!mqttConfig.auth?.enabled) {
+    return 'admin';
+  }
+
+  return req.session?.user?.username || 'unknown';
+}
+
+function canManageChartConfig(req, chartConfig) {
+  return (
+    isAdminUser(req)
+    || chartConfig.createdBy === getRequestUsername(req)
+  );
+}
+
+function normalizeChartConfig(config, existingConfig, username) {
+  const now = new Date().toISOString();
+
+  return {
+    id: String(config.id || "").trim(),
+    name: String(config.name || "").trim(),
+    primaryEntityId: String(config.primaryEntityId || "").trim(),
+    entityIds: Array.isArray(config.entityIds)
+      ? config.entityIds.map(id => String(id).trim()).filter(Boolean)
+      : [],
+    hours: Number(config.hours) || 12,
+    createdBy: existingConfig?.createdBy || username,
+    createdAt: existingConfig?.createdAt || now,
+    updatedBy: username,
+    updatedAt: now
+  };
+}
+
 app.post("/api/config", requireAdmin, (req, res) => {
   const oldConfig = { ...mqttConfig };
   const {
@@ -2398,6 +2451,7 @@ app.post("/api/config", requireAdmin, (req, res) => {
   clientId,
   discoveryViaPrefixes,
   enabledEntityTypes,
+  chartConfigs,
   auth,
   history
 } = req.body;
@@ -2453,6 +2507,19 @@ app.post("/api/config", requireAdmin, (req, res) => {
     };
   }
 
+  if (Array.isArray(chartConfigs)) {
+    const username = getRequestUsername(req);
+
+    mqttConfig.chartConfigs = chartConfigs.map(config =>
+      normalizeChartConfig(config, config, username)
+    ).filter(config =>
+      config.id
+      && config.name
+      && config.primaryEntityId
+      && config.entityIds.length
+    );
+  }
+
   allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes
   .filter(p => p.enabled)
   .map(p => p.value);
@@ -2488,8 +2555,101 @@ app.post("/api/config", requireAdmin, (req, res) => {
       auth: {
         enabled: mqttConfig.auth?.enabled ?? false
       },
+      chartConfigs: mqttConfig.chartConfigs || [],
       history: mqttConfig.history || { enabled: false, entities: {} }
     }
+  });
+});
+
+app.post("/api/chart-configs", (req, res) => {
+  const username = getRequestUsername(req);
+  const incomingConfig = req.body?.config;
+
+  if (!incomingConfig || typeof incomingConfig !== 'object') {
+    return res.status(400).json({
+      error: "config ist erforderlich"
+    });
+  }
+
+  if (!Array.isArray(mqttConfig.chartConfigs)) {
+    mqttConfig.chartConfigs = [];
+  }
+
+  const existingIndex =
+    mqttConfig.chartConfigs.findIndex(config =>
+      config.id === String(incomingConfig.id || "").trim()
+    );
+  const existingConfig =
+    existingIndex >= 0
+      ? mqttConfig.chartConfigs[existingIndex]
+      : null;
+
+  if (existingConfig && !canManageChartConfig(req, existingConfig)) {
+    return res.status(403).json({
+      error: "Nur Ersteller oder Admin dürfen diese Ansicht ändern"
+    });
+  }
+
+  const chartConfig =
+    normalizeChartConfig(incomingConfig, existingConfig, username);
+
+  if (
+    !chartConfig.id
+    || !chartConfig.name
+    || !chartConfig.primaryEntityId
+    || !chartConfig.entityIds.length
+  ) {
+    return res.status(400).json({
+      error: "Ungültige Chart-Konfiguration"
+    });
+  }
+
+  if (existingIndex >= 0) {
+    mqttConfig.chartConfigs[existingIndex] = chartConfig;
+  } else {
+    mqttConfig.chartConfigs.push(chartConfig);
+  }
+
+  saveConfigToFile();
+
+  res.json({
+    success: true,
+    chartConfig,
+    chartConfigs: mqttConfig.chartConfigs
+  });
+});
+
+app.delete("/api/chart-configs/:id", (req, res) => {
+  const id = String(req.params.id || "").trim();
+
+  if (!Array.isArray(mqttConfig.chartConfigs)) {
+    mqttConfig.chartConfigs = [];
+  }
+
+  const existingIndex =
+    mqttConfig.chartConfigs.findIndex(config => config.id === id);
+
+  if (existingIndex < 0) {
+    return res.status(404).json({
+      error: "Chart-Konfiguration nicht gefunden"
+    });
+  }
+
+  const existingConfig =
+    mqttConfig.chartConfigs[existingIndex];
+
+  if (!canManageChartConfig(req, existingConfig)) {
+    return res.status(403).json({
+      error: "Nur Ersteller oder Admin dürfen diese Ansicht löschen"
+    });
+  }
+
+  mqttConfig.chartConfigs.splice(existingIndex, 1);
+  saveConfigToFile();
+
+  res.json({
+    success: true,
+    chartConfigs: mqttConfig.chartConfigs
   });
 });
 
@@ -2822,8 +2982,14 @@ app.get('/api/history/:entityId', (req, res) => {
   const aggregation =
     parseInt(req.query.aggregation) || 300;
   // cutoff berechnen
-  const cutoff =
+  let cutoff =
     Math.floor(Date.now() / 1000) - (hours * 60 * 60);
+
+  if (aggregation >= 24 * 60 * 60) {
+    const cutoffDate = new Date(cutoff * 1000);
+    cutoffDate.setHours(0, 0, 0, 0);
+    cutoff = Math.floor(cutoffDate.getTime() / 1000);
+  }
 
   if (isBinarySensor) {
 
@@ -2902,11 +3068,27 @@ app.get('/api/history/:entityId', (req, res) => {
       return;
   }
 
+  const aggregationSelect =
+    aggregation >= 24 * 60 * 60
+      ? `
+        CAST(strftime(
+          '%s',
+          date(bucket, 'unixepoch', 'localtime') || ' 00:00:00',
+          'utc'
+        ) AS INTEGER) as t
+      `
+      : `((bucket / ?) * ?) as t`;
+
+  const aggregationParams =
+    aggregation >= 24 * 60 * 60
+      ? []
+      : [aggregation, aggregation];
+
   db.all(`
 
     SELECT
 
-      ((bucket / ?) * ?) as t,
+      ${aggregationSelect},
 
       MIN(min) as min,
       MAX(max) as max,
@@ -2935,8 +3117,7 @@ app.get('/api/history/:entityId', (req, res) => {
 
   `, [
 
-    aggregation,
-    aggregation,
+    ...aggregationParams,
 
     entityId,
     cutoff
