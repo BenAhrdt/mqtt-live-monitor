@@ -792,7 +792,13 @@ function loadConfigFromFile() {
     // 👇 NEU: adminOnly sauber setzen
     mqttConfig.customDashboards = (mqttConfig.customDashboards || []).map(d => ({
       ...d,
-      adminOnly: d.adminOnly ?? false
+      adminOnly: d.adminOnly ?? false,
+      allowedRoles: Array.isArray(d.allowedRoles)
+        ? d.allowedRoles.map(role => String(role).trim()).filter(Boolean)
+        : d.adminOnly === true
+          ? ["admin"]
+          : [],
+      devices: Array.isArray(d.devices) ? d.devices : []
     }));
 
     allowedDiscoveryViaDevicePrefixes = mqttConfig.discoveryViaPrefixes

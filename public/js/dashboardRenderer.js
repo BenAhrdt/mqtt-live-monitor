@@ -1401,6 +1401,12 @@ export function createDashboardRenderer(deps) {
             row.className = 'prefix-row';
 
             const isOpen = openDashboardIds.has(dashboard.id);
+            const allowedRoles = Array.isArray(dashboard.allowedRoles)
+                ? dashboard.allowedRoles
+                : [];
+            const devices = Array.isArray(dashboard.devices)
+                ? dashboard.devices
+                : [];
 
             row.innerHTML = `
                 <details class="dashboard-config-block" data-dashboard-id="${escapeHtml(dashboard.id)}" ${isOpen ? 'open' : ''}>
@@ -1425,8 +1431,8 @@ export function createDashboardRenderer(deps) {
                         >
                             <span>
                                 ${
-                                    dashboard.allowedRoles.length
-                                        ? dashboard.allowedRoles.join('<br>')
+                                    allowedRoles.length
+                                        ? allowedRoles.map(role => escapeHtml(role)).join('<br>')
                                         : 'Alle Benutzer'
                                 }
                             </span>
@@ -1474,7 +1480,7 @@ export function createDashboardRenderer(deps) {
             list.appendChild(row);
             const container = row.querySelector('.dashboard-device-selector');
             setupSettingsDragAndDrop(container, dashboard.id);
-            dashboard.devices.forEach(device => {
+            devices.forEach(device => {
                 const entityContainer = row.querySelector(
                     `#entities-${dashboard.id}-${device.deviceId}`
                 );
@@ -1589,7 +1595,7 @@ export function createDashboardRenderer(deps) {
     }
 
     function renderEntitySelector(dashboard, device) {
-        const dashboardDevice = dashboard.devices.find(d => d.deviceId === device.id);
+        const dashboardDevice = (dashboard.devices || []).find(d => d.deviceId === device.id);
 
         const selectedEntities = dashboardDevice?.entityIds || [];
 

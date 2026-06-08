@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.23 Import von Dashboards abgesichert. (Rollen werden beachtet)
+* (BenAhrdt) Mit den neuen Rollen, geb es Problme beim Import.
+
 ### V1.6.22 Boolscher chart zeigt anzahl und Länge der Zustände an
 * (BenAhrdt) Im Boolschen Chart kann man nun erkennen, wie oft und wie lange ein Zustand im ausgewählten Zeitbereich anstand.
 

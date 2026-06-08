@@ -581,6 +581,20 @@ function canAccessDashboard(dashboard) {
     );
 }
 
+function normalizeDashboardRoles(dashboard) {
+    if (Array.isArray(dashboard.allowedRoles)) {
+        return dashboard.allowedRoles
+            .map(role => String(role).trim())
+            .filter(Boolean);
+    }
+
+    if (dashboard.adminOnly === true) {
+        return ['admin'];
+    }
+
+    return [];
+}
+
 function getFirstAllowedDashboard() {
 
     if (!Array.isArray(customDashboards)) {
@@ -898,6 +912,7 @@ async function importCustomDashboardsFromFile(file) {
             dashboardMap.set(id, {
                 id,
                 name,
+                allowedRoles: normalizeDashboardRoles(importedDashboard),
                 devices: Array.isArray(importedDashboard.devices)
                     ? importedDashboard.devices
                     : []
@@ -906,6 +921,7 @@ async function importCustomDashboardsFromFile(file) {
         }
 
         existingDashboard.name = name;
+        existingDashboard.allowedRoles = normalizeDashboardRoles(importedDashboard);
 
         if (!Array.isArray(existingDashboard.devices)) {
             existingDashboard.devices = [];
@@ -944,7 +960,11 @@ async function importCustomDashboardsFromFile(file) {
         existingDashboard.devices = Array.from(deviceMap.values());
     });
 
-    customDashboards = Array.from(dashboardMap.values());
+    customDashboards = Array.from(dashboardMap.values()).map(dashboard => ({
+        ...dashboard,
+        allowedRoles: normalizeDashboardRoles(dashboard),
+        devices: Array.isArray(dashboard.devices) ? dashboard.devices : []
+    }));
 
     dashboardRenderer.renderCustomDashboards();
     dashboardRenderer.renderCustomDashboardsNav();
@@ -1281,6 +1301,7 @@ async function duplicateDashboard(dashboardId) {
         id: newId,
         name: newName,
         adminOnly: original.adminOnly,
+        allowedRoles: normalizeDashboardRoles(original),
         devices: JSON.parse(JSON.stringify(original.devices || []))
     };
 
@@ -2373,15 +2394,7 @@ async function loadConfig() {
 
     // Migration adminOnly -> allowedRoles
     customDashboards.forEach(dashboard => {
-
-        if (dashboard.adminOnly === true && !dashboard.allowedRoles) {
-            dashboard.allowedRoles = ['admin'];
-        }
-
-        if (!dashboard.allowedRoles) {
-            dashboard.allowedRoles = [];
-        }
-
+        dashboard.allowedRoles = normalizeDashboardRoles(dashboard);
     });
     friendlyNames = config.friendlyNames || {};
     dashboardRenderer.renderCustomDashboards();
