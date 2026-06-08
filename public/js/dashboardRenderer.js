@@ -1952,6 +1952,11 @@ export function createDashboardRenderer(deps) {
             const viaClass = getViaDeviceClass(device.viaDevice);
             const via = String(device.viaDevice || '').toLowerCase();
             const isZigbee = via.includes('zigbee');
+            const totalEntityCount = (device.entities || []).length || device.entityCount || 0;
+            const visibleEntityCount = visibleEntities.length;
+            const entityCountLabel = activeCustomDashboardId && visibleEntityCount !== totalEntityCount
+                ? `${visibleEntityCount} von ${totalEntityCount} Entitäten`
+                : `${visibleEntityCount} Entitäten`;
 
             return `
                 <div
@@ -1971,7 +1976,7 @@ export function createDashboardRenderer(deps) {
                         ${escapeHtml(getDeviceDisplayName(device))}
                     </div>
                     <div class="dashboard-device-subtitle">
-                        Entitäten: ${escapeHtml(device.entityCount || 0)}
+                        ${escapeHtml(entityCountLabel)}
                     </div>
                     </div>
 

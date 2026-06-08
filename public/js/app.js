@@ -524,6 +524,7 @@ async function showView(viewName, options = {}) {
         }
         ensureDevicesInitialized();
         initHistorySettings();
+        initSettingsCollapsibles();
         generateClickhandler();
         return;
     }
@@ -3504,6 +3505,60 @@ function initHistorySettings() {
   renderSelectedHistoryEntities();
 }
 
+function initSettingsCollapsibles() {
+    document
+        .querySelectorAll('[data-settings-section]')
+        .forEach(section => {
+            const sectionId = section.dataset.settingsSection;
+            const toggle = section.querySelector('[data-settings-toggle]');
+            const header = section.querySelector('.settings-section-header');
+            const storageKey = `settings-section-${sectionId}-collapsed`;
+            const isCollapsed =
+                localStorage.getItem(storageKey) === 'true';
+
+            const setCollapsed = (collapsed) => {
+                section.classList.toggle('collapsed', collapsed);
+                toggle?.setAttribute(
+                    'aria-expanded',
+                    String(!collapsed)
+                );
+            };
+
+            setCollapsed(isCollapsed);
+
+            if (toggle?.dataset.bound === 'true') return;
+
+            const toggleSection = () => {
+                const collapsed =
+                    section.classList.toggle('collapsed');
+
+                toggle?.setAttribute(
+                    'aria-expanded',
+                    String(!collapsed)
+                );
+
+                localStorage.setItem(
+                    storageKey,
+                    String(collapsed)
+                );
+            };
+
+            toggle?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleSection();
+            });
+
+            header?.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                toggleSection();
+            });
+
+            if (toggle) {
+                toggle.dataset.bound = 'true';
+            }
+        });
+}
+
 // Header für avatarBtn
 function updateHeader() {
   const avatar = document.getElementById('avatarBtn');
@@ -3749,12 +3804,14 @@ function setupHistoryRangeSelect() {
         currentHistoryHours =
             Number(select.value);
 
-        openHistory(currentEntityId);
+        openHistory(currentEntityId, {
+            preserveCompare: true
+        });
     });
 }
 
 
-async function openHistory(entityId) {
+async function openHistory(entityId, options = {}) {
 
     const entity = findEntityById(entityId);
 
@@ -3763,7 +3820,7 @@ async function openHistory(entityId) {
         return;
     }
 
-    await openNumericHistory(entityId);
+    await openNumericHistory(entityId, options);
 }
 
 function isEntityHistoryEnabled(entityId) {
@@ -3777,13 +3834,19 @@ function canCompareNumericHistoryEntity(entity, primaryEntity) {
     if (!entity || !primaryEntity) return false;
     if (!isEntityHistoryEnabled(entity.id)) return false;
     if (entity.type === 'binary_sensor') return false;
-    if (entity.deviceClass === 'energy') return false;
-    if (primaryEntity.deviceClass === 'energy') return false;
 
     const primaryUnit = primaryEntity.unit || '';
     const entityUnit = entity.unit || '';
+    const primaryIsEnergy = primaryEntity.deviceClass === 'energy';
+    const entityIsEnergy = entity.deviceClass === 'energy';
 
-    return primaryUnit === entityUnit;
+    if (primaryIsEnergy) {
+        return entityIsEnergy
+            ? primaryUnit === entityUnit
+            : true;
+    }
+
+    return !entityIsEnergy;
 }
 
 function getHistoryEntityLabel(entity) {
@@ -3810,6 +3873,69 @@ function getHistoryCompareEntities(primaryEntityId) {
         });
 
     return Array.from(entityMap.values());
+}
+
+function getHistoryCompareUnits(primaryEntityId, entityIds = historyCompareEntityIds) {
+    const primaryEntity = findEntityById(primaryEntityId);
+    if (!primaryEntity) return [''];
+
+    const units = [primaryEntity.unit || ''];
+
+    entityIds
+        .filter(entityId => entityId !== primaryEntityId)
+        .forEach(entityId => {
+        const entity = findEntityById(entityId);
+        if (!entity) return;
+        if (
+            primaryEntity.deviceClass === 'energy'
+            && entity.deviceClass === 'energy'
+        ) {
+            return;
+        }
+
+        const unit = entity.unit || '';
+        if (!units.includes(unit) && units.length < 2) {
+            units.push(unit);
+        }
+    });
+
+    return units.length ? units : [primaryEntity.unit || ''];
+}
+
+function canUseHistoryCompareEntity(entity, primaryEntity, activeUnits) {
+    if (!canCompareNumericHistoryEntity(entity, primaryEntity)) {
+        return false;
+    }
+
+    if (primaryEntity.deviceClass === 'energy') {
+        if (entity.deviceClass === 'energy') {
+            return (entity.unit || '') === (primaryEntity.unit || '');
+        }
+
+        const unit = entity.unit || '';
+        return activeUnits.includes(unit) || activeUnits.length < 2;
+    }
+
+    const unit = entity.unit || '';
+    return activeUnits.includes(unit) || activeUnits.length < 2;
+}
+
+function getHistoryAxisId(entity, primaryEntity) {
+    if (primaryEntity.deviceClass === 'energy') {
+        return entity.deviceClass === 'energy'
+            ? 'y'
+            : 'y1';
+    }
+
+    return (entity.unit || '') === (primaryEntity.unit || '')
+        ? 'y'
+        : 'y1';
+}
+
+function getHistoryAxisLabel(entity, primaryEntity) {
+    return getHistoryAxisId(entity, primaryEntity) === 'y1'
+        ? 'rechts'
+        : 'links';
 }
 
 function getDashboardEntityIds(dashboard) {
@@ -3849,14 +3975,25 @@ function getAllowedDashboardEntityIds() {
 
 function getAllowedHistoryCompareEntities(primaryEntityId) {
     const allowedEntityIds = getAllowedDashboardEntityIds();
+    const primaryEntity = findEntityById(primaryEntityId);
+    const activeUnits = getHistoryCompareUnits(primaryEntityId);
 
     return getHistoryCompareEntities(primaryEntityId)
-        .filter(entity => allowedEntityIds.has(entity.id));
+        .filter(entity =>
+            allowedEntityIds.has(entity.id)
+            && canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
+        );
 }
 
 function getActiveDashboardHistoryCompareEntities(primaryEntityId) {
+    const primaryEntity = findEntityById(primaryEntityId);
+    const activeUnits = getHistoryCompareUnits(primaryEntityId);
+
     if (!activeCustomDashboardId && canAccessHomeDashboard()) {
-        return getHistoryCompareEntities(primaryEntityId);
+        return getHistoryCompareEntities(primaryEntityId)
+            .filter(entity =>
+                canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
+            );
     }
 
     const activeDashboard =
@@ -3872,29 +4009,54 @@ function getActiveDashboardHistoryCompareEntities(primaryEntityId) {
         getDashboardEntityIds(activeDashboard);
 
     return getHistoryCompareEntities(primaryEntityId)
-        .filter(entity => activeEntityIds.has(entity.id));
+        .filter(entity =>
+            activeEntityIds.has(entity.id)
+            && canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
+        );
 }
 
 function ensureHistoryCompareSelection(primaryEntityId) {
     const allowedEntityIds = getAllowedDashboardEntityIds();
+    const primaryEntity = findEntityById(primaryEntityId);
+    const units = [];
 
     historyCompareEntityIds = [
         primaryEntityId,
         ...historyCompareEntityIds.filter(entityId => entityId !== primaryEntityId)
     ];
 
-    historyCompareEntityIds = historyCompareEntityIds
-        .filter((entityId, index, allIds) =>
-            allIds.indexOf(entityId) === index
-            && (
-                entityId === primaryEntityId
-                || allowedEntityIds.has(entityId)
-            )
-            && canCompareNumericHistoryEntity(
-                findEntityById(entityId),
-                findEntityById(primaryEntityId)
-            )
-        );
+    historyCompareEntityIds = historyCompareEntityIds.filter((entityId, index, allIds) => {
+        if (allIds.indexOf(entityId) !== index) return false;
+
+        const entity = findEntityById(entityId);
+        if (!entity) return false;
+
+        if (
+            entityId !== primaryEntityId
+            && !allowedEntityIds.has(entityId)
+        ) {
+            return false;
+        }
+
+        if (!canCompareNumericHistoryEntity(entity, primaryEntity)) {
+            return false;
+        }
+
+        const unit = entity.unit || '';
+        if (
+            primaryEntity.deviceClass === 'energy'
+            && entity.deviceClass === 'energy'
+        ) {
+            return unit === (primaryEntity.unit || '');
+        }
+
+        if (!units.includes(unit)) {
+            if (units.length >= 2) return false;
+            units.push(unit);
+        }
+
+        return true;
+    });
 
     if (!historyCompareEntityIds.length) {
         historyCompareEntityIds = [primaryEntityId];
@@ -3920,12 +4082,16 @@ function renderHistoryCompareControls(primaryEntityId) {
             const valueText = Number.isFinite(value)
                 ? `${value.toFixed(2)} ${unit}`.trim()
                 : `${entity.value ?? '-'} ${unit}`.trim();
+            const axisLabel = getHistoryAxisLabel(entity, primaryEntity);
 
             return `
                 <span class="history-compare-chip">
                     <span class="history-compare-dot" style="background:${color}"></span>
                     <span>${escapeHtml(getHistoryEntityLabel(entity))}</span>
                     <b>${escapeHtml(valueText)}</b>
+                    <span class="history-axis-badge">
+                        ${escapeHtml(unit || '-')} ${axisLabel}
+                    </span>
                     ${entityId !== primaryEntityId ? `
                         <button
                             type="button"
@@ -3953,6 +4119,7 @@ function renderHistoryCompareControls(primaryEntityId) {
                     ${availableEntities.map(entity => `
                         <option value="${escapeHtml(entity.id)}">
                             ${escapeHtml(getHistoryEntityLabel(entity))}
+                            (${escapeHtml(entity.unit || '-')})
                         </option>
                     `).join('')}
                 </select>
@@ -4021,15 +4188,57 @@ function createNumericHistoryPoints(data, valueKey = 'avg') {
         );
 }
 
+function createEnergyHistoryLabels(historyResponses) {
+    const timestamps = new Set();
+
+    historyResponses.forEach(response => {
+        response.data.forEach(row => {
+            const timestamp = Number(row.t);
+            if (Number.isFinite(timestamp)) {
+                timestamps.add(timestamp);
+            }
+        });
+    });
+
+    return Array.from(timestamps)
+        .sort((a, b) => a - b);
+}
+
+function createEnergyHistoryValues(data, labels, key) {
+    const valuesByTimestamp = new Map(
+        data.map(row => [
+            Number(row.t),
+            Number(row[key]) || 0
+        ])
+    );
+
+    return labels.map(timestamp =>
+        valuesByTimestamp.get(timestamp) || 0
+    );
+}
+
+function createEnergyHistoryPoints(data, key) {
+    return data
+        .map(row => ({
+            x: Number(row.t),
+            y: Number(row[key]) || 0
+        }))
+        .filter(point =>
+            Number.isFinite(point.x)
+            && Number.isFinite(point.y)
+        );
+}
+
 function addHistoryCompareEntity(entityId) {
     if (!currentEntityId || !entityId) return;
 
     const primaryEntity = findEntityById(currentEntityId);
     const entity = findEntityById(entityId);
     const allowedEntityIds = getAllowedDashboardEntityIds();
+    const activeUnits = getHistoryCompareUnits(currentEntityId);
 
     if (
-        !canCompareNumericHistoryEntity(entity, primaryEntity)
+        !canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
         || (
             entityId !== currentEntityId
             && !allowedEntityIds.has(entityId)
@@ -4043,7 +4252,9 @@ function addHistoryCompareEntity(entityId) {
         historyCompareEntityIds.push(entityId);
     }
 
-    openNumericHistory(currentEntityId);
+    openNumericHistory(currentEntityId, {
+        preserveCompare: true
+    });
 }
 
 function removeHistoryCompareEntity(entityId) {
@@ -4052,7 +4263,9 @@ function removeHistoryCompareEntity(entityId) {
     historyCompareEntityIds =
         historyCompareEntityIds.filter(id => id !== entityId);
 
-    openNumericHistory(currentEntityId);
+    openNumericHistory(currentEntityId, {
+        preserveCompare: true
+    });
 }
 
 async function openBooleanHistory(entityId) {
@@ -4553,7 +4766,7 @@ async function openBooleanHistory(entityId) {
     }, 0);
 }
 
-async function openNumericHistory(entityId) {
+async function openNumericHistory(entityId, options = {}) {
 
   currentEntityId = entityId;
 
@@ -4578,11 +4791,11 @@ async function openNumericHistory(entityId) {
     currentAggregation =
         getNumericHistoryAggregation(entity);
 
-    if (entity.deviceClass === 'energy') {
+    if (!options.preserveCompare) {
         historyCompareEntityIds = [entityId];
-    } else {
-        ensureHistoryCompareSelection(entityId);
     }
+
+    ensureHistoryCompareSelection(entityId);
 
   const historyResponses = await Promise.all(
     historyCompareEntityIds.map(async comparedEntityId => ({
@@ -4598,6 +4811,7 @@ async function openNumericHistory(entityId) {
 
   // More Entity Infos
   const unit = entity?.unit || '';
+  const chartUnits = getHistoryCompareUnits(entityId);
     const device = dashboardDevices.find(
     d => d.id === entity.deviceId
     );
@@ -4647,9 +4861,11 @@ async function openNumericHistory(entityId) {
         )
         .filter(value => Number.isFinite(value));
     const valuesOnly =
-        allCompareValues.length
-            ? allCompareValues
-            : avgs.filter(v => !isNaN(v));
+        entity.deviceClass !== 'energy' && chartUnits.length > 1
+            ? avgs.filter(v => !isNaN(v))
+            : allCompareValues.length
+                ? allCompareValues
+                : avgs.filter(v => !isNaN(v));
     const min = valuesOnly.length ? Math.min(...valuesOnly) : 0;
     const max = valuesOnly.length ? Math.max(...valuesOnly) : 0;
     const range = max - min;
@@ -4716,6 +4932,8 @@ async function openNumericHistory(entityId) {
         </div>
 
         </div>
+
+        ${renderHistoryCompareControls(entityId)}
     `;
 
     } else {
@@ -4778,70 +4996,105 @@ async function openNumericHistory(entityId) {
         chartLabel = 'Verlauf';
     }
 
+    const energyHasNegativeValues =
+        historyResponses.some(response =>
+            response.entity?.deviceClass === 'energy'
+            && response.data.some(row =>
+                Number(row.negative_change) > 0
+            )
+        );
+
+    const energyCompareDatasets = historyResponses
+        .filter(response => response.entity)
+        .flatMap((response, index) => {
+            const color =
+                historyCompareColors[index % historyCompareColors.length];
+            const label =
+                getHistoryEntityLabel(response.entity);
+            if (response.entity.deviceClass !== 'energy') {
+                return [{
+                    type: 'line',
+                    label,
+                    data: createNumericHistoryPoints(response.data),
+                    borderColor: color,
+                    backgroundColor: `${color}22`,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    yAxisID: 'y1',
+                    historyUnit: response.entity.unit || ''
+                }];
+            }
+
+            const datasets = [{
+                type: 'bar',
+                label,
+                data: createEnergyHistoryPoints(
+                    response.data,
+                    'positive_change'
+                ),
+                backgroundColor: `${color}88`,
+                borderColor: color,
+                borderWidth: 1,
+                yAxisID: 'y',
+                historyUnit: response.entity.unit || unit
+            }];
+
+            if (energyHasNegativeValues) {
+                datasets.push({
+                    type: 'bar',
+                    label: `${label} Negativ`,
+                    data: createEnergyHistoryPoints(
+                        response.data,
+                        'negative_change'
+                    ),
+                    backgroundColor: 'rgba(239,68,68,0.45)',
+                    borderColor: 'rgba(239,68,68,1)',
+                    borderWidth: 1,
+                    yAxisID: 'y',
+                    historyUnit: response.entity.unit || unit
+                });
+            }
+
+            return datasets;
+        });
+
     const compareDatasets = historyResponses
         .filter(response => response.entity)
         .map((response, index) => {
             const color =
                 historyCompareColors[index % historyCompareColors.length];
 
-            return {
-                label: getHistoryEntityLabel(response.entity),
-                data: createNumericHistoryPoints(response.data),
-                borderColor: color,
-                backgroundColor: `${color}22`,
-                tension: 0.3,
-                fill: index === 0 && historyResponses.length === 1,
-                pointRadius: 0,
-                borderWidth: index === 0 ? 2.5 : 2
-            };
-        });
+	            return {
+	                label: getHistoryEntityLabel(response.entity),
+	                data: createNumericHistoryPoints(response.data),
+	                borderColor: color,
+	                backgroundColor: `${color}22`,
+	                tension: 0.3,
+	                fill: index === 0 && historyResponses.length === 1,
+	                pointRadius: 0,
+	                borderWidth: index === 0 ? 2.5 : 2,
+	                yAxisID: getHistoryAxisId(response.entity, entity),
+	                historyUnit: response.entity.unit || ''
+	            };
+	        });
 
   // 🔧 Chart erstellen
   historyChart = new Chart(ctx, {
     type: currentType,
-    data: {
+	    data: {
 
-    labels: labels,
+	    labels: entity.deviceClass === 'energy'
+            ? []
+            : labels,
 
-    datasets:
+	    datasets:
 
-        entity.deviceClass === 'energy'
+	        entity.deviceClass === 'energy'
 
-        ? [
+	        ? energyCompareDatasets
 
-            // 🔥 Verbrauch
-            {
-            label: 'Positiv',
-
-            data: positiveChanges,
-
-            backgroundColor:
-                'rgba(59,130,246,0.5)',
-
-            borderColor:
-                'rgba(59,130,246,1)',
-
-            borderWidth: 1
-            },
-
-            // 🔥 Einspeisung
-            {
-            label: 'Negativ',
-
-            data: negativeChanges,
-
-            backgroundColor:
-                'rgba(239,68,68,0.5)',
-
-            borderColor:
-                'rgba(239,68,68,1)',
-
-            borderWidth: 1
-            }
-
-        ]
-
-        : compareDatasets
+	        : compareDatasets
     },
 	    options: {
 	      responsive: true,
@@ -4863,41 +5116,39 @@ async function openNumericHistory(entityId) {
         tooltip: {
           callbacks: {
 
-            // 🔥 Titel = vollständige Zeit
-            title: (ctx) => {
-              const ts = (
-                entity.deviceClass === 'energy'
-                    ? labels[ctx[0].dataIndex]
-                    : ctx[0].parsed.x
-              ) * 1000;
-              return new Date(ts).toLocaleString('de-DE');
-            },
+	            // 🔥 Titel = vollständige Zeit
+		            title: (ctx) => {
+		              const ts = ctx[0].parsed.x * 1000;
+		              return new Date(ts).toLocaleString('de-DE');
+	            },
 
             // 🔥 Werte
             label: (ctx) => {
 
             const i = ctx.dataIndex;
 
-            // 🔥 Energy
-            if (
-                entity.deviceClass
-                && entity.deviceClass === 'energy'
-            ) {
+	            // 🔥 Energy
+	            if (
+	                entity.deviceClass
+	                && entity.deviceClass === 'energy'
+	            ) {
+	                const value = Number(ctx.parsed.y);
 
-                if (ctx.raw <= 0) {
-                return null;
-                }
+	                if (
+	                    !Number.isFinite(value)
+	                    || (ctx.dataset.type === 'bar' && value <= 0)
+	                ) {
+	                return null;
+	                }
 
-                return `
-                ${ctx.dataset.label}:
-                ${ctx.raw.toFixed(2)} ${unit}
-                `;
+	                return `
+		                ${ctx.dataset.label}:
+		                ${value.toFixed(2)} ${ctx.dataset.historyUnit || unit}
+		                `;
 
-                return rows;
+	            }
 
-            }
-
-            return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${unit}`;
+	            return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${ctx.dataset.historyUnit || unit}`;
 
             }
           }
@@ -4905,25 +5156,17 @@ async function openNumericHistory(entityId) {
       },
 
       scales: {
-        x: {
-          type: entity.deviceClass === 'energy' ? 'category' : 'linear',
-          min: entity.deviceClass === 'energy'
-            ? undefined
-            : Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60),
-          max: entity.deviceClass === 'energy'
-            ? undefined
-            : Math.floor(Date.now() / 1000),
+	        x: {
+	          type: 'linear',
+	          min: Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60),
+	          max: Math.floor(Date.now() / 1000),
           ticks: {
             maxTicksLimit: currentHistoryHours > 48 ? 6 : 10,
 
             // 🔥 HIER passiert die HA-Magie
             callback: function(value, index) {
 
-              const ts = (
-                entity.deviceClass === 'energy'
-                    ? labels[index]
-                    : value
-              ) * 1000;
+		              const ts = value * 1000;
               const d = new Date(ts);
 
               const hours = d.getHours().toString().padStart(2, '0');
@@ -4941,19 +5184,30 @@ async function openNumericHistory(entityId) {
           }
         },
 
-        y: {
-        ticks: {
-            callback: (v) => {
+	        y: {
+	        ticks: {
+	            callback: (v) => {
 
-            if (range < 2) return `${v.toFixed(2)} ${unit}`;
-            if (range < 5) return `${v.toFixed(1)} ${unit}`;
-            if (range < 50) return `${v.toFixed(0)} ${unit}`;
+	            if (range < 2) return `${v.toFixed(2)} ${chartUnits[0] || unit}`;
+	            if (range < 5) return `${v.toFixed(1)} ${chartUnits[0] || unit}`;
+	            if (range < 50) return `${v.toFixed(0)} ${chartUnits[0] || unit}`;
 
-            return `${Math.round(v)} ${unit}`;
-            }
-        }
-        }
-      }
+	            return `${Math.round(v)} ${chartUnits[0] || unit}`;
+	            }
+	        }
+	        },
+
+		        y1: {
+		        display: chartUnits.length > 1,
+	        position: 'right',
+	        grid: {
+	            drawOnChartArea: false
+	        },
+	        ticks: {
+	            callback: (v) => `${v} ${chartUnits[1] || ''}`
+	        }
+	        }
+	      }
     }
   });
 

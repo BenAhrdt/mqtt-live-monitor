@@ -138,6 +138,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.25 Weiter Features
+* (BenAhrdt) Zweite Achse in den Charts möglich
+* (BenAhrdt) Einklappen von Dashboards und History in den EInstellungen
+* (BenAhrdt) Korrekte Anzeige der ENtitätsanzahl bei den Dashboards und Geräten, wo etwas ausgebledet wurde
+
 ### V1.6.24 Entity Vergleich im Chart
 * (BenAhrdt) Im numerischen chart, können jetzt merhere ENtites verglichen werden.
 

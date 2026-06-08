@@ -2903,6 +2903,31 @@ code {
   flex-direction: column;
 }
 
+.settings-section-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-section-toggle {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.settings-collapsible.collapsed .settings-section-body {
+  display: none;
+}
+
+.settings-collapsible.collapsed .settings-section-toggle {
+  transform: rotate(-90deg);
+}
+
 .history-compare {
   margin-top: 12px;
   display: flex;
@@ -2931,6 +2956,15 @@ code {
 }
 
 .history-compare-chip b {
+  white-space: nowrap;
+}
+
+.history-axis-badge {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 11px;
   white-space: nowrap;
 }
 

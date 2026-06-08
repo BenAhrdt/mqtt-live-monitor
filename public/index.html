@@ -399,44 +399,50 @@
           <div id="discoveryPrefixList"></div>
         </div>
 
-        <div class="card panel">
-          <div class="panel-header">
+        <div class="card panel settings-collapsible" data-settings-section="dashboards">
+          <div class="panel-header settings-section-header">
             <h2>Dashboards</h2>
+            <button class="settings-section-toggle" type="button" data-settings-toggle="dashboards" aria-label="Dashboards ein- oder ausblenden">▾</button>
           </div>
 
-          <div class="prefix-add-row">
-            <input id="newDashboardNameInput" placeholder="z. B. Schlafzimmer">
-            <button id="addDashboardBtn" class="btn primary">Dashboard hinzufügen</button>
-          </div>
+          <div class="settings-section-body" data-settings-body="dashboards">
+            <div class="prefix-add-row">
+              <input id="newDashboardNameInput" placeholder="z. B. Schlafzimmer">
+              <button id="addDashboardBtn" class="btn primary">Dashboard hinzufügen</button>
+            </div>
 
-          <div class="prefix-actions" style="margin:12px 0;">
-            <button id="exportDashboardsBtn" class="btn secondary" type="button">Exportieren</button>
-            <button id="importDashboardsBtn" class="btn secondary" type="button">Importieren</button>
-            <input id="importDashboardsFile" type="file" accept="application/json" style="display:none;">
-          </div>
+            <div class="prefix-actions" style="margin:12px 0;">
+              <button id="exportDashboardsBtn" class="btn secondary" type="button">Exportieren</button>
+              <button id="importDashboardsBtn" class="btn secondary" type="button">Importieren</button>
+              <input id="importDashboardsFile" type="file" accept="application/json" style="display:none;">
+            </div>
 
-          <div id="customDashboardList"></div>
+            <div id="customDashboardList"></div>
+          </div>
         </div>
 
-        <div class="card panel" id="historyPanel">
-          <div class="panel-header">
+        <div class="card panel settings-collapsible" id="historyPanel" data-settings-section="history">
+          <div class="panel-header settings-section-header">
             <h2>History / Aufzeichnung</h2>
+            <button class="settings-section-toggle" type="button" data-settings-toggle="history" aria-label="History ein- oder ausblenden">▾</button>
           </div>
 
-          <label class="checkbox-row">
-            <input type="checkbox" id="historyEnabled">
-            Aufzeichnung aktivieren
-          </label>
+          <div class="settings-section-body" data-settings-body="history">
+            <label class="checkbox-row">
+              <input type="checkbox" id="historyEnabled">
+              Aufzeichnung aktivieren
+            </label>
 
-          <p style="margin-bottom: 10px;">
-            Nur ausgewählte Entitäten werden gespeichert.
-          </p>
+            <p style="margin-bottom: 10px;">
+              Nur ausgewählte Entitäten werden gespeichert.
+            </p>
 
-          <div class="add-history-row">
-            <button id="addHistoryEntityBtn" class="btn primary">Hinzufügen</button>
+            <div class="add-history-row">
+              <button id="addHistoryEntityBtn" class="btn primary">Hinzufügen</button>
+            </div>
+
+            <div id="selectedHistoryEntities"></div>
           </div>
-
-          <div id="selectedHistoryEntities"></div>
         </div>
 
       </section>
