@@ -218,7 +218,11 @@ export function createDashboardRenderer(deps) {
             valueText.length > 30;
 
         return wrapDashboardEntity(entity, `
-            <div class="${multiline ? 'sensor-row-multiline' : 'sensor-row-line'} ${hasHistory ? 'has-history' : ''}" data-entity-id="${entity.id}">
+            <div
+                class="${multiline ? 'sensor-row-multiline' : 'sensor-row-line'} ${hasHistory ? 'has-history' : ''}"
+                data-entity-id="${entity.id}"
+                ${hasHistory ? 'draggable="true"' : ''}
+            >
 
                 <div class="sensor-name-wrap">
                 ${historyIcon

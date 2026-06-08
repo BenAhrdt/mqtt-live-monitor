@@ -2574,6 +2574,12 @@ document.addEventListener('click', async (e) => {
         }
     }
 
+    const removeCompareBtn = e.target.closest('.history-compare-remove');
+    if (removeCompareBtn) {
+        removeHistoryCompareEntity(removeCompareBtn.dataset.entityId);
+        return;
+    }
+
     // 🔥 ADD ENTITY (Virtuelles Gerät)
     const addEntityBtn = e.target.closest('.action-add-entity');
     if (addEntityBtn) {
@@ -3611,8 +3617,20 @@ if (bell && dropdown) {
 ///////////////////////////////////////////////////////////////////
 
 let historyChart = null;
+let historyCompareEntityIds = [];
 
-const booleanHistoryHours = [
+const historyCompareColors = [
+    '#3b82f6',
+    '#16a34a',
+    '#f97316',
+    '#a855f7',
+    '#e11d48',
+    '#0891b2'
+];
+
+const historyRangeHours = [
+    0.25,
+    0.5,
     1,
     2,
     3,
@@ -3624,15 +3642,9 @@ const booleanHistoryHours = [
     720
 ];
 
-const numericHistoryHours = [
-    12,
-    24,
-    168,
-    336,
-    720
-];
-
 const historyHourLabels = {
+    0.25: '15 Minuten',
+    0.5: '30 Minuten',
     1: '1 Stunde',
     2: '2 Stunden',
     3: '3 Stunden',
@@ -3754,12 +3766,301 @@ async function openHistory(entityId) {
     await openNumericHistory(entityId);
 }
 
+function isEntityHistoryEnabled(entityId) {
+    const history = window.config?.history;
+    const cfg = history?.entities?.[entityId];
+
+    return Boolean(history?.enabled && cfg && cfg.enabled);
+}
+
+function canCompareNumericHistoryEntity(entity, primaryEntity) {
+    if (!entity || !primaryEntity) return false;
+    if (!isEntityHistoryEnabled(entity.id)) return false;
+    if (entity.type === 'binary_sensor') return false;
+    if (entity.deviceClass === 'energy') return false;
+    if (primaryEntity.deviceClass === 'energy') return false;
+
+    const primaryUnit = primaryEntity.unit || '';
+    const entityUnit = entity.unit || '';
+
+    return primaryUnit === entityUnit;
+}
+
+function getHistoryEntityLabel(entity) {
+    if (!entity) return '';
+
+    const device = dashboardDevices.find(d => d.id === entity.deviceId);
+    const deviceName = getDeviceDisplayName(device);
+    const entityName = getEntityDisplayName(entity, entity.deviceId);
+
+    return `${deviceName}: ${entityName}`;
+}
+
+function getHistoryCompareEntities(primaryEntityId) {
+    const primaryEntity = findEntityById(primaryEntityId);
+    const entityMap = new Map();
+
+    dashboardDevices
+        .flatMap(device => device.entities || [])
+        .filter(entity => canCompareNumericHistoryEntity(entity, primaryEntity))
+        .forEach(entity => {
+            if (!entityMap.has(entity.id)) {
+                entityMap.set(entity.id, entity);
+            }
+        });
+
+    return Array.from(entityMap.values());
+}
+
+function getDashboardEntityIds(dashboard) {
+    const entityIds = new Set();
+
+    (dashboard?.devices || []).forEach(deviceConfig => {
+        (deviceConfig.entityIds || []).forEach(entityId => {
+            entityIds.add(entityId);
+        });
+    });
+
+    return entityIds;
+}
+
+function canAccessHomeDashboard() {
+    return isAdmin();
+}
+
+function getAllowedDashboardEntityIds() {
+    const entityIds = new Set();
+
+    if (canAccessHomeDashboard()) {
+        dashboardDevices
+            .flatMap(device => device.entities || [])
+            .forEach(entity => entityIds.add(entity.id));
+    }
+
+    customDashboards
+        .filter(canAccessDashboard)
+        .forEach(dashboard => {
+            getDashboardEntityIds(dashboard)
+                .forEach(entityId => entityIds.add(entityId));
+        });
+
+    return entityIds;
+}
+
+function getAllowedHistoryCompareEntities(primaryEntityId) {
+    const allowedEntityIds = getAllowedDashboardEntityIds();
+
+    return getHistoryCompareEntities(primaryEntityId)
+        .filter(entity => allowedEntityIds.has(entity.id));
+}
+
+function getActiveDashboardHistoryCompareEntities(primaryEntityId) {
+    if (!activeCustomDashboardId && canAccessHomeDashboard()) {
+        return getHistoryCompareEntities(primaryEntityId);
+    }
+
+    const activeDashboard =
+        customDashboards.find(
+            dashboard => dashboard.id === activeCustomDashboardId
+        );
+
+    if (!activeDashboard || !canAccessDashboard(activeDashboard)) {
+        return [];
+    }
+
+    const activeEntityIds =
+        getDashboardEntityIds(activeDashboard);
+
+    return getHistoryCompareEntities(primaryEntityId)
+        .filter(entity => activeEntityIds.has(entity.id));
+}
+
+function ensureHistoryCompareSelection(primaryEntityId) {
+    const allowedEntityIds = getAllowedDashboardEntityIds();
+
+    historyCompareEntityIds = [
+        primaryEntityId,
+        ...historyCompareEntityIds.filter(entityId => entityId !== primaryEntityId)
+    ];
+
+    historyCompareEntityIds = historyCompareEntityIds
+        .filter((entityId, index, allIds) =>
+            allIds.indexOf(entityId) === index
+            && (
+                entityId === primaryEntityId
+                || allowedEntityIds.has(entityId)
+            )
+            && canCompareNumericHistoryEntity(
+                findEntityById(entityId),
+                findEntityById(primaryEntityId)
+            )
+        );
+
+    if (!historyCompareEntityIds.length) {
+        historyCompareEntityIds = [primaryEntityId];
+    }
+}
+
+function renderHistoryCompareControls(primaryEntityId) {
+    const primaryEntity = findEntityById(primaryEntityId);
+    const selectedIds = new Set(historyCompareEntityIds);
+    const availableEntities = getAllowedHistoryCompareEntities(primaryEntityId)
+        .filter(entity => !selectedIds.has(entity.id));
+    const dragEntities = getActiveDashboardHistoryCompareEntities(primaryEntityId)
+        .filter(entity => !selectedIds.has(entity.id));
+
+    const chips = historyCompareEntityIds
+        .map((entityId, index) => {
+            const entity = findEntityById(entityId);
+            if (!entity) return '';
+
+            const color = historyCompareColors[index % historyCompareColors.length];
+            const unit = entity.unit || primaryEntity?.unit || '';
+            const value = Number(entity.value);
+            const valueText = Number.isFinite(value)
+                ? `${value.toFixed(2)} ${unit}`.trim()
+                : `${entity.value ?? '-'} ${unit}`.trim();
+
+            return `
+                <span class="history-compare-chip">
+                    <span class="history-compare-dot" style="background:${color}"></span>
+                    <span>${escapeHtml(getHistoryEntityLabel(entity))}</span>
+                    <b>${escapeHtml(valueText)}</b>
+                    ${entityId !== primaryEntityId ? `
+                        <button
+                            type="button"
+                            class="history-compare-remove"
+                            data-entity-id="${escapeHtml(entityId)}"
+                            title="Aus Vergleich entfernen"
+                        >
+                            ×
+                        </button>
+                    ` : ''}
+                </span>
+            `;
+        })
+        .join('');
+
+    return `
+        <div class="history-compare">
+            <div class="history-compare-chips">
+                ${chips}
+            </div>
+
+            <div class="history-compare-actions">
+                <select id="historyCompareSelect">
+                    <option value="">+ Entity</option>
+                    ${availableEntities.map(entity => `
+                        <option value="${escapeHtml(entity.id)}">
+                            ${escapeHtml(getHistoryEntityLabel(entity))}
+                        </option>
+                    `).join('')}
+                </select>
+
+                <div
+                    class="history-compare-dropzone"
+                    id="historyCompareDropzone"
+                    data-primary-entity-id="${escapeHtml(primaryEntityId)}"
+                >
+                    Entity hierher ziehen
+                </div>
+            </div>
+
+            ${dragEntities.length ? `
+                <div class="history-compare-available">
+                    ${dragEntities.map(entity => `
+                        <div
+                            class="history-compare-source"
+                            draggable="true"
+                            data-entity-id="${escapeHtml(entity.id)}"
+                            title="In den Graphen ziehen"
+                        >
+                            <span>↕</span>
+                            ${escapeHtml(getHistoryEntityLabel(entity))}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function getNumericHistoryAggregation(entity) {
+    if (entity.deviceClass && entity.deviceClass === 'energy') {
+        if (currentHistoryHours <= 0.5) return 60;
+        if (currentHistoryHours <= 3) return 5 * 60;
+        if (currentHistoryHours <= 24) return 15 * 60;
+        if (currentHistoryHours <= 24 * 7) return 60 * 60;
+        return 24 * 60 * 60;
+    }
+
+    if (currentHistoryHours <= 0.5) return 30;
+    if (currentHistoryHours <= 3) return 60;
+    if (currentHistoryHours <= 24) return 5 * 60;
+    if (currentHistoryHours <= 24 * 7) return 15 * 60;
+    return 60 * 60;
+}
+
+async function fetchNumericHistoryData(entityId, aggregation) {
+    const res = await fetch(
+        `/api/history/${entityId}?hours=${currentHistoryHours}&aggregation=${aggregation}`
+    );
+
+    return res.json();
+}
+
+function createNumericHistoryPoints(data, valueKey = 'avg') {
+    return data
+        .map(row => ({
+            x: Number(row.t),
+            y: Number(row[valueKey])
+        }))
+        .filter(point =>
+            Number.isFinite(point.x)
+            && Number.isFinite(point.y)
+        );
+}
+
+function addHistoryCompareEntity(entityId) {
+    if (!currentEntityId || !entityId) return;
+
+    const primaryEntity = findEntityById(currentEntityId);
+    const entity = findEntityById(entityId);
+    const allowedEntityIds = getAllowedDashboardEntityIds();
+
+    if (
+        !canCompareNumericHistoryEntity(entity, primaryEntity)
+        || (
+            entityId !== currentEntityId
+            && !allowedEntityIds.has(entityId)
+        )
+    ) {
+        alert('Diese Entity passt nicht zum aktuellen Graphen.');
+        return;
+    }
+
+    if (!historyCompareEntityIds.includes(entityId)) {
+        historyCompareEntityIds.push(entityId);
+    }
+
+    openNumericHistory(currentEntityId);
+}
+
+function removeHistoryCompareEntity(entityId) {
+    if (!currentEntityId || entityId === currentEntityId) return;
+
+    historyCompareEntityIds =
+        historyCompareEntityIds.filter(id => id !== entityId);
+
+    openNumericHistory(currentEntityId);
+}
+
 async function openBooleanHistory(entityId) {
 
     currentEntityId = entityId;
 
     ensureHistoryHoursAvailable(
-        booleanHistoryHours
+        historyRangeHours
     );
 
     const modal =
@@ -3924,7 +4225,7 @@ async function openBooleanHistory(entityId) {
 
                 <div class="history-range-buttons">
                     <select id="historyRangeSelect">
-                        ${getHistoryRangeOptionsHtml(booleanHistoryHours)}
+                        ${getHistoryRangeOptionsHtml(historyRangeHours)}
                     </select>
                 </div>
 
@@ -3976,7 +4277,7 @@ async function openBooleanHistory(entityId) {
             <div class="history-range-buttons">
 
                 <select id="historyRangeSelect">
-                    ${getHistoryRangeOptionsHtml(booleanHistoryHours)}
+                    ${getHistoryRangeOptionsHtml(historyRangeHours)}
                 </select>
 
             </div>
@@ -4257,7 +4558,7 @@ async function openNumericHistory(entityId) {
   currentEntityId = entityId;
 
   ensureHistoryHoursAvailable(
-    numericHistoryHours
+    historyRangeHours
   );
 
   const modal = document.getElementById('historyModal');
@@ -4268,31 +4569,30 @@ async function openNumericHistory(entityId) {
 
     let chartData;
     let chartLabel;
-    // Deside Aggregation and Type of Chart
-    if (entity.deviceClass && entity.deviceClass === 'energy') {
-        currentType = 'bar';
 
-        if (currentHistoryHours <= 24) {
-            currentAggregation = 15 * 60;
-        } else if (currentHistoryHours <= 24 * 7) {
-            currentAggregation = 60 * 60;
-        } else {
-            currentAggregation = 24 * 60 * 60;
-        }
+    currentType =
+        entity.deviceClass === 'energy'
+            ? 'bar'
+            : 'line';
+
+    currentAggregation =
+        getNumericHistoryAggregation(entity);
+
+    if (entity.deviceClass === 'energy') {
+        historyCompareEntityIds = [entityId];
     } else {
-        currentType = 'line';
-
-        if (currentHistoryHours <= 24) {
-            currentAggregation = 5 * 60;
-        } else if (currentHistoryHours <= 24 * 7) {
-            currentAggregation = 15 * 60;
-        } else {
-            currentAggregation = 60 * 60;
-        }
+        ensureHistoryCompareSelection(entityId);
     }
 
-  const res = await fetch(`/api/history/${entityId}?hours=${currentHistoryHours}&aggregation=${currentAggregation}`);
-  const data = await res.json();
+  const historyResponses = await Promise.all(
+    historyCompareEntityIds.map(async comparedEntityId => ({
+        entityId: comparedEntityId,
+        entity: findEntityById(comparedEntityId),
+        data: await fetchNumericHistoryData(comparedEntityId, currentAggregation)
+    }))
+  );
+
+  const data = historyResponses.find(row => row.entityId === entityId)?.data || [];
 
   const ctx = document.getElementById('historyChart');
 
@@ -4341,10 +4641,17 @@ async function openNumericHistory(entityId) {
 
 
   // 🔧 Gesamtwerte
+    const allCompareValues = historyResponses
+        .flatMap(response =>
+            response.data.map(row => Number(row.avg))
+        )
+        .filter(value => Number.isFinite(value));
     const valuesOnly =
-        avgs.filter(v => !isNaN(v));
-    const min = Math.min(...valuesOnly);
-    const max = Math.max(...valuesOnly);
+        allCompareValues.length
+            ? allCompareValues
+            : avgs.filter(v => !isNaN(v));
+    const min = valuesOnly.length ? Math.min(...valuesOnly) : 0;
+    const max = valuesOnly.length ? Math.max(...valuesOnly) : 0;
     const range = max - min;
 
     let infoHtml = '';
@@ -4403,7 +4710,7 @@ async function openNumericHistory(entityId) {
         <div class="history-range-buttons">
             <div class="history-range-buttons">
                 <select id="historyRangeSelect">
-                    ${getHistoryRangeOptionsHtml(numericHistoryHours)}
+                    ${getHistoryRangeOptionsHtml(historyRangeHours)}
                 </select>
             </div>
         </div>
@@ -4440,12 +4747,14 @@ async function openNumericHistory(entityId) {
         <div class="history-range-buttons">
             <div class="history-range-buttons">
                 <select id="historyRangeSelect">
-                    ${getHistoryRangeOptionsHtml(numericHistoryHours)}
+                    ${getHistoryRangeOptionsHtml(historyRangeHours)}
                 </select>
             </div>
         </div>
 
         </div>
+
+        ${renderHistoryCompareControls(entityId)}
     `;
 
     }
@@ -4468,6 +4777,24 @@ async function openNumericHistory(entityId) {
         chartData = avgs;
         chartLabel = 'Verlauf';
     }
+
+    const compareDatasets = historyResponses
+        .filter(response => response.entity)
+        .map((response, index) => {
+            const color =
+                historyCompareColors[index % historyCompareColors.length];
+
+            return {
+                label: getHistoryEntityLabel(response.entity),
+                data: createNumericHistoryPoints(response.data),
+                borderColor: color,
+                backgroundColor: `${color}22`,
+                tension: 0.3,
+                fill: index === 0 && historyResponses.length === 1,
+                pointRadius: 0,
+                borderWidth: index === 0 ? 2.5 : 2
+            };
+        });
 
   // 🔧 Chart erstellen
   historyChart = new Chart(ctx, {
@@ -4514,32 +4841,18 @@ async function openNumericHistory(entityId) {
 
         ]
 
-        : [
-
-            {
-            label: chartLabel,
-
-            data: chartData,
-
-            borderColor: '#3b82f6',
-
-            backgroundColor:
-                'rgba(59,130,246,0.15)',
-
-            tension: 0.3,
-
-            fill: true,
-
-            pointRadius: 0
-            }
-
-        ]
+        : compareDatasets
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
+	    options: {
+	      responsive: true,
+	      maintainAspectRatio: false,
+	      layout: {
+	        padding: {
+	            bottom: 12
+	        }
+	      },
 
-      interaction: {
+	      interaction: {
         mode: 'index',
         intersect: false
       },
@@ -4552,7 +4865,11 @@ async function openNumericHistory(entityId) {
 
             // 🔥 Titel = vollständige Zeit
             title: (ctx) => {
-              const ts = labels[ctx[0].dataIndex] * 1000;
+              const ts = (
+                entity.deviceClass === 'energy'
+                    ? labels[ctx[0].dataIndex]
+                    : ctx[0].parsed.x
+              ) * 1000;
               return new Date(ts).toLocaleString('de-DE');
             },
 
@@ -4580,16 +4897,7 @@ async function openNumericHistory(entityId) {
 
             }
 
-            // 🔥 Standard / Power
-            return [
-
-                `Ø: ${avgs[i].toFixed(2)} ${unit}`,
-
-                `Min: ${mins[i].toFixed(2)} ${unit}`,
-
-                `Max: ${maxs[i].toFixed(2)} ${unit}`
-
-            ];
+            return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${unit}`;
 
             }
           }
@@ -4598,13 +4906,24 @@ async function openNumericHistory(entityId) {
 
       scales: {
         x: {
+          type: entity.deviceClass === 'energy' ? 'category' : 'linear',
+          min: entity.deviceClass === 'energy'
+            ? undefined
+            : Math.floor(Date.now() / 1000) - (currentHistoryHours * 60 * 60),
+          max: entity.deviceClass === 'energy'
+            ? undefined
+            : Math.floor(Date.now() / 1000),
           ticks: {
             maxTicksLimit: currentHistoryHours > 48 ? 6 : 10,
 
             // 🔥 HIER passiert die HA-Magie
             callback: function(value, index) {
 
-              const ts = labels[index] * 1000;
+              const ts = (
+                entity.deviceClass === 'energy'
+                    ? labels[index]
+                    : value
+              ) * 1000;
               const d = new Date(ts);
 
               const hours = d.getHours().toString().padStart(2, '0');
@@ -4657,6 +4976,84 @@ document.getElementById('historyModal')
       e.currentTarget.classList.add('hidden');
       currentEntityId = null;
     }
+});
+
+document.addEventListener('change', (e) => {
+    const compareSelect =
+        e.target.closest('#historyCompareSelect');
+
+    if (!compareSelect || !compareSelect.value) {
+        return;
+    }
+
+    addHistoryCompareEntity(compareSelect.value);
+    compareSelect.value = '';
+});
+
+document.addEventListener('dragstart', (e) => {
+    const source =
+        e.target.closest('.history-compare-source');
+
+    if (source?.dataset.entityId && e.dataTransfer) {
+        e.dataTransfer.setData(
+            'text/plain',
+            source.dataset.entityId
+        );
+        e.dataTransfer.effectAllowed = 'copy';
+        return;
+    }
+
+    const sensor =
+        e.target.closest('.sensor-row-line.has-history, .sensor-row-multiline.has-history');
+
+    if (!sensor?.dataset.entityId || !e.dataTransfer) {
+        return;
+    }
+
+    e.dataTransfer.setData(
+        'text/plain',
+        sensor.dataset.entityId
+    );
+    e.dataTransfer.effectAllowed = 'copy';
+});
+
+document.addEventListener('dragover', (e) => {
+    const dropzone =
+        e.target.closest('#historyCompareDropzone');
+
+    if (!dropzone) {
+        return;
+    }
+
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+});
+
+document.addEventListener('dragleave', (e) => {
+    const dropzone =
+        e.target.closest('#historyCompareDropzone');
+
+    if (!dropzone) {
+        return;
+    }
+
+    dropzone.classList.remove('drag-over');
+});
+
+document.addEventListener('drop', (e) => {
+    const dropzone =
+        e.target.closest('#historyCompareDropzone');
+
+    if (!dropzone || !e.dataTransfer) {
+        return;
+    }
+
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+
+    addHistoryCompareEntity(
+        e.dataTransfer.getData('text/plain')
+    );
 });
 
 let currentHistoryHours = 24;

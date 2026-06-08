@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.24 Entity Vergleich im Chart
+* (BenAhrdt) Im numerischen chart, können jetzt merhere ENtites verglichen werden.
+
 ### V1.6.23 Import von Dashboards abgesichert. (Rollen werden beachtet)
 * (BenAhrdt) Mit den neuen Rollen, geb es Problme beim Import.
 
