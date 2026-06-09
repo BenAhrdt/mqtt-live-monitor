@@ -1,6 +1,6 @@
 {
   "name": "mqtt-live-monitor",
-  "version": "1.6.26",
+  "version": "1.6.27",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
