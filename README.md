@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.7.0 Chrome Extension in separatem Ordner
+* (BenAhrdt) Für Google Chrome liegt nun einei eigene extension im Ordner browser-extension
+
 ### V1.6.28 Enweiterung History Entities
 * (BenAhrdt) Bei Clima Entitäten, können jetzt auch Isttemperatur udn SOlltemperatur aufgezeichnet werden.
 

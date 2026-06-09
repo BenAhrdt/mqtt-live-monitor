@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQTT Live Monitor Einstellungen</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options">
+  <main class="options-shell">
+    <section class="settings-panel">
+      <header class="settings-header">
+        <div>
+          <h1>Extension konfigurieren</h1>
+          <p><span id="loginState">Nicht verbunden</span> · v0.2.1</p>
+        </div>
+      </header>
+
+      <div class="form-grid">
+        <label>
+          Server-URL
+          <input id="serverUrl" type="url" placeholder="https://mqtt.example.de">
+        </label>
+        <label>
+          Benutzername
+          <input id="username" autocomplete="username">
+        </label>
+        <label>
+          Passwort
+          <input id="password" type="password" autocomplete="current-password">
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="loginBtn" class="primary">Verbinden</button>
+        <button id="reloadBtn">Quellen neu laden</button>
+      </div>
+
+      <div class="layout-row">
+        <span>Layout</span>
+        <div class="segmented">
+          <button data-layout="compact" class="active">Kompakt</button>
+          <button data-layout="list">Liste</button>
+          <button data-layout="tiles">Kacheln</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-panel">
+      <div class="source-toolbar">
+        <h2>Entitaeten auswaehlen</h2>
+        <input id="search" placeholder="Suchen...">
+      </div>
+      <div id="sources" class="source-list"></div>
+    </section>
+
+    <section class="settings-panel">
+      <h2>Meine Schnellansicht</h2>
+      <div id="selectedItems" class="selected-list"></div>
+      <div class="button-row end">
+        <button id="saveBtn" class="primary">Speichern</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="vendor/socket.io.min.js"></script>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

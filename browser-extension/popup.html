@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQTT Live Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="popup">
+  <header class="popup-header">
+    <div class="brand-row">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M3 13h3l2-7 4 14 3-10 2 3h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>MQTT Live Monitor</h1>
+      <div class="status-line">
+        <span id="liveDot" class="dot muted"></span>
+        <span id="statusText">Nicht verbunden</span>
+      </div>
+      </div>
+    </div>
+    <button id="openOptions" class="icon-btn" title="Einstellungen">⚙</button>
+  </header>
+
+  <section class="quick-section">
+    <h2>Schnellansicht</h2>
+    <main id="content" class="content">
+      <div class="empty-state">
+        <strong>Keine Schnellansicht eingerichtet</strong>
+        <span>Oeffne die Einstellungen und waehle Werte aus.</span>
+      </div>
+    </main>
+  </section>
+
+  <footer class="popup-footer">
+    <span id="updatedText">Noch nicht aktualisiert</span>
+    <span class="version-badge">v0.2.1</span>
+  </footer>
+
+  <script src="vendor/socket.io.min.js"></script>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

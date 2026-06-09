@@ -3,6 +3,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
+const crypto = require("crypto");
 const mqtt = require("mqtt");
 const packageJson = require("./package.json");
 const { exec } = require("child_process");
@@ -17,6 +18,8 @@ dotenv.config();
 
 let CONFIG_PATH;
 const USER_FILE = path.join(__dirname, "usercredentials.json");
+const EXTENSION_CONFIG_FILE = path.join(__dirname, "data", "extension-configs.json");
+const EXTENSION_TOKENS_FILE = path.join(__dirname, "data", "extension-tokens.json");
 
 function readUsers() {
   try {
@@ -36,6 +39,82 @@ function readUsers() {
 
 function writeUsers(data) {
   fs.writeFileSync(USER_FILE, JSON.stringify(data, null, 2));
+}
+
+function hashExtensionToken(token) {
+  return crypto
+    .createHash("sha256")
+    .update(String(token))
+    .digest("hex");
+}
+
+function readExtensionTokens() {
+  try {
+    if (!fs.existsSync(EXTENSION_TOKENS_FILE)) {
+      return {};
+    }
+
+    return JSON.parse(fs.readFileSync(EXTENSION_TOKENS_FILE, "utf8"));
+  } catch (err) {
+    console.error("Fehler beim Lesen extension-tokens.json:", err.message);
+    return {};
+  }
+}
+
+function writeExtensionTokens(data) {
+  const dir = path.dirname(EXTENSION_TOKENS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(
+    EXTENSION_TOKENS_FILE,
+    JSON.stringify(data, null, 2),
+    "utf8"
+  );
+}
+
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || null;
+}
+
+function getUserByUsername(username) {
+  const data = readUsers();
+  return (data.users || []).find(user => user.username === username);
+}
+
+function getExtensionUserFromToken(token) {
+  if (!token) return null;
+
+  const tokens = readExtensionTokens();
+  const record = tokens[hashExtensionToken(token)];
+  if (!record?.username) return null;
+
+  const user = getUserByUsername(record.username);
+  if (!user || user.active === false) return null;
+
+  return {
+    username: user.username,
+    roles: user.roles || [],
+    isDefault: user.isDefault
+  };
+}
+
+function attachExtensionUserFromToken(req) {
+  const user = getExtensionUserFromToken(getBearerToken(req));
+
+  if (!user) {
+    return false;
+  }
+
+  req.extensionUser = user;
+  return true;
+}
+
+function getRequestUser(req) {
+  return req.session?.user || req.extensionUser || null;
 }
 
 // 👉 prüfen ob Electron läuft
@@ -252,7 +331,15 @@ app.use('/api', (req, res, next) => {
   if (
     req.path.startsWith('/auth/login') ||
     req.path.startsWith('/auth/me') ||
-    req.path.startsWith('/auth/enabled')
+    req.path.startsWith('/auth/enabled') ||
+    req.path.startsWith('/extension/login')
+  ) {
+    return next();
+  }
+
+  if (
+    req.path.startsWith('/extension/') &&
+    attachExtensionUserFromToken(req)
   ) {
     return next();
   }
@@ -269,7 +356,10 @@ io.use((socket, next) => {
     return next();
   }
 
-  const user = socket.request.session?.user;
+  const user =
+    socket.request.session?.user ||
+    getExtensionUserFromToken(socket.handshake.auth?.token);
+
   if (!user) {
     return next(new Error("Nicht eingeloggt"));
   }
@@ -2395,6 +2485,439 @@ function getDevicesForDashboard() {
   });
 }
 
+function readExtensionConfigs() {
+  try {
+    if (!fs.existsSync(EXTENSION_CONFIG_FILE)) {
+      return {};
+    }
+
+    return JSON.parse(fs.readFileSync(EXTENSION_CONFIG_FILE, "utf8"));
+  } catch (err) {
+    console.error("Fehler beim Lesen extension-configs.json:", err.message);
+    return {};
+  }
+}
+
+function writeExtensionConfigs(data) {
+  const dir = path.dirname(EXTENSION_CONFIG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(
+    EXTENSION_CONFIG_FILE,
+    JSON.stringify(data, null, 2),
+    "utf8"
+  );
+}
+
+function getDeviceDisplayNameServer(device) {
+  return String(
+    mqttConfig.friendlyNames?.[device?.id]?.name ||
+    device?.name ||
+    device?.id ||
+    ""
+  );
+}
+
+function getEntityDisplayNameServer(entity, deviceId) {
+  return String(
+    mqttConfig.friendlyNames?.[deviceId]?.entities?.[entity?.id] ||
+    entity?.name ||
+    entity?.id ||
+    ""
+  );
+}
+
+function getExtensionUsername(req) {
+  return getRequestUsername(req);
+}
+
+function canUserAccessCustomDashboard(user, dashboard) {
+  if (!mqttConfig.auth?.enabled) return true;
+  if (user?.roles?.includes("admin")) return true;
+
+  const allowedRoles = Array.isArray(dashboard?.allowedRoles)
+    ? dashboard.allowedRoles
+    : [];
+
+  if (!allowedRoles.length) return true;
+
+  return allowedRoles.some(role => user?.roles?.includes(role));
+}
+
+function getAllowedExtensionEntityIds(req) {
+  const user = getRequestUser(req);
+  const allowedEntityIds = new Set();
+
+  if (!mqttConfig.auth?.enabled || user?.roles?.includes("admin")) {
+    Object.values(getCombinedStore()).forEach(device => {
+      Object.values(device.entities || {}).forEach(entity => {
+        allowedEntityIds.add(entity.id);
+      });
+    });
+
+    return allowedEntityIds;
+  }
+
+  (mqttConfig.customDashboards || [])
+    .filter(dashboard => canUserAccessCustomDashboard(user, dashboard))
+    .forEach(dashboard => {
+      (dashboard.devices || []).forEach(deviceConfig => {
+        (deviceConfig.entityIds || []).forEach(entityId => {
+          allowedEntityIds.add(entityId);
+        });
+      });
+    });
+
+  return allowedEntityIds;
+}
+
+function createExtensionSourceId(entityId, key) {
+  return `${entityId}::${key}`;
+}
+
+function parseExtensionSourceId(sourceId) {
+  const [entityId, key] = String(sourceId || "").split("::");
+  return {
+    entityId,
+    key: key || null
+  };
+}
+
+function formatExtensionValue(value, unit = "") {
+  if (typeof value === "boolean") {
+    return value ? "An" : "Aus";
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    const formatted =
+      Math.abs(numeric) >= 100
+        ? numeric.toFixed(0)
+        : numeric.toFixed(2).replace(/\.?0+$/, "");
+
+    return `${formatted}${unit ? ` ${unit}` : ""}`;
+  }
+
+  return `${value}${unit ? ` ${unit}` : ""}`;
+}
+
+function getNestedExtensionValue(entity, key) {
+  if (!key) return entity?.value;
+
+  if (key === "lightState") {
+    const raw = entity?.rawState;
+    if (raw && typeof raw === "object" && raw.state !== undefined) {
+      return raw.state;
+    }
+    return entity?.value;
+  }
+
+  if (key === "brightnessPercent") {
+    const raw = entity?.rawState;
+    const brightness = raw && typeof raw === "object"
+      ? Number(raw.brightness)
+      : Number.NaN;
+    const scale = Number(entity?.brightnessScale || 255);
+
+    if (!Number.isFinite(brightness) || !Number.isFinite(scale) || scale <= 0) {
+      return null;
+    }
+
+    return Math.round((brightness / scale) * 100);
+  }
+
+  return entity?.[key];
+}
+
+function getExtensionIcon(entity, sourceKey = null) {
+  const type = String(entity?.type || "").toLowerCase();
+  const deviceClass = String(entity?.deviceClass || "").toLowerCase();
+  const unit = String(entity?.unit || "").toLowerCase();
+  const name = String(entity?.name || "").toLowerCase();
+  const rawName = `${name} ${String(entity?.id || "").toLowerCase()}`;
+  const key = String(sourceKey || "").toLowerCase();
+
+  if (deviceClass === "carbon_dioxide" || rawName.includes("co2")) return "co2";
+  if (deviceClass === "battery" || rawName.includes("battery") || rawName.includes("batterie") || rawName.includes("akku")) return "battery";
+  if (rawName.includes("intervall") || rawName.includes("interval") || unit === "min") return "timer";
+  if (rawName.includes("pv") || rawName.includes("solar")) return "sun";
+  if (deviceClass === "energy" || deviceClass === "power" || rawName.includes("leistung") || rawName.includes("netz") || unit.includes("w")) return "zap";
+  if (rawName.includes("pool") || rawName.includes("wasser") || rawName.includes("water")) return "waves";
+  if (rawName.includes("garten") || rawName.includes("garden")) return "leaf";
+  if (key.includes("temperature") || deviceClass === "temperature" || unit.includes("°c")) return "thermometer";
+  if (deviceClass === "humidity" || unit === "%") return "droplets";
+  if (deviceClass === "window") return "panel-top";
+  if (deviceClass === "door" || deviceClass === "opening") return "door-open";
+  if (deviceClass === "motion" || deviceClass === "presence") return "activity";
+  if (rawName.includes("air") || rawName.includes("luft")) return "cloud";
+  if (type === "climate") return "thermometer";
+  if (type === "light") return "lightbulb";
+  if (type === "cover") return "blinds";
+  if (type === "switch") return "toggle-left";
+  if (type === "binary_sensor") return "circle-dot";
+  return "gauge";
+}
+
+function createExtensionSource(device, entity, source = {}) {
+  const sourceId = source.id || entity.id;
+  const key = source.key || null;
+  const value = getNestedExtensionValue(entity, key);
+  const unit = source.unit ?? entity?.unit ?? "";
+  const type = source.type || (
+    typeof value === "boolean" || entity.type === "binary_sensor"
+      ? "boolean"
+      : Number.isFinite(Number(value))
+        ? "numeric"
+        : "text"
+  );
+  const deviceName = getDeviceDisplayNameServer(device);
+  const entityName = source.name || getEntityDisplayNameServer(entity, device.id);
+
+  return {
+    id: sourceId,
+    entityId: entity.id,
+    sourceKey: key,
+    type,
+    deviceId: device.id,
+    deviceName,
+    name: entityName,
+    label: `${deviceName}: ${entityName}`,
+    value,
+    unit,
+    displayValue: formatExtensionValue(value, unit),
+    icon: source.icon || getExtensionIcon(entity, key),
+    updatedAt: entity.lastUpdate || device.updatedAt || null
+  };
+}
+
+function getExtensionSourcesForEntity(device, entity) {
+  if (entity.type === "light") {
+    const sources = [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "lightState"),
+        key: "lightState",
+        name: "Status",
+        type: "text",
+        unit: "",
+        icon: "lightbulb"
+      })
+    ];
+
+    if (getNestedExtensionValue(entity, "brightnessPercent") !== null) {
+      sources.push(
+        createExtensionSource(device, entity, {
+          id: createExtensionSourceId(entity.id, "brightnessPercent"),
+          key: "brightnessPercent",
+          name: "Helligkeit",
+          type: "numeric",
+          unit: "%",
+          icon: "sun"
+        })
+      );
+    }
+
+    return sources;
+  }
+
+  if (entity.type === "climate") {
+    return [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "currentTemperature"),
+        key: "currentTemperature",
+        name: "Isttemperatur",
+        type: "numeric",
+        unit: "°C",
+        icon: "thermometer"
+      }),
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "targetTemperature"),
+        key: "targetTemperature",
+        name: "Solltemperatur",
+        type: "numeric",
+        unit: "°C",
+        icon: "thermometer"
+      })
+    ];
+  }
+
+  if (entity.type === "humidifier") {
+    return [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "currentHumidity"),
+        key: "currentHumidity",
+        name: "Luftfeuchtigkeit",
+        type: "numeric",
+        unit: "%",
+        icon: "droplets"
+      }),
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "targetHumidity"),
+        key: "targetHumidity",
+        name: "Sollfeuchte",
+        type: "numeric",
+        unit: "%",
+        icon: "droplets"
+      }),
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "state"),
+        key: "state",
+        name: "Status",
+        type: "text",
+        unit: "",
+        icon: "fan"
+      })
+    ];
+  }
+
+  if (entity.type === "cover") {
+    const sources = [];
+
+    sources.push(
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "state"),
+        key: "state",
+        name: "Zustand",
+        type: "text",
+        unit: "",
+        icon: "blinds"
+      })
+    );
+
+    if (entity.position !== null && entity.position !== undefined) {
+      sources.push(
+        createExtensionSource(device, entity, {
+          id: createExtensionSourceId(entity.id, "position"),
+          key: "position",
+          name: "Position",
+          type: "numeric",
+          unit: "%",
+          icon: "blinds"
+        })
+      );
+    }
+
+    return sources;
+  }
+
+  if (entity.type === "lock") {
+    return [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "state"),
+        key: "state",
+        name: "Zustand",
+        type: "text",
+        unit: "",
+        icon: "lock"
+      })
+    ];
+  }
+
+  if (entity.type === "lawn_mower") {
+    return [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "activity"),
+        key: "activity",
+        name: "Aktivitaet",
+        type: "text",
+        unit: "",
+        icon: "activity"
+      })
+    ];
+  }
+
+  if (entity.type === "button") {
+    return [];
+  }
+
+  if (entity.value === undefined || entity.value === null || entity.value === "") {
+    return [];
+  }
+
+  return [createExtensionSource(device, entity)];
+}
+
+function getAllowedExtensionSources(req) {
+  const allowedEntityIds = getAllowedExtensionEntityIds(req);
+  const sources = [];
+
+  Object.values(getCombinedStore()).forEach(device => {
+    Object.values(device.entities || {}).forEach(entity => {
+      if (!allowedEntityIds.has(entity.id)) return;
+
+      getExtensionSourcesForEntity(device, entity)
+        .forEach(source => sources.push(source));
+    });
+  });
+
+  return sources.sort((a, b) =>
+    a.label.localeCompare(b.label, "de", { sensitivity: "base" })
+  );
+}
+
+function normalizeExtensionConfig(config, allowedSourceIds = new Set()) {
+  const layout = ["compact", "list", "tiles"].includes(config?.layout)
+    ? config.layout
+    : "compact";
+
+  const items = Array.isArray(config?.items)
+    ? config.items
+        .map((item, index) => ({
+          sourceId: String(item?.sourceId || "").trim(),
+          label: String(item?.label || "").trim(),
+          icon: String(item?.icon || "").trim(),
+          order: Number.isFinite(Number(item?.order))
+            ? Number(item.order)
+            : index + 1
+        }))
+        .filter(item =>
+          item.sourceId &&
+          (!allowedSourceIds.size || allowedSourceIds.has(item.sourceId))
+        )
+        .sort((a, b) => a.order - b.order)
+    : [];
+
+  return { layout, items };
+}
+
+function getExtensionConfigForUser(username, allowedSourceIds) {
+  const configs = readExtensionConfigs();
+  return normalizeExtensionConfig(configs[username], allowedSourceIds);
+}
+
+function createExtensionSnapshot(req) {
+  const sources = getAllowedExtensionSources(req);
+  const sourceMap = new Map(sources.map(source => [source.id, source]));
+  const config = getExtensionConfigForUser(
+    getExtensionUsername(req),
+    new Set(sourceMap.keys())
+  );
+
+  const items = config.items
+    .map(item => {
+      const source = sourceMap.get(item.sourceId);
+      if (!source) return null;
+
+      return {
+        ...source,
+        label: item.label || source.name || source.label,
+        icon: item.icon || source.icon,
+        order: item.order
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    layout: config.layout,
+    items
+  };
+}
+
 function getPublicConfig() {
   return {
     webPort: mqttConfig.webPort,
@@ -2444,7 +2967,7 @@ function isAdminUser(req) {
     return true;
   }
 
-  return req.session?.user?.roles?.includes('admin');
+  return getRequestUser(req)?.roles?.includes('admin');
 }
 
 function getRequestUsername(req) {
@@ -2452,7 +2975,7 @@ function getRequestUsername(req) {
     return 'admin';
   }
 
-  return req.session?.user?.username || 'unknown';
+  return getRequestUser(req)?.username || 'unknown';
 }
 
 function canManageChartConfig(req, chartConfig) {
@@ -3179,6 +3702,96 @@ app.get('/api/history/:entityId', (req, res) => {
 
   });
 
+});
+
+app.post('/api/extension/login', loginLimiter, async (req, res) => {
+  const { username, password } = req.body;
+  const user = getUserByUsername(username);
+
+  if (!user || user.active === false) {
+    return res.status(401).json({ error: "Login fehlgeschlagen" });
+  }
+
+  const valid = await bcryptjs.compare(password, user.passwordHash);
+  if (!valid) {
+    return res.status(401).json({ error: "Login fehlgeschlagen" });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokens = readExtensionTokens();
+
+  tokens[hashExtensionToken(token)] = {
+    username: user.username,
+    createdAt: new Date().toISOString()
+  };
+
+  writeExtensionTokens(tokens);
+
+  res.json({
+    ok: true,
+    token,
+    user: {
+      username: user.username,
+      roles: user.roles || [],
+      isDefault: user.isDefault
+    }
+  });
+});
+
+app.get('/api/extension/me', (req, res) => {
+  const user = getRequestUser(req);
+
+  res.json({
+    ok: true,
+    user: {
+      username: getExtensionUsername(req),
+      roles: user?.roles || ['admin']
+    }
+  });
+});
+
+app.get('/api/extension/sources', (req, res) => {
+  res.json({
+    ok: true,
+    sources: getAllowedExtensionSources(req)
+  });
+});
+
+app.get('/api/extension/config', (req, res) => {
+  const sources = getAllowedExtensionSources(req);
+  const allowedSourceIds = new Set(sources.map(source => source.id));
+
+  res.json({
+    ok: true,
+    config: getExtensionConfigForUser(
+      getExtensionUsername(req),
+      allowedSourceIds
+    )
+  });
+});
+
+app.post('/api/extension/config', (req, res) => {
+  const sources = getAllowedExtensionSources(req);
+  const allowedSourceIds = new Set(sources.map(source => source.id));
+  const config = normalizeExtensionConfig(req.body, allowedSourceIds);
+  const configs = readExtensionConfigs();
+
+  configs[getExtensionUsername(req)] = config;
+  writeExtensionConfigs(configs);
+
+  res.json({
+    ok: true,
+    config
+  });
+});
+
+app.get('/api/extension/snapshot', (req, res) => {
+  const snapshot = createExtensionSnapshot(req);
+
+  res.json({
+    ok: true,
+    ...snapshot
+  });
 });
 
 // Restliche API Routen als unbekannt melden
