@@ -474,6 +474,15 @@ export function createDashboardRenderer(deps) {
         const minTemp = Number(entity.minTemp ?? 6);
         const maxTemp = Number(entity.maxTemp ?? 30);
         const tempStep = Number(entity.tempStep ?? 0.1);
+        const history = window.config?.history;
+        const currentTempHistoryId = `${entity.id}::currentTemperature`;
+        const targetTempHistoryId = `${entity.id}::targetTemperature`;
+        const hasCurrentTempHistory =
+            history?.enabled &&
+            history?.entities?.[currentTempHistoryId]?.enabled;
+        const hasTargetTempHistory =
+            history?.enabled &&
+            history?.entities?.[targetTempHistoryId]?.enabled;
 
         return wrapDashboardEntity(entity, `
         <div class="climate-entity-block">
@@ -485,12 +494,22 @@ export function createDashboardRenderer(deps) {
                 })}
             </div>
 
-            <div class="climate-current-line">
+            <div
+                class="climate-current-line ${hasCurrentTempHistory ? 'has-history climate-history-row' : ''}"
+                data-entity-id="${currentTempHistoryId}"
+            >
+            ${hasCurrentTempHistory ? '<span class="history-icon">📈</span>' : ''}
             Isttemperatur <strong>${currentTemp.toFixed(1)} °C</strong>
             </div>
 
             <div class="climate-target-panel">
-            <div class="climate-target-label">Solltemperatur</div>
+            <div
+                class="climate-target-label ${hasTargetTempHistory ? 'has-history climate-history-row' : ''}"
+                data-entity-id="${targetTempHistoryId}"
+            >
+                ${hasTargetTempHistory ? '<span class="history-icon">📈</span>' : ''}
+                Solltemperatur
+            </div>
 
             <button
                 type="button"

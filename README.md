@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.28 Enweiterung History Entities
+* (BenAhrdt) Bei Clima Entitäten, können jetzt auch Isttemperatur udn SOlltemperatur aufgezeichnet werden.
+
 ### V1.6.27 Sicherheitsupdate
 * (BenAhrdt) Verbesserte Sicherheit beim Login / beo API Anfragen.
 

@@ -1087,6 +1087,9 @@ code {
 }
 
 .climate-current-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 14px;
 }
@@ -1106,9 +1109,25 @@ code {
 }
 
 .climate-target-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 13px;
   margin-bottom: 8px;
+}
+
+.climate-history-row.has-history {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.climate-history-row.has-history:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--text);
 }
 
 .climate-target-value {

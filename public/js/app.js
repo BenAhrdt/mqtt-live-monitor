@@ -835,6 +835,90 @@ function findEntityById(id) {
     return null;
 }
 
+function createHistorySourceId(entityId, key) {
+    return `${entityId}::${key}`;
+}
+
+function parseHistorySourceId(id) {
+    const [entityId, key] = String(id || '').split('::');
+    return {
+        entityId,
+        key: key || null
+    };
+}
+
+function getClimateHistorySources(entity, device) {
+    if (!entity || entity.type !== 'climate') return [];
+
+    const deviceId = device?.id || entity.deviceId;
+    const baseName = getEntityDisplayName(entity, deviceId);
+
+    return [
+        {
+            id: createHistorySourceId(entity.id, 'currentTemperature'),
+            entityId: entity.id,
+            key: 'currentTemperature',
+            label: `${baseName}: Isttemperatur`,
+            name: 'Isttemperatur',
+            type: 'numeric',
+            unit: '°C'
+        },
+        {
+            id: createHistorySourceId(entity.id, 'targetTemperature'),
+            entityId: entity.id,
+            key: 'targetTemperature',
+            label: `${baseName}: Solltemperatur`,
+            name: 'Solltemperatur',
+            type: 'numeric',
+            unit: '°C'
+        }
+    ];
+}
+
+function getHistorySourcesForEntity(entity, device) {
+    if (!entity) return [];
+
+    if (entity.type === 'climate') {
+        return getClimateHistorySources(entity, device);
+    }
+
+    return [];
+}
+
+function findHistorySourceById(id) {
+    const entity = findEntityById(id);
+
+    if (entity) {
+        return entity;
+    }
+
+    const { entityId, key } = parseHistorySourceId(id);
+    if (!key) return null;
+
+    for (const device of dashboardDevices) {
+        const parentEntity =
+            (device.entities || []).find(item => item.id === entityId);
+
+        const source =
+            getHistorySourcesForEntity(parentEntity, device)
+                .find(item => item.id === id);
+
+        if (source) {
+            return {
+                ...source,
+                id: source.id,
+                parentEntityId: parentEntity.id,
+                deviceId: device.id,
+                deviceClass: source.deviceClass || '',
+                value: parentEntity?.[source.key],
+                isHistorySource: true
+            };
+        }
+    }
+
+    return null;
+}
+
 function getCustomDashboardIdFromUrl() {
     const match = window.location.pathname.match(/^\/dashboard\/custom\/(.+)$/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -2077,7 +2161,17 @@ socket.on('entity-update', (data) => {
     updateDashboardEntity(data);
 
     // 🔥 ===== LIVE VALUE =====
-    if (data.entityId === currentEntityId) {
+    const currentHistorySource =
+        currentEntityId
+            ? findHistorySourceById(currentEntityId)
+            : null;
+
+    const currentHistoryBaseEntityId =
+        currentEntityId
+            ? getHistoryBaseEntityId(currentEntityId)
+            : null;
+
+    if (data.entityId === currentHistoryBaseEntityId) {
 
         const el =
             document.getElementById('historyLiveValue');
@@ -2094,12 +2188,16 @@ socket.on('entity-update', (data) => {
             } else {
 
                 const value =
-                    Number(data.entity.value);
+                    Number(
+                        currentHistorySource?.isHistorySource
+                            ? data.entity?.[currentHistorySource.key]
+                            : data.entity.value
+                    );
 
                 if (!isNaN(value)) {
 
                     el.innerHTML =
-                        `<b>${value.toFixed(2)}</b> ${data.entity.unit || ''}`;
+                        `<b>${value.toFixed(2)}</b> ${currentHistorySource?.unit || data.entity.unit || ''}`;
                 }
             }
         }
@@ -2556,7 +2654,7 @@ document.addEventListener('click', async (e) => {
     }
 
     // 🔥 HISTORY POPUP für Sensoren
-    const sensor = e.target.closest('.sensor-row-line.has-history');
+    const sensor = e.target.closest('.sensor-row-line.has-history, .climate-history-row.has-history');
 
     if (sensor) {
 
@@ -3819,7 +3917,7 @@ function setupHistoryRangeSelect() {
 
 async function openHistory(entityId, options = {}) {
 
-    const entity = findEntityById(entityId);
+    const entity = findHistorySourceById(entityId);
 
     if (entity?.type === 'binary_sensor') {
         await openBooleanHistory(entityId);
@@ -3860,29 +3958,69 @@ function getHistoryEntityLabel(entity) {
 
     const device = dashboardDevices.find(d => d.id === entity.deviceId);
     const deviceName = getDeviceDisplayName(device);
-    const entityName = getEntityDisplayName(entity, entity.deviceId);
+    const entityName = entity.isHistorySource
+        ? entity.label
+        : getEntityDisplayName(entity, entity.deviceId);
 
-    return `${deviceName}: ${entityName}`;
+    return entity.isHistorySource
+        ? `${deviceName}: ${entityName}`
+        : `${deviceName}: ${entityName}`;
 }
 
 function getHistoryCompareEntities(primaryEntityId) {
-    const primaryEntity = findEntityById(primaryEntityId);
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     const entityMap = new Map();
 
     dashboardDevices
-        .flatMap(device => device.entities || [])
-        .filter(entity => canCompareNumericHistoryEntity(entity, primaryEntity))
-        .forEach(entity => {
-            if (!entityMap.has(entity.id)) {
-                entityMap.set(entity.id, entity);
-            }
+        .forEach(device => {
+            (device.entities || []).forEach(entity => {
+                [
+                    entity,
+                    ...getHistorySourcesForEntity(entity, device)
+                        .map(source => findHistorySourceById(source.id))
+                        .filter(Boolean)
+                ]
+                    .filter(item => canCompareNumericHistoryEntity(item, primaryEntity))
+                    .forEach(item => {
+                        if (!entityMap.has(item.id)) {
+                            entityMap.set(item.id, item);
+                        }
+                    });
+            });
         });
 
     return Array.from(entityMap.values());
 }
 
+function getHistoryBaseEntityId(historyId) {
+    return parseHistorySourceId(historyId).entityId;
+}
+
+function isHistorySourceAllowed(historyId, allowedEntityIds) {
+    return allowedEntityIds.has(getHistoryBaseEntityId(historyId));
+}
+
+function getAllowedDashboardHistorySourceIds() {
+    const allowedEntityIds = getAllowedDashboardEntityIds();
+    const allowedHistoryIds = new Set();
+
+    allowedEntityIds.forEach(entityId => {
+        allowedHistoryIds.add(entityId);
+        const entity = findEntityById(entityId);
+        const device = dashboardDevices.find(item => item.id === entity?.deviceId);
+
+        getHistorySourcesForEntity(entity, device)
+            .forEach(source => {
+                allowedHistoryIds.add(source.id);
+            });
+            }
+        );
+
+    return allowedHistoryIds;
+}
+
 function getHistoryCompareUnits(primaryEntityId, entityIds = historyCompareEntityIds) {
-    const primaryEntity = findEntityById(primaryEntityId);
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     if (!primaryEntity) return [''];
 
     const units = [primaryEntity.unit || ''];
@@ -3890,7 +4028,7 @@ function getHistoryCompareUnits(primaryEntityId, entityIds = historyCompareEntit
     entityIds
         .filter(entityId => entityId !== primaryEntityId)
         .forEach(entityId => {
-        const entity = findEntityById(entityId);
+        const entity = findHistorySourceById(entityId);
         if (!entity) return;
         if (
             primaryEntity.deviceClass === 'energy'
@@ -3980,19 +4118,19 @@ function getAllowedDashboardEntityIds() {
 }
 
 function getAllowedHistoryCompareEntities(primaryEntityId) {
-    const allowedEntityIds = getAllowedDashboardEntityIds();
-    const primaryEntity = findEntityById(primaryEntityId);
+    const allowedHistoryIds = getAllowedDashboardHistorySourceIds();
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     const activeUnits = getHistoryCompareUnits(primaryEntityId);
 
     return getHistoryCompareEntities(primaryEntityId)
         .filter(entity =>
-            allowedEntityIds.has(entity.id)
+            allowedHistoryIds.has(entity.id)
             && canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
         );
 }
 
 function getActiveDashboardHistoryCompareEntities(primaryEntityId) {
-    const primaryEntity = findEntityById(primaryEntityId);
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     const activeUnits = getHistoryCompareUnits(primaryEntityId);
 
     if (!activeCustomDashboardId && canAccessHomeDashboard()) {
@@ -4016,14 +4154,14 @@ function getActiveDashboardHistoryCompareEntities(primaryEntityId) {
 
     return getHistoryCompareEntities(primaryEntityId)
         .filter(entity =>
-            activeEntityIds.has(entity.id)
+            isHistorySourceAllowed(entity.id, activeEntityIds)
             && canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
         );
 }
 
 function ensureHistoryCompareSelection(primaryEntityId) {
-    const allowedEntityIds = getAllowedDashboardEntityIds();
-    const primaryEntity = findEntityById(primaryEntityId);
+    const allowedHistoryIds = getAllowedDashboardHistorySourceIds();
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     const units = [];
 
     historyCompareEntityIds = [
@@ -4034,12 +4172,12 @@ function ensureHistoryCompareSelection(primaryEntityId) {
     historyCompareEntityIds = historyCompareEntityIds.filter((entityId, index, allIds) => {
         if (allIds.indexOf(entityId) !== index) return false;
 
-        const entity = findEntityById(entityId);
+        const entity = findHistorySourceById(entityId);
         if (!entity) return false;
 
         if (
             entityId !== primaryEntityId
-            && !allowedEntityIds.has(entityId)
+            && !allowedHistoryIds.has(entityId)
         ) {
             return false;
         }
@@ -4070,7 +4208,7 @@ function ensureHistoryCompareSelection(primaryEntityId) {
 }
 
 function renderHistoryCompareControls(primaryEntityId) {
-    const primaryEntity = findEntityById(primaryEntityId);
+    const primaryEntity = findHistorySourceById(primaryEntityId);
     const selectedIds = new Set(historyCompareEntityIds);
     const availableEntities = getAllowedHistoryCompareEntities(primaryEntityId)
         .filter(entity => !selectedIds.has(entity.id));
@@ -4079,7 +4217,7 @@ function renderHistoryCompareControls(primaryEntityId) {
 
     const chips = historyCompareEntityIds
         .map((entityId, index) => {
-            const entity = findEntityById(entityId);
+            const entity = findHistorySourceById(entityId);
             if (!entity) return '';
 
             const color = historyCompareColors[index % historyCompareColors.length];
@@ -4382,18 +4520,18 @@ async function loadChartConfig(configId) {
 
     if (!config) return;
 
-    const allowedEntityIds =
-        getAllowedDashboardEntityIds();
+    const allowedHistoryIds =
+        getAllowedDashboardHistorySourceIds();
     const allowedConfigEntityIds = (
         Array.isArray(config.entityIds)
             ? config.entityIds
             : [config.primaryEntityId]
     ).filter(id =>
-        findEntityById(id)
-        && allowedEntityIds.has(id)
+        findHistorySourceById(id)
+        && allowedHistoryIds.has(id)
     );
     const primaryEntityId =
-        allowedEntityIds.has(config.primaryEntityId)
+        allowedHistoryIds.has(config.primaryEntityId)
             ? config.primaryEntityId
             : allowedConfigEntityIds[0];
 
@@ -4530,7 +4668,7 @@ function getNextLocalDayStartSeconds(timestampSeconds) {
 
 async function fetchNumericHistoryData(entityId, aggregation) {
     const res = await fetch(
-        `/api/history/${entityId}?hours=${currentHistoryHours}&aggregation=${aggregation}`
+        `/api/history/${encodeURIComponent(entityId)}?hours=${currentHistoryHours}&aggregation=${aggregation}`
     );
 
     return res.json();
@@ -4592,16 +4730,16 @@ function createEnergyHistoryPoints(data, key) {
 function addHistoryCompareEntity(entityId) {
     if (!currentEntityId || !entityId) return;
 
-    const primaryEntity = findEntityById(currentEntityId);
-    const entity = findEntityById(entityId);
-    const allowedEntityIds = getAllowedDashboardEntityIds();
+    const primaryEntity = findHistorySourceById(currentEntityId);
+    const entity = findHistorySourceById(entityId);
+    const allowedHistoryIds = getAllowedDashboardHistorySourceIds();
     const activeUnits = getHistoryCompareUnits(currentEntityId);
 
     if (
         !canUseHistoryCompareEntity(entity, primaryEntity, activeUnits)
         || (
             entityId !== currentEntityId
-            && !allowedEntityIds.has(entityId)
+            && !allowedHistoryIds.has(entityId)
         )
     ) {
         alert('Diese Entity passt nicht zum aktuellen Graphen.');
@@ -4644,10 +4782,10 @@ async function openBooleanHistory(entityId) {
     modal.classList.remove('hidden');
 
     const entity =
-        findEntityById(entityId);
+        findHistorySourceById(entityId);
 
     const res = await fetch(
-        `/api/history/${entityId}?hours=${currentHistoryHours}`
+        `/api/history/${encodeURIComponent(entityId)}?hours=${currentHistoryHours}`
     );
 
     const data = await res.json();
@@ -5140,7 +5278,8 @@ async function openNumericHistory(entityId, options = {}) {
   modal.classList.remove('hidden');
 
   // 🔧 Entity Infos
-  const entity = findEntityById(entityId);
+  const entity = findHistorySourceById(entityId);
+  if (!entity) return;
 
     let chartData;
     let chartLabel;
@@ -5165,7 +5304,7 @@ async function openNumericHistory(entityId, options = {}) {
 
   const historyResponses = await Promise.all(
     historyCompareEntityIds.map(async comparedEntityId => {
-        const comparedEntity = findEntityById(comparedEntityId);
+        const comparedEntity = findHistorySourceById(comparedEntityId);
 
         return {
             entityId: comparedEntityId,
@@ -5192,7 +5331,7 @@ async function openNumericHistory(entityId, options = {}) {
     );
   const deviceName = getDeviceDisplayName(device);
   const entitName = entity
-    ? getEntityDisplayName(entity, entity.deviceId)
+    ? (entity.isHistorySource ? entity.label : getEntityDisplayName(entity, entity.deviceId))
     : entityId;
 
   document.getElementById('historyTitle').textContent = `${deviceName}: ${entitName}`;
@@ -5272,7 +5411,7 @@ async function openNumericHistory(entityId, options = {}) {
             <div class="history-live">
             Live:
             <b id="historyLiveValue">
-                ${entity.value} ${unit}
+	                ${entity.value ?? '-'} ${unit}
             </b>
             </div>
 
@@ -5315,7 +5454,7 @@ async function openNumericHistory(entityId, options = {}) {
             <div class="history-live">
             Live:
             <b id="historyLiveValue">
-                ${entity.value} ${unit}
+                ${entity.value ?? '-'} ${unit}
             </b>
             </div>
 
@@ -5638,7 +5777,7 @@ document.addEventListener('dragstart', (e) => {
     }
 
     const sensor =
-        e.target.closest('.sensor-row-line.has-history, .sensor-row-multiline.has-history');
+        e.target.closest('.sensor-row-line.has-history, .sensor-row-multiline.has-history, .climate-history-row.has-history');
 
     if (!sensor?.dataset.entityId || !e.dataTransfer) {
         return;
@@ -5783,7 +5922,7 @@ function addHistoryEntity(entityId) {
 
   if (!history.entities) history.entities = {};
 
-  const entity = findEntityById(entityId);
+  const entity = findHistorySourceById(entityId);
 
   let bucket = 5;
 
@@ -5792,9 +5931,22 @@ function addHistoryEntity(entityId) {
     bucket = 15;
   }
 
+  const sourceConfig = entity?.isHistorySource
+    ? {
+        source: {
+            entityId: entity.parentEntityId,
+            key: entity.key,
+            type: entity.type,
+            unit: entity.unit,
+            label: entity.name
+        }
+    }
+    : {};
+
   history.entities[entityId] = {
     enabled: true,
-    bucketMinutes: bucket
+    bucketMinutes: bucket,
+    ...sourceConfig
   };
 
   renderSelectedHistoryEntities();
@@ -5812,23 +5964,27 @@ function renderSelectedHistoryEntities() {
 
     Object.entries(history.entities).forEach(([entityId, cfg]) => {
 
-    const entity = findEntityById(entityId);
+    const entity = findHistorySourceById(entityId);
     if (!entity) return;
 
     const device = dashboardDevices.find(d =>
-      d.entities.some(e => e.id === entityId)
+      d.entities.some(e => e.id === getHistoryBaseEntityId(entityId))
     );
 
     const deviceName = device
       ? getDeviceDisplayName(device)
       : 'Unbekannt';
 
-    const entityName = getEntityDisplayName(entity, device?.id);
+    const entityName = entity.isHistorySource
+      ? entity.label
+      : getEntityDisplayName(entity, device?.id);
 
     const row = document.createElement('div');
     row.className = 'history-row';
 
-    const isBinarySensor = entity.type === 'binary_sensor';
+    const isBinarySensor =
+        entity.type === 'binary_sensor' ||
+        cfg?.source?.type === 'boolean';
 
     row.innerHTML = `
     <div class="history-left">
@@ -6088,24 +6244,30 @@ function getAvailableHistoryEntities() {
             const isBinarySensor =
                 entity.type === 'binary_sensor';
 
-            if (
-                !isNumericSensor &&
-                !isBinarySensor
-            ) {
-                return;
+            if (isNumericSensor || isBinarySensor) {
+                if (!selected[entity.id]) {
+                    const entityName =
+                        getEntityDisplayName(entity, device.id);
+
+                    entities.push({
+                        id: entity.id,
+                        label: `${deviceName}: ${entityName}`,
+                        entity,
+                        device
+                    });
+                }
             }
 
-            if (selected[entity.id]) return;
-
-            const entityName =
-                getEntityDisplayName(entity, device.id);
-
-            entities.push({
-                id: entity.id,
-                label: `${deviceName}: ${entityName}`,
-                entity,
-                device
-            });
+            getHistorySourcesForEntity(entity, device)
+                .filter(source => !selected[source.id])
+                .forEach(source => {
+                    entities.push({
+                        id: source.id,
+                        label: `${deviceName}: ${source.label}`,
+                        entity: source,
+                        device
+                    });
+                });
 
         });
 

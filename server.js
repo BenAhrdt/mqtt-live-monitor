@@ -2090,8 +2090,9 @@ function finalizeEntityUpdate(device, entity, mapping) {
   });
 
   // History-Store schreiben
-  const cfg = getHistoryConfig(mapping.entityId);
-  historyStore.writeHistory(mapping.entityId, entity, cfg);
+  getHistoryConfigsForEntity(mapping.entityId).forEach(({ historyId, cfg }) => {
+    historyStore.writeHistory(historyId, entity, cfg);
+  });
 
   // Logik anstoßen
   logicEngine.runLogicEngine(mapping.entityId);
@@ -3012,8 +3013,10 @@ app.get('/api/history/:entityId', (req, res) => {
 
   const { entityId } = req.params;
   const entity = findEntityById(entityId);
+  const cfg = getHistoryConfig(entityId);
 
   const isBinarySensor =
+      cfg?.source?.type === 'boolean' ||
       entity?.type === 'binary_sensor';
 
   const hours = parseFloat(req.query.hours) || 24;
@@ -3324,4 +3327,30 @@ function getHistoryConfig(entityId) {
   if (!mqttConfig.history?.enabled) return null;
 
   return mqttConfig.history?.entities?.[entityId];
+}
+
+function getHistoryConfigsForEntity(entityId) {
+  if (!mqttConfig.history?.enabled) return [];
+
+  const entries = [];
+  const configs = mqttConfig.history?.entities || {};
+  const directConfig = configs[entityId];
+
+  if (directConfig) {
+    entries.push({
+      historyId: entityId,
+      cfg: directConfig
+    });
+  }
+
+  Object.entries(configs).forEach(([historyId, cfg]) => {
+    if (
+      historyId.startsWith(`${entityId}::`) &&
+      cfg?.source?.entityId === entityId
+    ) {
+      entries.push({ historyId, cfg });
+    }
+  });
+
+  return entries;
 }

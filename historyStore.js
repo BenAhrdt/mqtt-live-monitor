@@ -10,6 +10,20 @@ const DB_PATH = path.join(__dirname, './data/history.db');
 
 const db = new sqlite3.Database(DB_PATH);
 
+function getHistoryValue(entity, cfg) {
+  if (!cfg?.source?.key) {
+    return entity?.value;
+  }
+
+  const value = entity?.[cfg.source.key];
+
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  return value;
+}
+
 // Letzten Wetr laden
 function loadLastValues() {
 
@@ -213,18 +227,23 @@ function writeNumericHistory (entityId, value, cfg) {
 }
 
 function writeHistory(entityId, entity, cfg) {
+    const value = getHistoryValue(entity, cfg);
 
-    if (entity.type === 'binary_sensor') {
+    if (cfg?.source?.type === 'boolean' || entity.type === 'binary_sensor') {
+        if (typeof value !== 'boolean') return;
         return writeBooleanHistory(
             entityId,
-            entity.value,
+            value,
             cfg
         );
     }
 
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return;
+
     return writeNumericHistory(
         entityId,
-        entity.value,
+        numericValue,
         cfg
     );
 }
