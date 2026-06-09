@@ -452,7 +452,7 @@ selectedItemsEl.addEventListener('input', event => {
   if (!item) return;
 
   item.label = input.value;
-  scheduleSave({ render: true });
+  scheduleSave();
 });
 
 layoutButtons.forEach(btn => {

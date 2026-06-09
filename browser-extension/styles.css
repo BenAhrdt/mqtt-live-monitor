@@ -5,6 +5,7 @@
   --border: #dbe2ea;
   --muted: #64748b;
   --panel: #ffffff;
+  --popup-height: 600px;
   --text: #0f172a;
 }
 
@@ -20,7 +21,7 @@ body {
 
 .popup-document {
   width: 580px;
-  height: 900px;
+  height: var(--popup-height);
   overflow: hidden;
 }
 
@@ -70,18 +71,26 @@ p {
 
 .popup {
   width: 580px;
-  height: 900px;
+  height: var(--popup-height);
   position: relative;
   overflow-x: hidden;
   overflow-y: hidden;
   background: var(--panel);
 }
 
+.popup-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
 .popup-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 580px;
+  position: relative;
+  width: 100%;
   z-index: 100;
   display: flex;
   align-items: flex-start;
@@ -170,10 +179,11 @@ p {
 }
 
 .popup-main {
-  padding-top: 86px;
-  padding-bottom: 54px;
+  min-height: 0;
+  padding-bottom: 18px;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .tab-panel {
@@ -466,10 +476,8 @@ p {
 }
 
 .popup-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 580px;
+  position: relative;
+  width: 100%;
   z-index: 100;
   display: flex;
   align-items: center;

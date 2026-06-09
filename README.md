@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.2 Chrome Extension verfeinert
+* (BenAhrdt) Verbesserte extension
+
 ### V1.8.1 Readme glatt gezogen
 * (BenAhrdt) Verlerhaften Versionsprung ausgebessert
 
