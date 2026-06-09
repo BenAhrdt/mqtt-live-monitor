@@ -37,10 +37,11 @@ export function normalizeServerUrl(url) {
 }
 
 export async function getLocalSettings() {
-  const data = await chrome.storage.local.get(['serverUrl', 'token']);
+  const data = await chrome.storage.local.get(['serverUrl', 'token', 'username']);
   return {
     serverUrl: normalizeServerUrl(data.serverUrl),
-    token: data.token || ''
+    token: data.token || '',
+    username: data.username || ''
   };
 }
 
@@ -53,6 +54,10 @@ export async function setLocalSettings(settings) {
 
   if (settings.token !== undefined) {
     next.token = settings.token || '';
+  }
+
+  if (settings.username !== undefined) {
+    next.username = settings.username || '';
   }
 
   await chrome.storage.local.set(next);
@@ -83,6 +88,22 @@ export async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+export async function getServerVersion() {
+  const { serverUrl } = await getLocalSettings();
+
+  if (!serverUrl) {
+    return '';
+  }
+
+  const res = await fetch(`${serverUrl}/api/version`);
+  if (!res.ok) {
+    return '';
+  }
+
+  const data = await res.json().catch(() => ({}));
+  return data.version || '';
+}
+
 export function iconFor(name) {
   const icon = ICONS[name] || ICONS.gauge;
   const bg = icon.match(/--icon-bg:([^"]+)"/)?.[1] || '#f8fafc';
@@ -110,8 +131,8 @@ export function inferIconName(item = {}) {
   if (text.includes('luftfeuchtigkeit') || text.includes('humidity') || text.includes('feuchte')) return 'droplets';
   if (text.includes('luftqualität') || text.includes('luftqualitaet') || text.includes('air quality')) return 'cloud';
   if (text.includes('temperatur') || text.includes('temperature') || unit.includes('°c')) return 'thermometer';
-  if (text.includes('fenster') || text.includes('window') || text.includes('openwindow')) return 'panel-top';
-  if (text.includes('tür') || text.includes('tuer') || text.includes('door')) return 'door-open';
+  if (text.includes('fenster') || text.includes('window') || text.includes('openwindow') || text.includes('kontakt') || text.includes('contact')) return 'panel-top';
+  if (text.includes('tür') || text.includes('tuer') || text.includes('door') || text.includes('garage')) return 'door-open';
   if (text.includes('bewegung') || text.includes('motion') || text.includes('presence')) return 'activity';
 
   if (unit === '%' && given === 'droplets') return 'gauge';
@@ -119,15 +140,63 @@ export function inferIconName(item = {}) {
   return given || 'gauge';
 }
 
+function isOpenClosedItem(item = {}) {
+  const icon = inferIconName(item);
+  const text = [
+    item.icon,
+    item.label,
+    item.name,
+    item.deviceName,
+    item.originalDeviceName,
+    item.originalEntityName,
+    item.sourceId,
+    item.id
+  ].join(' ').toLowerCase();
+
+  return ['panel-top', 'door-open'].includes(icon) ||
+    text.includes('fenster') ||
+    text.includes('window') ||
+    text.includes('openwindow') ||
+    text.includes('tür') ||
+    text.includes('tuer') ||
+    text.includes('door') ||
+    text.includes('garage') ||
+    text.includes('kontakt') ||
+    text.includes('contact');
+}
+
+function normalizeBooleanValue(value) {
+  if (typeof value === 'boolean') return value;
+
+  const text = String(value ?? '').trim().toLowerCase();
+  if (['true', 'on', 'open', 'opened', 'offen', '1', 'yes'].includes(text)) return true;
+  if (['false', 'off', 'closed', 'geschlossen', '0', 'no'].includes(text)) return false;
+
+  return null;
+}
+
 export function formatValue(item) {
-  if (item.displayValue) return item.displayValue;
   if (item.value === null || item.value === undefined || item.value === '') return '-';
 
-  if (typeof item.value === 'boolean') {
-    return item.value ? 'An' : 'Aus';
+  const numeric = Number(item.value);
+  if (Number.isFinite(numeric) && (item.type === 'numeric' || item.unit)) {
+    const text = Math.abs(numeric) >= 100
+      ? numeric.toFixed(0)
+      : numeric.toFixed(2).replace(/\.?0+$/, '');
+    return `${text}${item.unit ? ` ${item.unit}` : ''}`;
   }
 
-  const numeric = Number(item.value);
+  const booleanValue = normalizeBooleanValue(item.value);
+  if (booleanValue !== null && (item.type === 'boolean' || isOpenClosedItem(item))) {
+    if (isOpenClosedItem(item)) {
+      return booleanValue ? 'Offen' : 'Geschlossen';
+    }
+
+    return booleanValue ? 'An' : 'Aus';
+  }
+
+  if (item.displayValue) return item.displayValue;
+
   if (Number.isFinite(numeric)) {
     const text = Math.abs(numeric) >= 100
       ? numeric.toFixed(0)

@@ -8,8 +8,13 @@
     "default_popup": "popup.html"
   },
   "options_page": "options.html",
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "permissions": [
-    "storage"
+    "storage",
+    "sidePanel",
+    "windows"
   ],
   "host_permissions": [
     "http://*/*",

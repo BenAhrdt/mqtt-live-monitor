@@ -3,6 +3,7 @@ import {
   apiFetch,
   formatValue,
   getLocalSettings,
+  getServerVersion,
   iconFor,
   inferIconName,
   setLocalSettings
@@ -13,8 +14,8 @@ const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const loginBtn = document.getElementById('loginBtn');
 const reloadBtn = document.getElementById('reloadBtn');
-const saveBtn = document.getElementById('saveBtn');
 const loginState = document.getElementById('loginState');
+const versionBadge = document.getElementById('versionBadge');
 const sourcesEl = document.getElementById('sources');
 const selectedItemsEl = document.getElementById('selectedItems');
 const searchInput = document.getElementById('search');
@@ -22,6 +23,8 @@ const layoutButtons = Array.from(document.querySelectorAll('[data-layout]'));
 
 let sources = [];
 let config = { ...DEFAULT_CONFIG };
+let saveTimer = null;
+let saveSequence = 0;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -52,11 +55,25 @@ function syncLayoutButtons() {
 
 function renderSources() {
   const term = searchInput.value.trim().toLowerCase();
-  const filtered = sources.filter(source =>
-    !term ||
-    source.label.toLowerCase().includes(term) ||
-    source.type.toLowerCase().includes(term)
-  );
+  const filtered = sources.filter(source => {
+    if (!term) return true;
+
+    const haystack = [
+      source.searchText,
+      source.label,
+      source.name,
+      source.deviceName,
+      source.originalDeviceName,
+      source.originalEntityName,
+      source.type,
+      source.unit,
+      source.id,
+      source.entityId,
+      source.deviceId
+    ].join(' ').toLowerCase();
+
+    return haystack.includes(term);
+  });
 
   sourcesEl.innerHTML = filtered.map(source => `
     <label class="source-row">
@@ -106,7 +123,8 @@ function renderAll() {
 
 async function login() {
   const serverUrl = serverUrlInput.value;
-  await setLocalSettings({ serverUrl });
+  const username = usernameInput.value.trim();
+  await setLocalSettings({ serverUrl, username });
 
   const authRes = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/auth/enabled`);
   const authInfo = await authRes.json().catch(() => ({ enabled: true }));
@@ -122,7 +140,7 @@ async function login() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      username: usernameInput.value,
+      username,
       password: passwordInput.value
     })
   });
@@ -134,6 +152,7 @@ async function login() {
   const data = await res.json();
   await setLocalSettings({
     serverUrl,
+    username,
     token: data.token
   });
 
@@ -152,7 +171,12 @@ async function loadData() {
   renderAll();
 }
 
-async function saveConfig() {
+async function loadVersion() {
+  const serverVersion = await getServerVersion().catch(() => '');
+  versionBadge.textContent = serverVersion ? `MQTT ${serverVersion}` : 'MQTT Version nicht geladen';
+}
+
+function collectConfigFromInputs() {
   config.items = config.items.map((item, index) => {
     const row = Array.from(selectedItemsEl.querySelectorAll('.selected-row'))
       .find(element => element.dataset.sourceId === item.sourceId);
@@ -166,15 +190,37 @@ async function saveConfig() {
       order: index + 1
     };
   });
+}
+
+async function saveConfig({ render = false } = {}) {
+  collectConfigFromInputs();
+  const sequence = ++saveSequence;
+  setState('Speichere...');
 
   const response = await apiFetch('/api/extension/config', {
     method: 'POST',
     body: JSON.stringify(config)
   });
 
+  if (sequence !== saveSequence) return;
+
   config = response.config;
-  setState('Gespeichert');
-  renderAll();
+  setState('Automatisch gespeichert');
+
+  if (render) {
+    renderAll();
+  }
+}
+
+function scheduleSave({ render = false } = {}) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await saveConfig({ render });
+    } catch (err) {
+      setState(err.message);
+    }
+  }, 350);
 }
 
 sourcesEl.addEventListener('change', event => {
@@ -194,6 +240,7 @@ sourcesEl.addEventListener('change', event => {
   }
 
   renderAll();
+  scheduleSave();
 });
 
 selectedItemsEl.addEventListener('click', event => {
@@ -214,6 +261,7 @@ selectedItemsEl.addEventListener('click', event => {
   }
 
   renderAll();
+  scheduleSave();
 });
 
 selectedItemsEl.addEventListener('input', event => {
@@ -225,12 +273,14 @@ selectedItemsEl.addEventListener('input', event => {
   if (!item) return;
 
   item.label = input.value;
+  scheduleSave();
 });
 
 layoutButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     config.layout = btn.dataset.layout;
     syncLayoutButtons();
+    scheduleSave();
   });
 });
 
@@ -252,19 +302,13 @@ reloadBtn.addEventListener('click', async () => {
   }
 });
 
-saveBtn.addEventListener('click', async () => {
-  try {
-    await saveConfig();
-  } catch (err) {
-    setState(err.message);
-  }
-});
-
 searchInput.addEventListener('input', renderSources);
 
 async function init() {
   const settings = await getLocalSettings();
   serverUrlInput.value = settings.serverUrl || '';
+  usernameInput.value = settings.username || '';
+  await loadVersion();
 
   if (settings.serverUrl) {
     try {

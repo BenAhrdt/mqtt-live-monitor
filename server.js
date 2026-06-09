@@ -2607,6 +2607,14 @@ function formatExtensionValue(value, unit = "") {
   return `${value}${unit ? ` ${unit}` : ""}`;
 }
 
+function getExtensionOriginalDeviceName(device) {
+  return String(device?.name || device?.id || "");
+}
+
+function getExtensionOriginalEntityName(entity) {
+  return String(entity?.name || entity?.id || "");
+}
+
 function getNestedExtensionValue(entity, key) {
   if (!key) return entity?.value;
 
@@ -2678,6 +2686,9 @@ function createExtensionSource(device, entity, source = {}) {
   );
   const deviceName = getDeviceDisplayNameServer(device);
   const entityName = source.name || getEntityDisplayNameServer(entity, device.id);
+  const originalDeviceName = getExtensionOriginalDeviceName(device);
+  const originalEntityName = getExtensionOriginalEntityName(entity);
+  const label = `${deviceName}: ${entityName}`;
 
   return {
     id: sourceId,
@@ -2686,8 +2697,25 @@ function createExtensionSource(device, entity, source = {}) {
     type,
     deviceId: device.id,
     deviceName,
+    originalDeviceName,
     name: entityName,
-    label: `${deviceName}: ${entityName}`,
+    originalEntityName,
+    label,
+    searchText: [
+      sourceId,
+      entity.id,
+      key,
+      type,
+      device.id,
+      deviceName,
+      originalDeviceName,
+      entityName,
+      originalEntityName,
+      label,
+      entity.type,
+      entity.deviceClass,
+      entity.unit
+    ].filter(Boolean).join(" "),
     value,
     unit,
     displayValue: formatExtensionValue(value, unit),

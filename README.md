@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.7.1 Chrome Extension verbessert
+* (BenAhrdt) Konfiguration der Extension vebessert
+
 ### V1.7.0 Chrome Extension in separatem Ordner
 * (BenAhrdt) Für Google Chrome liegt nun einei eigene extension im Ordner browser-extension
 
