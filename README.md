@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.6.27 Sicherheitsupdate
+* (BenAhrdt) Verbesserte Sicherheit beim Login / beo API Anfragen.
+
 ### V1.6.26 Charterweiterungen
 * (BenAhrdt) Speichern und Laden von Charts möglich
 

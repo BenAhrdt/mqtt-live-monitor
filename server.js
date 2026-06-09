@@ -217,7 +217,7 @@ let allowedDiscoveryViaDevicePrefixes = [
 const app = express();
 app.set("trust proxy", 1)
 
-app.use(session({
+const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
@@ -226,7 +226,9 @@ app.use(session({
         secure: process.env.USE_HTTPS === "true",
         sameSite: "lax"
     }
-}));
+});
+
+app.use(sessionMiddleware);
 
 
 app.use(express.json({limit: '5mb'}));
@@ -260,6 +262,21 @@ app.use('/api', (req, res, next) => {
 
 const server = http.createServer(app);
 const io = new Server(server);
+
+io.engine.use(sessionMiddleware);
+io.use((socket, next) => {
+  if (!mqttConfig.auth?.enabled) {
+    return next();
+  }
+
+  const user = socket.request.session?.user;
+  if (!user) {
+    return next(new Error("Nicht eingeloggt"));
+  }
+
+  socket.user = user;
+  next();
+});
 
 const loggingFilter = [ 'homeassistant/sensor/badezimmer_fenster/zigbee2mqtt_0_0x00158d0002a63f48_battery/config',
                         'lorawan_0/badezimmer_fenster/zigbee2mqtt_0_0x00158d0002a63f48_battery/state',
@@ -363,7 +380,7 @@ app.post("/api/auth/login", loginLimiter, async (req, res) => {
   req.session.user = {
     username: user.username,
     roles: user.roles,
-    isDefault: users.isDefault
+    isDefault: user.isDefault
   };
 
   res.json({
@@ -407,7 +424,7 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
-app.post('/api/settings/auth', (req, res) => {
+app.post('/api/settings/auth', requireAdmin, (req, res) => {
 
   try {
 
@@ -457,9 +474,12 @@ app.post('/api/settings/auth', (req, res) => {
 
 app.get('/api/users', (req, res) => {
   const data = readUsers();
+  const visibleUsers = isAdminUser(req)
+    ? data.users
+    : data.users.filter(u => u.username === req.session?.user?.username);
 
   // Passwort NICHT mitsenden!
-  const users = data.users.map(u => ({
+  const users = visibleUsers.map(u => ({
     username: u.username,
     roles: u.roles,
     active: u.active !== false,
@@ -469,7 +489,7 @@ app.get('/api/users', (req, res) => {
   res.json(users);
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireAdmin, async (req, res) => {
   const { username, password, roles } = req.body;
 
   const data = readUsers();
@@ -495,12 +515,24 @@ app.post('/api/users', async (req, res) => {
 app.put('/api/users/:username', async (req, res) => {
   const { username } = req.params;
   const { password, roles, active } = req.body;
+  const requester = req.session?.user;
 
   const data = readUsers();
   const user = data.users.find(u => u.username === username);
 
   if (!user) {
     return res.status(404).json({ error: 'User nicht gefunden' });
+  }
+
+  const isAdminRequest = isAdminUser(req);
+  const isSelfRequest = requester?.username === username;
+
+  if (!isAdminRequest && !isSelfRequest) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (!isAdminRequest && (roles !== undefined || active !== undefined)) {
+    return res.status(403).json({ error: 'Nur Admins dürfen Rollen oder Status ändern' });
   }
 
   const isDefaultAdmin = user.username === 'admin';
@@ -529,6 +561,14 @@ app.put('/api/users/:username', async (req, res) => {
 });
 
 app.delete('/api/users/:username', (req, res) => {
+  if (!isAdminUser(req)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (req.params.username === 'admin') {
+    return res.status(400).json({ error: 'Der Admin-Benutzer darf nicht gelöscht werden' });
+  }
+
   const data = readUsers();
 
   data.users = data.users.filter(u => u.username !== req.params.username);
@@ -538,7 +578,7 @@ app.delete('/api/users/:username', (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/admin/create", async (req, res) => {
+app.post("/api/admin/create", requireAdmin, async (req, res) => {
   const { password } = req.body;
 
   if (!password) {
@@ -559,14 +599,14 @@ app.post("/api/admin/create", async (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/admin/reset", (req, res) => {
+app.post("/api/admin/reset", requireAdmin, (req, res) => {
   const creds = readCredentials();
   creds.passwordHash = null;
   writeCredentials(creds);
   res.json({ success: true });
 });
 
-app.post("/api/admin/change-password", async (req, res) => {
+app.post("/api/admin/change-password", requireAdmin, async (req, res) => {
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword) {
@@ -624,7 +664,7 @@ app.get('/api/update/check', async (req, res) => {
   });
 });
 
-app.post("/api/update/run", (req, res) => {
+app.post("/api/update/run", requireAdmin, (req, res) => {
   console.log("Update per Button angefordert");
 
   res.json({
@@ -2653,7 +2693,7 @@ app.delete("/api/chart-configs/:id", (req, res) => {
   });
 });
 
-app.post("/api/entity-types", (req, res) => {
+app.post("/api/entity-types", requireAdmin, (req, res) => {
   const { enabledEntityTypes } = req.body;
 
   if (!Array.isArray(enabledEntityTypes)) {
@@ -2674,7 +2714,7 @@ app.post("/api/entity-types", (req, res) => {
   });
 });
 
-app.post("/api/discovery-prefixes", (req, res) => {
+app.post("/api/discovery-prefixes", requireAdmin, (req, res) => {
   const { discoveryViaPrefixes } = req.body;
 
   mqttConfig.discoveryViaPrefixes = normalizeDiscoveryPrefixes(discoveryViaPrefixes);
@@ -2693,7 +2733,7 @@ app.post("/api/discovery-prefixes", (req, res) => {
   });
 });
 
-app.post("/api/custom-dashboards", (req, res) => {
+app.post("/api/custom-dashboards", requireAdmin, (req, res) => {
   const { customDashboards } = req.body;
   if (!Array.isArray(customDashboards)) {
     return res.status(400).json({
@@ -2731,12 +2771,12 @@ app.post("/api/custom-dashboards", (req, res) => {
   });
 });
 
-app.post("/api/disconnect", (req, res) => {
+app.post("/api/disconnect", requireAdmin, (req, res) => {
   disconnectMqtt();
   res.json({ success: true });
 });
 
-app.post("/api/reconnect", (req, res) => {
+app.post("/api/reconnect", requireAdmin, (req, res) => {
   connectMqtt();
 
   res.json({
@@ -2804,7 +2844,7 @@ function publishMqttDirect(topic, payload) {
 // FUnktion an LogicEngine übergeben
 logicEngine.setMqttPublisher(publishMqttDirect);
 
-app.post("/api/friendly-names", (req, res) => {
+app.post("/api/friendly-names", requireAdmin, (req, res) => {
   const { friendlyNames, deviceId, name, entityId, entityName } = req.body;
 
   // 👉 INIT falls nicht vorhanden
@@ -2903,7 +2943,7 @@ app.get("/api/combined", (req, res) => {
 });
 
 // logical Store ins Backend
-app.post('/api/logical-devices', (req, res) => {
+app.post('/api/logical-devices', requireAdmin, (req, res) => {
 
     const devices = req.body.devices || [];
 
@@ -2948,7 +2988,7 @@ function getCombinedStore() {
 
 const LOGIC_FILE = path.join(__dirname, './data/logics.json');
 
-app.post('/api/logics', (req, res) => {
+app.post('/api/logics', requireAdmin, (req, res) => {
   const dir = path.dirname(LOGIC_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
