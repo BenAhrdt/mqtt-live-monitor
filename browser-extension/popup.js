@@ -5,8 +5,10 @@ import {
   formatValue,
   getLocalSettings,
   getServerVersion,
+  hasOpenStateBadge,
   iconFor,
   inferIconName,
+  inferStateIconName,
   setLocalSettings,
   sourceBaseId
 } from './shared.js';
@@ -117,7 +119,7 @@ function renderItems(layout = 'compact') {
   content.innerHTML = currentItems
     .map(item => `
       <div class="quick-row">
-        <span class="quick-icon">${iconFor(inferIconName(item))}</span>
+        <span class="quick-icon ${hasOpenStateBadge(item) ? 'has-alert-badge' : ''}">${iconFor(inferStateIconName(item))}</span>
         <span class="quick-label">${escapeHtml(item.label || item.name)}</span>
         <strong class="quick-value">${escapeHtml(formatValue(item))}</strong>
       </div>

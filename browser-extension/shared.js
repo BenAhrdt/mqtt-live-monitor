@@ -16,10 +16,13 @@ export const ICONS = {
   cloud: svg('<path d="M17.5 18H8a5 5 0 1 1 1.1-9.9A6 6 0 0 1 20 12.5 3.5 3.5 0 0 1 17.5 18z"/>', '#64748b', '#f1f5f9'),
   co2: svg('<path d="M17.5 17H8a5 5 0 1 1 1.2-9.8A6 6 0 0 1 20 11.8 3.5 3.5 0 0 1 17.5 17z"/><text x="7" y="15" font-size="5" fill="currentColor" stroke="none" font-family="Arial">CO2</text>', '#487844', '#eff9e9'),
   'circle-dot': svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2" fill="currentColor"/>', '#6366f1', '#eef2ff'),
-  'door-open': svg('<path d="M6 21h12"/><path d="M8 21V5l8-2v18"/><path d="M11 12h.01"/>', '#a855f7', '#f5f0ff'),
+  'door-closed': svg('<path d="M7 21h10"/><rect x="8" y="4" width="8" height="17" rx="1"/><path d="M13 12h.01"/>', '#16a34a', '#edf9ed'),
+  'door-open': svg('<path d="M5 21h14"/><path d="M16 21V5H9"/><path d="M9 5l-4 2v14l4-2z"/><path d="M8 13h.01"/><path d="M16 7h-4"/>', '#16a34a', '#edf9ed'),
   droplets: svg('<path d="M7 16a4 4 0 0 0 8 0c0-3-4-7-4-7s-4 4-4 7z"/><path d="M17 14c1.2-1.4 2-3 2-3s3 3 3 5a3 3 0 0 1-5 2.2"/>', '#0ea5e9', '#edf8ff'),
   fan: svg('<path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M12 10c0-4 2-7 4-7 1.5 0 2.5 1 2.5 2.5 0 2.5-3.5 4.5-6.5 4.5"/><path d="M14 13.5c3.5 2 5 4.5 4 6.3-.7 1.3-2 1.7-3.3 1-2.1-1.2-2.4-5.2-.7-7.3"/><path d="M10 13.5c-3.5 2-6.5 1.8-7.5 0C1.8 12.2 2.2 10.8 3.5 10c2.1-1.2 5.8.5 6.5 3.5"/>', '#14b8a6', '#ecfdf5'),
   gauge: svg('<path d="M5 19a8 8 0 1 1 14 0"/><path d="M12 14l4-4"/><path d="M8 19h8"/>', '#3f97cb', '#eef8ff'),
+  'garage-closed': svg('<path d="M4 21V9l8-5 8 5v12"/><path d="M7 21V11h10v10"/><path d="M7 14h10"/><path d="M7 17h10"/>', '#7c3aed', '#f5f0ff'),
+  'garage-open': svg('<path d="M4 21V9l8-5 8 5v12"/><path d="M7 21V11h10v10"/><path d="M7 12h10"/><path d="M8 21v-6h8v6"/><path d="M10 18h4"/>', '#7c3aed', '#f5f0ff'),
   leaf: svg('<path d="M5 21c8 0 14-6 14-14V4h-3C8 4 4 8 4 14c0 2 1 4 3 5"/><path d="M9 15c2-4 5-6 10-8"/>', '#22c55e', '#eefaf0'),
   lightbulb: svg('<path d="M9 18h6"/><path d="M10 22h4"/><path d="M8 14a6 6 0 1 1 8 0c-.8.7-1 1.5-1 2H9c0-.5-.2-1.3-1-2z"/>', '#f2a900', '#fff8db'),
   lock: svg('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>', '#7c3aed', '#f5f0ff'),
@@ -29,6 +32,8 @@ export const ICONS = {
   timer: svg('<path d="M10 2h4"/><path d="M12 14l3-3"/><circle cx="12" cy="14" r="8"/>', '#3f97cb', '#eef8ff'),
   'toggle-left': svg('<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="8" cy="12" r="3"/>', '#64748b', '#f1f5f9'),
   waves: svg('<path d="M3 8c2 2 4 2 6 0s4-2 6 0 4 2 6 0"/><path d="M3 13c2 2 4 2 6 0s4-2 6 0 4 2 6 0"/><path d="M3 18c2 2 4 2 6 0s4-2 6 0 4 2 6 0"/>', '#5b8def', '#eef6ff'),
+  'window-closed': svg('<rect x="5" y="4" width="14" height="16" rx="1"/><path d="M12 4v16"/><path d="M5 12h14"/>', '#5b8def', '#eff6ff'),
+  'window-open': svg('<path d="M12 6v13"/><path d="M12 7L5 5v14l7-2"/><path d="M12 7l7-2v14l-7-2"/><path d="M7 8v8"/><path d="M17 8v8"/>', '#5b8def', '#eff6ff'),
   zap: svg('<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>', '#f97316', '#fff3e8')
 };
 
@@ -110,14 +115,50 @@ export function iconFor(name) {
   return `<span class="icon-art" style="--icon-bg:${bg}">${icon}</span>`;
 }
 
-export function inferIconName(item = {}) {
-  const text = [
+function itemText(item = {}) {
+  return [
+    item.icon,
     item.label,
     item.name,
     item.deviceName,
+    item.originalDeviceName,
+    item.originalEntityName,
     item.sourceId,
     item.id
   ].join(' ').toLowerCase();
+}
+
+function contactKind(item = {}) {
+  const text = itemText(item);
+
+  if (
+    text.includes('garagentor') ||
+    text.includes('garage door') ||
+    text.includes('garage_door') ||
+    text.includes('garagedoor') ||
+    text.includes('rolltor') ||
+    text.includes('sektionaltor')
+  ) {
+    return 'garage';
+  }
+
+  if (text.includes('fenster') || text.includes('window') || text.includes('openwindow')) {
+    return 'window';
+  }
+
+  if (text.includes('tür') || text.includes('tuer') || text.includes('door') || text.includes('opendoor')) {
+    return 'door';
+  }
+
+  if (text.includes('kontakt') || text.includes('contact')) {
+    return 'window';
+  }
+
+  return null;
+}
+
+export function inferIconName(item = {}) {
+  const text = itemText(item);
   const unit = String(item.unit || '').toLowerCase();
   const given = item.icon || '';
 
@@ -131,8 +172,9 @@ export function inferIconName(item = {}) {
   if (text.includes('luftfeuchtigkeit') || text.includes('humidity') || text.includes('feuchte')) return 'droplets';
   if (text.includes('luftqualität') || text.includes('luftqualitaet') || text.includes('air quality')) return 'cloud';
   if (text.includes('temperatur') || text.includes('temperature') || unit.includes('°c')) return 'thermometer';
-  if (text.includes('fenster') || text.includes('window') || text.includes('openwindow') || text.includes('kontakt') || text.includes('contact')) return 'panel-top';
-  if (text.includes('tür') || text.includes('tuer') || text.includes('door') || text.includes('garage')) return 'door-open';
+  if (contactKind(item) === 'garage') return 'garage-closed';
+  if (contactKind(item) === 'window') return 'window-closed';
+  if (contactKind(item) === 'door') return 'door-closed';
   if (text.includes('bewegung') || text.includes('motion') || text.includes('presence')) return 'activity';
 
   if (unit === '%' && given === 'droplets') return 'gauge';
@@ -142,18 +184,9 @@ export function inferIconName(item = {}) {
 
 function isOpenClosedItem(item = {}) {
   const icon = inferIconName(item);
-  const text = [
-    item.icon,
-    item.label,
-    item.name,
-    item.deviceName,
-    item.originalDeviceName,
-    item.originalEntityName,
-    item.sourceId,
-    item.id
-  ].join(' ').toLowerCase();
+  const text = itemText(item);
 
-  return ['panel-top', 'door-open'].includes(icon) ||
+  return ['panel-top', 'window-closed', 'window-open', 'door-closed', 'door-open', 'garage-closed', 'garage-open'].includes(icon) ||
     text.includes('fenster') ||
     text.includes('window') ||
     text.includes('openwindow') ||
@@ -165,7 +198,7 @@ function isOpenClosedItem(item = {}) {
     text.includes('contact');
 }
 
-function normalizeBooleanValue(value) {
+export function normalizeBooleanValue(value) {
   if (typeof value === 'boolean') return value;
 
   const text = String(value ?? '').trim().toLowerCase();
@@ -173,6 +206,23 @@ function normalizeBooleanValue(value) {
   if (['false', 'off', 'closed', 'geschlossen', '0', 'no'].includes(text)) return false;
 
   return null;
+}
+
+export function inferStateIconName(item = {}) {
+  const booleanValue = normalizeBooleanValue(item.value);
+  const kind = contactKind(item);
+
+  if (booleanValue === null || !kind) {
+    return inferIconName(item);
+  }
+
+  if (kind === 'garage') return booleanValue ? 'garage-open' : 'garage-closed';
+  if (kind === 'door') return booleanValue ? 'door-open' : 'door-closed';
+  return booleanValue ? 'window-open' : 'window-closed';
+}
+
+export function hasOpenStateBadge(item = {}) {
+  return normalizeBooleanValue(item.value) === true && Boolean(contactKind(item));
 }
 
 export function formatValue(item) {
