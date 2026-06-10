@@ -2720,6 +2720,7 @@ function createExtensionSource(device, entity, source = {}) {
     unit,
     displayValue: formatExtensionValue(value, unit),
     icon: source.icon || getExtensionIcon(entity, key),
+    historyEnabled: Boolean(getHistoryConfig(sourceId)?.enabled),
     updatedAt: entity.lastUpdate || device.updatedAt || null
   };
 }
@@ -3560,9 +3561,7 @@ app.get('/api/logics', (req, res) => {
   res.json(data);
 });
 
-app.get('/api/history/:entityId', (req, res) => {
-
-  const { entityId } = req.params;
+function sendHistoryResponse(req, res, entityId) {
   const entity = findEntityById(entityId);
   const cfg = getHistoryConfig(entityId);
 
@@ -3730,6 +3729,10 @@ app.get('/api/history/:entityId', (req, res) => {
 
   });
 
+}
+
+app.get('/api/history/:entityId', (req, res) => {
+  sendHistoryResponse(req, res, req.params.entityId);
 });
 
 app.post('/api/extension/login', loginLimiter, async (req, res) => {
@@ -3820,6 +3823,41 @@ app.get('/api/extension/snapshot', (req, res) => {
     ok: true,
     ...snapshot
   });
+});
+
+function sendExtensionHistoryResponse(req, res, sourceId) {
+  const source = getAllowedExtensionSources(req)
+    .find(item => item.id === sourceId);
+
+  if (!source) {
+    return res.status(404).json({
+      error: "History-Wert nicht gefunden"
+    });
+  }
+
+  if (!getHistoryConfig(source.id)?.enabled) {
+    return res.status(404).json({
+      error: "History fuer diesen Wert nicht aktiviert"
+    });
+  }
+
+  return sendHistoryResponse(req, res, source.id);
+}
+
+app.get('/api/extension/history', (req, res) => {
+  return sendExtensionHistoryResponse(
+    req,
+    res,
+    String(req.query.sourceId || "")
+  );
+});
+
+app.get('/api/extension/history/:sourceId', (req, res) => {
+  return sendExtensionHistoryResponse(
+    req,
+    res,
+    String(req.params.sourceId || "")
+  );
 });
 
 // Restliche API Routen als unbekannt melden

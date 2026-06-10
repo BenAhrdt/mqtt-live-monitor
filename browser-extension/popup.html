@@ -43,6 +43,39 @@
       </main>
     </section>
 
+    <section id="chartTab" class="tab-panel">
+      <div class="section-toolbar">
+        <h2>Chart</h2>
+      </div>
+
+      <div class="chart-stack">
+        <div class="chart-controls">
+          <label>
+            Wert
+            <select id="chartEntitySelect"></select>
+          </label>
+          <div class="chart-range" aria-label="Zeitraum">
+            <button data-chart-hours="1" type="button" title="Letzte Stunde">1h</button>
+            <button data-chart-hours="6" type="button" title="Letzte 6 Stunden">6h</button>
+            <button data-chart-hours="12" type="button" title="Letzte 12 Stunden">12h</button>
+            <button data-chart-hours="24" type="button" class="active" title="Letzte 24 Stunden">24h</button>
+            <button data-chart-hours="48" type="button" title="Letzte 48 Stunden">48h</button>
+          </div>
+        </div>
+
+        <section id="chartPanel" class="mini-panel chart-panel">
+          <div id="chartHeader" class="chart-header">
+            <strong id="chartMetric">-</strong>
+            <span id="chartSummary">Noch keine Chart-Daten geladen.</span>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="historyChart"></canvas>
+            <div id="chartEmpty" class="empty-state compact hidden">Noch keine Verlaufsdaten vorhanden.</div>
+          </div>
+        </section>
+      </div>
+    </section>
+
     <section id="editTab" class="tab-panel">
       <div class="section-toolbar">
         <h2>Bearbeiten</h2>
@@ -94,6 +127,7 @@
 
   <footer class="popup-footer">
     <button class="tab-btn active" data-tab="viewTab">Ansicht</button>
+    <button class="tab-btn" data-tab="chartTab">Chart</button>
     <button class="tab-btn" data-tab="editTab">Bearbeiten</button>
     <button class="tab-btn" data-tab="settingsTab">Einstellungen</button>
   </footer>
@@ -102,6 +136,7 @@
   </div>
 
   <script src="vendor/socket.io.min.js"></script>
+  <script src="vendor/chart.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

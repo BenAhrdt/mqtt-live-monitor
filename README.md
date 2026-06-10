@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.4 Erste Beta Version mit Charts in der Extension
+* (BenAhrdt) Extension kann erste Charts anzeigen
+
 ### V1.8.3 Chrome Extension bezüglich Türen und Fenstern verfeinert
 * (BenAhrdt) Verbesserte extension
 

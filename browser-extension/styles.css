@@ -32,7 +32,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -56,7 +57,8 @@ button:disabled {
   opacity: 0.45;
 }
 
-input {
+input,
+select {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -419,6 +421,108 @@ p {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.chart-stack {
+  display: grid;
+  gap: 12px;
+  padding: 14px 18px 18px;
+}
+
+.chart-controls {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.chart-range {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 38px);
+  overflow: hidden;
+}
+
+.chart-range button {
+  border: 0;
+  border-radius: 0;
+  color: #4a5f86;
+  min-height: 38px;
+  padding: 0;
+}
+
+.chart-range button + button {
+  border-left: 1px solid var(--border);
+}
+
+.chart-range button.active {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+}
+
+.chart-panel {
+  min-height: 330px;
+}
+
+.chart-header {
+  align-items: start;
+  display: grid;
+  gap: 4px;
+  min-height: 56px;
+}
+
+.chart-header strong {
+  color: #0b1533;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.chart-header span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.chart-canvas-wrap {
+  height: 238px;
+  min-height: 238px;
+  position: relative;
+}
+
+.chart-canvas-wrap canvas {
+  display: block;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.chart-canvas-wrap .empty-state {
+  align-content: center;
+  background: #fff;
+  inset: 0;
+  position: absolute;
+}
+
+.sidepanel-document .side-panel .chart-stack {
+  padding: 10px 14px 14px;
+}
+
+.sidepanel-document .side-panel .chart-controls {
+  grid-template-columns: 1fr;
+}
+
+.sidepanel-document .side-panel .chart-range {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.sidepanel-document .side-panel .chart-panel {
+  min-height: 320px;
+}
+
+.sidepanel-document .side-panel .chart-canvas-wrap {
+  height: 220px;
+  min-height: 220px;
+}
+
 .popup-selected {
   max-height: none;
   overflow: visible;
@@ -485,7 +589,14 @@ p {
 }
 
 .sidepanel-document .side-panel .popup-footer {
+  gap: 2px;
+  padding: 10px 8px;
   width: 100%;
+}
+
+.sidepanel-document .side-panel .tab-btn {
+  font-size: 11px;
+  padding: 4px 3px;
 }
 
 .popup-footer {
@@ -515,7 +626,8 @@ p {
 }
 
 .popup-footer .tab-btn {
-  min-width: 92px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .tab-btn:focus {

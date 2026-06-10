@@ -9,6 +9,7 @@ import {
   iconFor,
   inferIconName,
   inferStateIconName,
+  normalizeBooleanValue,
   setLocalSettings,
   sourceBaseId
 } from './shared.js';
@@ -32,6 +33,12 @@ const selectedItemsEl = document.getElementById('selectedItems');
 const layoutButtons = Array.from(document.querySelectorAll('[data-layout]'));
 const tabButtons = Array.from(document.querySelectorAll('[data-tab]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+const chartEntitySelect = document.getElementById('chartEntitySelect');
+const chartRangeButtons = Array.from(document.querySelectorAll('[data-chart-hours]'));
+const chartMetric = document.getElementById('chartMetric');
+const chartSummary = document.getElementById('chartSummary');
+const chartCanvas = document.getElementById('historyChart');
+const chartEmpty = document.getElementById('chartEmpty');
 
 let currentItems = [];
 let currentLayout = 'compact';
@@ -42,6 +49,10 @@ let saveTimer = null;
 let saveSequence = 0;
 let currentUser = '';
 let draggedSourceId = null;
+let historyChart = null;
+let currentChartSourceId = '';
+let currentChartHours = 24;
+let chartReloadTimer = null;
 
 openSidePanelBtn?.addEventListener('click', async () => {
   try {
@@ -63,6 +74,43 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function formatNumber(value, unit = '') {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '-';
+
+  const text = Math.abs(numeric) >= 100
+    ? numeric.toFixed(0)
+    : numeric.toFixed(2).replace(/\.?0+$/, '');
+
+  return `${text}${unit ? ` ${unit}` : ''}`;
+}
+
+function formatDuration(seconds) {
+  const duration = Math.max(0, Math.floor(seconds));
+  if (duration < 60) return `${duration} Sek`;
+  if (duration < 3600) return `${Math.floor(duration / 60)} Min`;
+
+  const hours = Math.floor(duration / 3600);
+  const minutes = Math.floor((duration % 3600) / 60);
+  return minutes ? `${hours} Std ${minutes} Min` : `${hours} Std`;
+}
+
+function formatChartTick(timestamp, hours = currentChartHours) {
+  const date = new Date(Number(timestamp) * 1000);
+
+  if (hours > 48) {
+    return date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+  }
+
+  return date.toLocaleTimeString('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 function setStatus(text, state = 'muted') {
   statusText.textContent = text;
   liveDot.className = `dot ${state}`;
@@ -82,12 +130,17 @@ function isSelected(sourceId) {
   return config.items.some(item => item.sourceId === sourceId);
 }
 
-function switchTab(tabId) {
+async function switchTab(tabId) {
   tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
   tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === tabId));
 
   if (tabId !== 'editTab') {
     pickerPanel.classList.add('hidden');
+  }
+
+  if (tabId === 'chartTab') {
+    await loadSelectedChart();
+    setTimeout(() => historyChart?.resize(), 0);
   }
 }
 
@@ -200,6 +253,353 @@ function renderAll() {
   renderItems(currentLayout);
   renderSelectedItems();
   renderEntityResults();
+  renderChartOptions();
+}
+
+function getChartItems() {
+  const configuredLabels = new Map(
+    config.items.map(item => [item.sourceId, item.label])
+  );
+
+  return sources
+    .filter(item => item.historyEnabled && ['numeric', 'boolean'].includes(item.type))
+    .map(item => ({
+      ...item,
+      label: configuredLabels.get(item.id) || item.label || item.name,
+      sourceId: item.id
+    }));
+}
+
+function getChartItem(sourceId = currentChartSourceId) {
+  return getChartItems().find(item => item.sourceId === sourceId);
+}
+
+function renderChartOptions() {
+  if (!chartEntitySelect) return;
+
+  const chartItems = getChartItems();
+
+  if (!chartItems.length) {
+    chartEntitySelect.innerHTML = '<option value="">Keine History-Werte konfiguriert</option>';
+    currentChartSourceId = '';
+    setChartEmpty('Aktiviere History fuer einen numerischen oder boolschen Wert im Monitor.');
+    return;
+  }
+
+  if (!currentChartSourceId || !chartItems.some(item => item.sourceId === currentChartSourceId)) {
+    currentChartSourceId = chartItems[0].sourceId;
+  }
+
+  chartEntitySelect.innerHTML = chartItems.map(item => `
+    <option value="${escapeHtml(item.sourceId)}" ${item.sourceId === currentChartSourceId ? 'selected' : ''}>
+      ${escapeHtml(item.label || item.name || item.sourceId)}
+    </option>
+  `).join('');
+}
+
+function setChartEmpty(message) {
+  chartMetric.textContent = '-';
+  chartSummary.textContent = message;
+  chartEmpty.textContent = message;
+  chartEmpty.classList.remove('hidden');
+
+  if (historyChart) {
+    historyChart.destroy();
+    historyChart = null;
+  }
+}
+
+function setChartLoading(item) {
+  chartMetric.textContent = item ? formatValue(item) : '-';
+  chartSummary.textContent = 'Lade Verlauf...';
+  chartEmpty.classList.add('hidden');
+}
+
+function buildNumericChartRows(rows) {
+  return rows
+    .map(row => ({
+      x: Number(row.t),
+      y: Number(row.avg),
+      min: Number(row.min),
+      max: Number(row.max)
+    }))
+    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function buildBooleanChartRows(rows, item) {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (currentChartHours * 60 * 60);
+  const points = [];
+
+  if (!rows.length) {
+    return points;
+  }
+
+  rows.forEach(row => {
+    const value = normalizeBooleanValue(row.value);
+    const timestamp = Math.max(windowStart, Number(row.t));
+    if (value === null || !Number.isFinite(timestamp)) return;
+
+    const last = points[points.length - 1];
+    if (last && last.x === timestamp) {
+      last.value = value;
+      last.y = value ? 1 : 0;
+      return;
+    }
+
+    points.push({
+      x: timestamp,
+      y: value ? 1 : 0,
+      value
+    });
+  });
+
+  const liveValue = normalizeBooleanValue(item?.value);
+  if (liveValue !== null) {
+    const last = points[points.length - 1];
+    if (!last || last.value !== liveValue) {
+      points.push({ x: now, y: liveValue ? 1 : 0, value: liveValue });
+    } else if (last.x > now) {
+      last.x = now;
+    }
+  }
+
+  return points;
+}
+
+function numericSummary(points, item) {
+  const values = points.map(point => point.y);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  chartMetric.textContent = formatValue(item);
+  chartSummary.textContent = `Min ${formatNumber(min, item.unit)} | Mittel ${formatNumber(avg, item.unit)} | Max ${formatNumber(max, item.unit)}`;
+}
+
+function booleanSummary(points, item) {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (currentChartHours * 60 * 60);
+  const stats = {
+    true: { count: 0, duration: 0 },
+    false: { count: 0, duration: 0 }
+  };
+
+  points.forEach((point, index) => {
+    const start = Math.max(point.x, windowStart);
+    const end = Math.min(points[index + 1]?.x ?? now, now);
+    if (end < windowStart || start > now) return;
+
+    const key = point.value ? 'true' : 'false';
+    stats[key].count += 1;
+    stats[key].duration += Math.max(0, end - start);
+  });
+
+  chartMetric.textContent = formatValue(item);
+  chartSummary.textContent =
+    `An/Offen ${stats.true.count}x | ${formatDuration(stats.true.duration)} | Aus/Geschlossen ${stats.false.count}x | ${formatDuration(stats.false.duration)}`;
+}
+
+function createBooleanBackgroundPlugin(points) {
+  return {
+    id: 'extensionBooleanBackground',
+    beforeDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea || !points.length) return;
+
+      ctx.save();
+      points.forEach((point, index) => {
+        const startX = scales.x.getPixelForValue(point.x);
+        const endX = points[index + 1]
+          ? scales.x.getPixelForValue(points[index + 1].x)
+          : chartArea.right;
+
+        ctx.fillStyle = point.value
+          ? 'rgba(34, 197, 94, 0.72)'
+          : 'rgba(239, 68, 68, 0.72)';
+        ctx.fillRect(startX, chartArea.top, endX - startX, chartArea.bottom - chartArea.top);
+      });
+      ctx.restore();
+    }
+  };
+}
+
+function renderNumericChart(rows, item) {
+  const points = buildNumericChartRows(rows);
+  if (!points.length) {
+    setChartEmpty('Noch keine numerischen Verlaufsdaten vorhanden.');
+    return;
+  }
+
+  numericSummary(points, item);
+  chartEmpty.classList.add('hidden');
+  historyChart?.destroy();
+  historyChart = new window.Chart(chartCanvas, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: item.label || item.name || 'Wert',
+        data: points,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.12)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.28,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          callbacks: {
+            title: ctx => new Date(ctx[0].parsed.x * 1000).toLocaleString('de-DE'),
+            label: ctx => `${item.label || item.name || 'Wert'}: ${formatNumber(ctx.parsed.y, item.unit)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { display: false },
+          ticks: {
+            maxTicksLimit: 6,
+            callback: value => formatChartTick(value)
+          }
+        },
+        y: {
+          grid: { color: 'rgba(148, 163, 184, 0.18)' },
+          ticks: {
+            maxTicksLimit: 5,
+            callback: value => formatNumber(value, item.unit)
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderBooleanChart(rows, item) {
+  const points = buildBooleanChartRows(rows, item);
+  if (!points.length) {
+    setChartEmpty('Noch keine boolschen Verlaufsdaten vorhanden.');
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (currentChartHours * 60 * 60);
+
+  booleanSummary(points, item);
+  chartEmpty.classList.add('hidden');
+  historyChart?.destroy();
+  historyChart = new window.Chart(chartCanvas, {
+    type: 'line',
+    plugins: [createBooleanBackgroundPlugin(points)],
+    data: {
+      datasets: [{
+        label: 'Status',
+        data: points.map(point => ({ x: point.x, y: point.y })),
+        borderColor: 'transparent',
+        pointRadius: 0,
+        stepped: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          callbacks: {
+            title: ctx => new Date(ctx[0].parsed.x * 1000).toLocaleString('de-DE'),
+            label: ctx => {
+              const point = points[ctx.dataIndex];
+              const end = points[ctx.dataIndex + 1]?.x ?? now;
+              return [
+                `Status: ${point.value ? 'true' : 'false'}`,
+                `Von: ${new Date(point.x * 1000).toLocaleString('de-DE')}`,
+                `Bis: ${new Date(end * 1000).toLocaleString('de-DE')}`,
+                `Dauer: ${formatDuration(end - point.x)}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: windowStart,
+          max: now,
+          grid: { display: false },
+          ticks: {
+            maxTicksLimit: 6,
+            callback: value => formatChartTick(value)
+          }
+        },
+        y: {
+          min: 0,
+          max: 1,
+          grid: { display: false },
+          ticks: {
+            stepSize: 1,
+            callback: value => value === 1 ? 'true' : 'false'
+          }
+        }
+      }
+    }
+  });
+}
+
+function historyAggregationSeconds() {
+  if (currentChartHours <= 1) return 60;
+  if (currentChartHours <= 6) return 300;
+  if (currentChartHours <= 24) return 900;
+  return 1800;
+}
+
+async function loadSelectedChart() {
+  if (!chartCanvas || !window.Chart) return;
+
+  renderChartOptions();
+  const item = getChartItem();
+
+  if (!item) {
+    setChartEmpty('Aktiviere History fuer einen numerischen oder boolschen Wert im Monitor.');
+    return;
+  }
+
+  setChartLoading(item);
+
+  try {
+    const path = `/api/extension/history?sourceId=${encodeURIComponent(item.sourceId)}&hours=${currentChartHours}&aggregation=${historyAggregationSeconds()}`;
+    const rows = await apiFetch(path);
+
+    if (item.type === 'boolean') {
+      renderBooleanChart(rows, item);
+    } else {
+      renderNumericChart(rows, item);
+    }
+  } catch (err) {
+    setChartEmpty(err.message || 'Chart konnte nicht geladen werden.');
+  }
+}
+
+function scheduleChartReload(sourceId) {
+  if (!currentChartSourceId || sourceBaseId(currentChartSourceId) !== sourceBaseId(sourceId)) return;
+  if (!document.getElementById('chartTab')?.classList.contains('active')) return;
+
+  clearTimeout(chartReloadTimer);
+  chartReloadTimer = setTimeout(() => {
+    loadSelectedChart().catch(() => {});
+  }, 500);
 }
 
 function collectConfigFromInputs() {
@@ -334,6 +734,11 @@ async function connectSocket() {
   socket.on('entity-update', data => {
     let changed = false;
 
+    sources = sources.map(source => {
+      if (sourceBaseId(source.id) !== data.entityId) return source;
+      return applyEntityUpdate(source, data.entity);
+    });
+
     currentItems = currentItems.map(item => {
       if (sourceBaseId(item.sourceId || item.id) !== data.entityId) return item;
       changed = true;
@@ -343,11 +748,30 @@ async function connectSocket() {
     if (changed) {
       renderItems(currentLayout);
     }
+
+    scheduleChartReload(data.entityId);
   });
 }
 
 tabButtons.forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  btn.addEventListener('click', () => {
+    switchTab(btn.dataset.tab).catch(err => setStatus(err.message, 'warn'));
+  });
+});
+
+chartEntitySelect?.addEventListener('change', () => {
+  currentChartSourceId = chartEntitySelect.value;
+  loadSelectedChart().catch(err => setChartEmpty(err.message));
+});
+
+chartRangeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentChartHours = Number(btn.dataset.chartHours) || 24;
+    chartRangeButtons.forEach(rangeBtn => {
+      rangeBtn.classList.toggle('active', rangeBtn === btn);
+    });
+    loadSelectedChart().catch(err => setChartEmpty(err.message));
+  });
 });
 
 addItemBtn.addEventListener('click', () => {
