@@ -849,3 +849,11 @@ label {
   text-align: right;
   white-space: nowrap;
 }
+
+.clickable-chart {
+  cursor: pointer;
+}
+
+.clickable-chart:hover {
+  background: rgba(59,130,246,0.08);
+}

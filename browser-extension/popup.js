@@ -170,13 +170,24 @@ function renderItems(layout = 'compact') {
   }
 
   content.innerHTML = currentItems
-    .map(item => `
-      <div class="quick-row">
-        <span class="quick-icon ${hasOpenStateBadge(item) ? 'has-alert-badge' : ''}">${iconFor(inferStateIconName(item))}</span>
-        <span class="quick-label">${escapeHtml(item.label || item.name)}</span>
-        <strong class="quick-value">${escapeHtml(formatValue(item))}</strong>
-      </div>
-    `)
+    .map(item => {
+      const chartEnabled = !!getChartItem(item.sourceId || item.id);
+
+      return `
+        <div
+          class="quick-row ${chartEnabled ? 'clickable-chart' : ''}"
+          data-source-id="${escapeHtml(item.sourceId || item.id)}">
+
+          <span class="quick-icon ${hasOpenStateBadge(item) ? 'has-alert-badge' : ''}">
+            ${iconFor(inferStateIconName(item))}
+          </span>
+
+          <span class="quick-label">${escapeHtml(item.label || item.name)}</span>
+
+          <strong class="quick-value">${escapeHtml(formatValue(item))}</strong>
+        </div>
+      `;
+    })
     .join('');
 }
 
@@ -908,6 +919,28 @@ reloadBtn.addEventListener('click', async () => {
     await loadData();
   } catch (err) {
     setStatus(err.message, 'warn');
+  }
+});
+
+content.addEventListener('click', async (event) => {
+  const row = event.target.closest('.quick-row');
+  if (!row) return;
+
+  const sourceId = row.dataset.sourceId;
+  if (!sourceId) return;
+
+  const chartItem = getChartItem(sourceId);
+
+  if (!chartItem) {
+    return;
+  }
+
+  currentChartSourceId = sourceId;
+
+  try {
+    await switchTab('chartTab');
+  } catch (err) {
+    setStatus(err.message || 'Chart konnte nicht geladen werden', 'warn');
   }
 });
 
