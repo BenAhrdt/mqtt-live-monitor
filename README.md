@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.7 Config entfernt
+* (BenAhrdt) Fälschlicherweise hochgeledene config entfernt.
+
 ### V1.8.6 Darstellung Chart verbessert
 * (BenAhrdt) Hover im Chart besser über den Messwerten.
 * (BenAhrdt) Chart in Extension Flackert nicht mehr.
