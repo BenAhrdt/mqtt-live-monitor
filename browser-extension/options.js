@@ -6,6 +6,7 @@ import {
   getServerVersion,
   iconFor,
   inferIconName,
+  normalizeServerUrl,
   setLocalSettings
 } from './shared.js';
 
@@ -122,8 +123,9 @@ function renderAll() {
 }
 
 async function login() {
-  const serverUrl = serverUrlInput.value;
+  const serverUrl = normalizeServerUrl(serverUrlInput.value);
   const username = usernameInput.value.trim();
+  serverUrlInput.value = serverUrl;
   await setLocalSettings({ serverUrl, username });
 
   const authRes = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/auth/enabled`);
@@ -295,7 +297,9 @@ loginBtn.addEventListener('click', async () => {
 
 reloadBtn.addEventListener('click', async () => {
   try {
-    await setLocalSettings({ serverUrl: serverUrlInput.value });
+    const serverUrl = normalizeServerUrl(serverUrlInput.value);
+    serverUrlInput.value = serverUrl;
+    await setLocalSettings({ serverUrl });
     await loadData();
   } catch (err) {
     setState(err.message);

@@ -38,7 +38,19 @@ export const ICONS = {
 };
 
 export function normalizeServerUrl(url) {
-  return String(url || '').trim().replace(/\/+$/, '');
+  const value = String(url || '').trim().replace(/\/+$/, '');
+  if (!value || /^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
+
+  const host = value.split('/')[0].split(':')[0];
+  const isLocal =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '0.0.0.0' ||
+    host.startsWith('192.168.') ||
+    host.startsWith('10.') ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+
+  return `${isLocal ? 'http' : 'https'}://${value}`;
 }
 
 export async function getLocalSettings() {
@@ -288,6 +300,8 @@ export function applyEntityUpdate(item, entity) {
   return {
     ...item,
     value,
+    deviceClass: entity?.deviceClass ?? item.deviceClass,
+    stateClass: entity?.stateClass ?? item.stateClass,
     displayValue: null,
     updatedAt: entity?.lastUpdate || new Date().toISOString()
   };

@@ -9,6 +9,7 @@ import {
   iconFor,
   inferIconName,
   inferStateIconName,
+  normalizeServerUrl,
   normalizeBooleanValue,
   setLocalSettings,
   sourceBaseId
@@ -34,9 +35,10 @@ const layoutButtons = Array.from(document.querySelectorAll('[data-layout]'));
 const tabButtons = Array.from(document.querySelectorAll('[data-tab]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const chartEntitySelect = document.getElementById('chartEntitySelect');
-const chartRangeButtons = Array.from(document.querySelectorAll('[data-chart-hours]'));
+const chartRangeSelect = document.getElementById('chartRangeSelect');
 const chartMetric = document.getElementById('chartMetric');
 const chartSummary = document.getElementById('chartSummary');
+const chartPanel = document.getElementById('chartPanel');
 const chartCanvas = document.getElementById('historyChart');
 const chartEmpty = document.getElementById('chartEmpty');
 
@@ -53,6 +55,12 @@ let historyChart = null;
 let currentChartSourceId = '';
 let currentChartHours = 24;
 let chartReloadTimer = null;
+let chartPointerActive = false;
+let chartReloadPending = false;
+let chartInteractionHoldUntil = 0;
+
+const CHART_RELOAD_DELAY_MS = 2500;
+const CHART_INTERACTION_IDLE_MS = 7000;
 
 openSidePanelBtn?.addEventListener('click', async () => {
   try {
@@ -114,6 +122,15 @@ function formatChartTick(timestamp, hours = currentChartHours) {
 function setStatus(text, state = 'muted') {
   statusText.textContent = text;
   liveDot.className = `dot ${state}`;
+}
+
+function networkErrorMessage(err) {
+  const message = String(err?.message || err || '');
+  if (message.toLowerCase().includes('failed to fetch')) {
+    return 'Server nicht erreichbar. Pruefe URL, HTTPS/Zertifikat und ob der Live-Server von Chrome erreichbar ist.';
+  }
+
+  return message || 'Verbindung fehlgeschlagen';
 }
 
 function setAvatar(name = '') {
@@ -326,6 +343,16 @@ function setChartLoading(item) {
   chartEmpty.classList.add('hidden');
 }
 
+function updateChartLiveValue(sourceId) {
+  if (!currentChartSourceId || sourceBaseId(currentChartSourceId) !== sourceBaseId(sourceId)) return;
+  if (!document.getElementById('chartTab')?.classList.contains('active')) return;
+
+  const item = getChartItem();
+  if (!item) return;
+
+  chartMetric.textContent = formatValue(item);
+}
+
 function buildNumericChartRows(rows) {
   return rows
     .map(row => ({
@@ -333,6 +360,25 @@ function buildNumericChartRows(rows) {
       y: Number(row.avg),
       min: Number(row.min),
       max: Number(row.max)
+    }))
+    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function isEnergyItem(item = {}) {
+  const deviceClass = String(item.deviceClass || '').toLowerCase();
+  const stateClass = String(item.stateClass || '').toLowerCase();
+  const unit = String(item.unit || '').trim().toLowerCase().replace(/\s+/g, '');
+
+  return deviceClass === 'energy'
+    || ['wh', 'kwh', 'mwh'].includes(unit)
+    || (stateClass === 'total_increasing' && ['wh', 'kwh', 'mwh'].includes(unit));
+}
+
+function buildEnergyChartRows(rows, key = 'positive_change') {
+  return rows
+    .map(row => ({
+      x: Number(row.t),
+      y: Number(row[key]) || 0
     }))
     .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
@@ -411,6 +457,16 @@ function booleanSummary(points, item) {
     `An/Offen ${stats.true.count}x | ${formatDuration(stats.true.duration)} | Aus/Geschlossen ${stats.false.count}x | ${formatDuration(stats.false.duration)}`;
 }
 
+function energySummary(rows, item) {
+  const positive = rows.reduce((sum, row) => sum + (Number(row.positive_change) || 0), 0);
+  const negative = rows.reduce((sum, row) => sum + (Number(row.negative_change) || 0), 0);
+
+  chartMetric.textContent = formatValue(item);
+  chartSummary.textContent = negative > 0
+    ? `Positiv ${formatNumber(positive, item.unit)} | Negativ ${formatNumber(negative, item.unit)}`
+    : `Verbrauch ${formatNumber(positive, item.unit)}`;
+}
+
 function createBooleanBackgroundPlugin(points) {
   return {
     id: 'extensionBooleanBackground',
@@ -433,6 +489,86 @@ function createBooleanBackgroundPlugin(points) {
       ctx.restore();
     }
   };
+}
+
+function renderEnergyChart(rows, item) {
+  const positivePoints = buildEnergyChartRows(rows, 'positive_change');
+  const negativePoints = buildEnergyChartRows(rows, 'negative_change');
+  const hasPositive = positivePoints.some(point => point.y > 0);
+  const hasNegative = negativePoints.some(point => point.y > 0);
+
+  if (!hasPositive && !hasNegative) {
+    setChartEmpty('Noch keine Energie-Verlaufsdaten vorhanden.');
+    return;
+  }
+
+  energySummary(rows, item);
+  chartEmpty.classList.add('hidden');
+  historyChart?.destroy();
+  historyChart = new window.Chart(chartCanvas, {
+    type: 'bar',
+    data: {
+      datasets: [
+        {
+          label: item.label || item.name || 'Energie',
+          data: positivePoints,
+          backgroundColor: 'rgba(37, 99, 235, 0.48)',
+          borderColor: '#2563eb',
+          borderWidth: 1
+        },
+        ...(hasNegative ? [{
+          label: 'Negativ',
+          data: negativePoints,
+          backgroundColor: 'rgba(239, 68, 68, 0.42)',
+          borderColor: '#ef4444',
+          borderWidth: 1
+        }] : [])
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: false,
+      interaction: {
+        mode: 'index',
+        axis: 'x',
+        intersect: false
+      },
+      plugins: {
+        legend: { display: hasNegative },
+        tooltip: {
+          displayColors: true,
+          callbacks: {
+            title: ctx => new Date(ctx[0].parsed.x * 1000).toLocaleString('de-DE'),
+            label: ctx => {
+              const value = Number(ctx.parsed.y);
+              if (!Number.isFinite(value) || value <= 0) return null;
+              return `${ctx.dataset.label}: ${formatNumber(value, item.unit)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { display: false },
+          ticks: {
+            maxTicksLimit: 6,
+            callback: value => formatChartTick(value)
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(148, 163, 184, 0.18)' },
+          ticks: {
+            maxTicksLimit: 5,
+            callback: value => formatNumber(value, item.unit)
+          }
+        }
+      }
+    }
+  });
 }
 
 function renderNumericChart(rows, item) {
@@ -464,6 +600,11 @@ function renderNumericChart(rows, item) {
       maintainAspectRatio: false,
       animation: false,
       parsing: false,
+      interaction: {
+        mode: 'index',
+        axis: 'x',
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -570,10 +711,27 @@ function renderBooleanChart(rows, item) {
 }
 
 function historyAggregationSeconds() {
-  if (currentChartHours <= 1) return 60;
-  if (currentChartHours <= 6) return 300;
-  if (currentChartHours <= 24) return 900;
-  return 1800;
+  const item = getChartItem();
+  const bucketSeconds = Number(item?.historyBucketSeconds);
+  const entityBucketSeconds = Number.isFinite(bucketSeconds) && bucketSeconds > 0
+    ? bucketSeconds
+    : 5 * 60;
+
+  if (isEnergyItem(item)) {
+    let desiredAggregation = 24 * 60 * 60;
+
+    if (currentChartHours <= 3) {
+      desiredAggregation = 5 * 60;
+    } else if (currentChartHours <= 24) {
+      desiredAggregation = 15 * 60;
+    } else if (currentChartHours <= 24 * 7) {
+      desiredAggregation = 60 * 60;
+    }
+
+    return Math.max(desiredAggregation, entityBucketSeconds);
+  }
+
+  return entityBucketSeconds;
 }
 
 async function loadSelectedChart() {
@@ -595,11 +753,13 @@ async function loadSelectedChart() {
 
     if (item.type === 'boolean') {
       renderBooleanChart(rows, item);
+    } else if (isEnergyItem(item)) {
+      renderEnergyChart(rows, item);
     } else {
       renderNumericChart(rows, item);
     }
   } catch (err) {
-    setChartEmpty(err.message || 'Chart konnte nicht geladen werden.');
+    setChartEmpty(networkErrorMessage(err) || 'Chart konnte nicht geladen werden.');
   }
 }
 
@@ -607,10 +767,31 @@ function scheduleChartReload(sourceId) {
   if (!currentChartSourceId || sourceBaseId(currentChartSourceId) !== sourceBaseId(sourceId)) return;
   if (!document.getElementById('chartTab')?.classList.contains('active')) return;
 
+  chartReloadPending = true;
+
   clearTimeout(chartReloadTimer);
+  const interactionWait = Math.max(0, chartInteractionHoldUntil - Date.now());
+  const delay = chartPointerActive
+    ? CHART_INTERACTION_IDLE_MS
+    : Math.max(CHART_RELOAD_DELAY_MS, interactionWait);
+
   chartReloadTimer = setTimeout(() => {
+    chartReloadTimer = null;
+    if (chartPointerActive || Date.now() < chartInteractionHoldUntil) {
+      scheduleChartReload(currentChartSourceId);
+      return;
+    }
+
+    chartReloadPending = false;
     loadSelectedChart().catch(() => {});
-  }, 500);
+  }, delay);
+}
+
+function markChartInteraction() {
+  chartInteractionHoldUntil = Date.now() + CHART_INTERACTION_IDLE_MS;
+
+  if (!chartReloadPending || chartReloadTimer) return;
+  scheduleChartReload(currentChartSourceId);
 }
 
 function collectConfigFromInputs() {
@@ -665,8 +846,9 @@ function scheduleSave({ render = false } = {}) {
 }
 
 async function login() {
-  const serverUrl = serverUrlInput.value;
+  const serverUrl = normalizeServerUrl(serverUrlInput.value);
   const username = usernameInput.value.trim();
+  serverUrlInput.value = serverUrl;
   await setLocalSettings({ serverUrl, username });
 
   const authRes = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/auth/enabled`);
@@ -760,6 +942,7 @@ async function connectSocket() {
       renderItems(currentLayout);
     }
 
+    updateChartLiveValue(data.entityId);
     scheduleChartReload(data.entityId);
   });
 }
@@ -775,14 +958,42 @@ chartEntitySelect?.addEventListener('change', () => {
   loadSelectedChart().catch(err => setChartEmpty(err.message));
 });
 
-chartRangeButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentChartHours = Number(btn.dataset.chartHours) || 24;
-    chartRangeButtons.forEach(rangeBtn => {
-      rangeBtn.classList.toggle('active', rangeBtn === btn);
-    });
-    loadSelectedChart().catch(err => setChartEmpty(err.message));
-  });
+function syncChartRangeControls() {
+  if (chartRangeSelect) {
+    const hasOption = Array.from(chartRangeSelect.options)
+      .some(option => Number(option.value) === currentChartHours);
+
+    chartRangeSelect.value = hasOption ? String(currentChartHours) : '24';
+  }
+}
+
+chartRangeSelect?.addEventListener('change', () => {
+  currentChartHours = Number(chartRangeSelect.value) || 24;
+  syncChartRangeControls();
+  loadSelectedChart().catch(err => setChartEmpty(networkErrorMessage(err)));
+});
+
+chartPanel?.addEventListener('pointerenter', () => {
+  chartPointerActive = true;
+  markChartInteraction();
+
+  if (chartReloadTimer) {
+    clearTimeout(chartReloadTimer);
+    chartReloadTimer = null;
+    chartReloadPending = true;
+  }
+});
+
+chartPanel?.addEventListener('pointermove', markChartInteraction);
+chartPanel?.addEventListener('touchstart', markChartInteraction, { passive: true });
+chartPanel?.addEventListener('wheel', markChartInteraction, { passive: true });
+
+chartPanel?.addEventListener('pointerleave', () => {
+  chartPointerActive = false;
+  markChartInteraction();
+
+  if (!chartReloadPending) return;
+  scheduleChartReload(currentChartSourceId);
 });
 
 addItemBtn.addEventListener('click', () => {
@@ -909,16 +1120,18 @@ loginBtn.addEventListener('click', async () => {
     await login();
     switchTab('viewTab');
   } catch (err) {
-    setStatus(err.message, 'warn');
+    setStatus(networkErrorMessage(err), 'warn');
   }
 });
 
 reloadBtn.addEventListener('click', async () => {
   try {
-    await setLocalSettings({ serverUrl: serverUrlInput.value, username: usernameInput.value.trim() });
+    const serverUrl = normalizeServerUrl(serverUrlInput.value);
+    serverUrlInput.value = serverUrl;
+    await setLocalSettings({ serverUrl, username: usernameInput.value.trim() });
     await loadData();
   } catch (err) {
-    setStatus(err.message, 'warn');
+    setStatus(networkErrorMessage(err), 'warn');
   }
 });
 
@@ -964,7 +1177,7 @@ async function init() {
     setStatus('Bitte anmelden', 'warn');
     content.innerHTML = `
       <div class="empty-state">
-        <strong>${escapeHtml(err.message)}</strong>
+        <strong>${escapeHtml(networkErrorMessage(err))}</strong>
         <span>Pruefe Server-URL und Login in den Einstellungen.</span>
       </div>
     `;

@@ -50,13 +50,22 @@
             Wert
             <select id="chartEntitySelect"></select>
           </label>
-          <div class="chart-range" aria-label="Zeitraum">
-            <button data-chart-hours="1" type="button" title="Letzte Stunde">1h</button>
-            <button data-chart-hours="6" type="button" title="Letzte 6 Stunden">6h</button>
-            <button data-chart-hours="12" type="button" title="Letzte 12 Stunden">12h</button>
-            <button data-chart-hours="24" type="button" class="active" title="Letzte 24 Stunden">24h</button>
-            <button data-chart-hours="48" type="button" title="Letzte 48 Stunden">48h</button>
-          </div>
+          <label>
+            Zeitraum
+            <select id="chartRangeSelect" class="chart-range-select">
+              <option value="0.25">15 Minuten</option>
+              <option value="0.5">30 Minuten</option>
+              <option value="1">1 Stunde</option>
+              <option value="2">2 Stunden</option>
+              <option value="3">3 Stunden</option>
+              <option value="6">6 Stunden</option>
+              <option value="12">12 Stunden</option>
+              <option value="24" selected>Tag</option>
+              <option value="168">Woche</option>
+              <option value="336">2 Wochen</option>
+              <option value="720">Monat</option>
+            </select>
+          </label>
         </div>
 
         <section id="chartPanel" class="mini-panel chart-panel">

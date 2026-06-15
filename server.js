@@ -2676,6 +2676,8 @@ function createExtensionSource(device, entity, source = {}) {
   const sourceId = source.id || entity.id;
   const key = source.key || null;
   const value = getNestedExtensionValue(entity, key);
+  const historyConfig = getHistoryConfig(sourceId);
+  const bucketMinutes = Number(historyConfig?.bucketMinutes);
   const unit = source.unit ?? entity?.unit ?? "";
   const type = source.type || (
     typeof value === "boolean" || entity.type === "binary_sensor"
@@ -2718,9 +2720,14 @@ function createExtensionSource(device, entity, source = {}) {
     ].filter(Boolean).join(" "),
     value,
     unit,
+    deviceClass: source.deviceClass ?? entity.deviceClass ?? "",
+    stateClass: source.stateClass ?? entity.stateClass ?? "",
     displayValue: formatExtensionValue(value, unit),
     icon: source.icon || getExtensionIcon(entity, key),
-    historyEnabled: Boolean(getHistoryConfig(sourceId)?.enabled),
+    historyEnabled: Boolean(historyConfig?.enabled),
+    historyBucketSeconds: Number.isFinite(bucketMinutes) && bucketMinutes > 0
+      ? bucketMinutes * 60
+      : 5 * 60,
     updatedAt: entity.lastUpdate || device.updatedAt || null
   };
 }

@@ -4727,6 +4727,87 @@ function createEnergyHistoryPoints(data, key) {
         );
 }
 
+function getPointXValue(point) {
+    if (point && typeof point === 'object') {
+        return Number(point.x);
+    }
+
+    return Number.NaN;
+}
+
+function getDatasetValueAtTimestamp(dataset, timestamp) {
+    const target = Number(timestamp);
+    if (!Number.isFinite(target) || !Array.isArray(dataset?.data)) {
+        return Number.NaN;
+    }
+
+    let closestPoint = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    dataset.data.forEach(point => {
+        const pointTimestamp = getPointXValue(point);
+        if (!Number.isFinite(pointTimestamp)) return;
+
+        const distance = Math.abs(pointTimestamp - target);
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestPoint = point;
+        }
+    });
+
+    if (closestPoint && typeof closestPoint === 'object') {
+        return Number(closestPoint.y);
+    }
+
+    return Number(closestPoint);
+}
+
+function getTooltipTimestamp(ctx) {
+    const first = Array.isArray(ctx) ? ctx[0] : ctx;
+    return Number(first?.parsed?.x ?? first?.raw?.x ?? 0);
+}
+
+function registerHistoryXAxisInteractionMode() {
+    if (!window.Chart?.Interaction?.modes || !window.Chart?.helpers) return;
+    if (window.Chart.Interaction.modes.historyXNearest) return;
+
+    window.Chart.Interaction.modes.historyXNearest = function(chart, event, options, useFinalPosition) {
+        const position = window.Chart.helpers.getRelativePosition(event, chart);
+        const xScale = chart.scales.x;
+        const targetX = xScale?.getValueForPixel(position.x);
+
+        if (!Number.isFinite(targetX)) {
+            return [];
+        }
+
+        return chart.data.datasets
+            .map((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (meta.hidden || !Array.isArray(dataset.data)) return null;
+
+                let closestIndex = -1;
+                let closestDistance = Number.POSITIVE_INFINITY;
+
+                dataset.data.forEach((point, pointIndex) => {
+                    const pointTimestamp = getPointXValue(point);
+                    if (!Number.isFinite(pointTimestamp)) return;
+
+                    const distance = Math.abs(pointTimestamp - targetX);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestIndex = pointIndex;
+                    }
+                });
+
+                const element = meta.data[closestIndex];
+                return element
+                    ? { element, datasetIndex, index: closestIndex }
+                    : null;
+            })
+            .filter(Boolean);
+    };
+}
+
 function addHistoryCompareEntity(entityId) {
     if (!currentEntityId || !entityId) return;
 
@@ -5583,6 +5664,8 @@ async function openNumericHistory(entityId, options = {}) {
 	        });
 
   // 🔧 Chart erstellen
+  registerHistoryXAxisInteractionMode();
+
   historyChart = new Chart(ctx, {
     type: currentType,
 	    data: {
@@ -5609,7 +5692,8 @@ async function openNumericHistory(entityId, options = {}) {
 	      },
 
 	      interaction: {
-        mode: 'index',
+        mode: 'historyXNearest',
+        axis: 'x',
         intersect: false
       },
 
@@ -5621,7 +5705,7 @@ async function openNumericHistory(entityId, options = {}) {
 
 	            // 🔥 Titel = vollständige Zeit
 		            title: (ctx) => {
-		              const ts = ctx[0].parsed.x * 1000;
+		              const ts = getTooltipTimestamp(ctx) * 1000;
                       const date = new Date(ts);
 
                       if (isHistoryDayAggregation()) {
@@ -5638,30 +5722,34 @@ async function openNumericHistory(entityId, options = {}) {
             // 🔥 Werte
             label: (ctx) => {
 
-            const i = ctx.dataIndex;
+            const tooltipTimestamp = getTooltipTimestamp([ctx]);
+            const value = getDatasetValueAtTimestamp(ctx.dataset, tooltipTimestamp);
 
 	            // 🔥 Energy
 	            if (
 	                entity.deviceClass
 	                && entity.deviceClass === 'energy'
 	            ) {
-	                const value = Number(ctx.parsed.y);
+	                const numericValue = Number(value);
 
 	                if (
-	                    !Number.isFinite(value)
-	                    || (ctx.dataset.type === 'bar' && value <= 0)
+	                    !Number.isFinite(numericValue)
+	                    || (ctx.dataset.type === 'bar' && numericValue <= 0)
 	                ) {
 	                return null;
 	                }
 
 	                return `
 		                ${ctx.dataset.label}:
-		                ${value.toFixed(2)} ${ctx.dataset.historyUnit || unit}
+		                ${numericValue.toFixed(2)} ${ctx.dataset.historyUnit || unit}
 		                `;
 
 	            }
 
-	            return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${ctx.dataset.historyUnit || unit}`;
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue)) return null;
+
+	            return `${ctx.dataset.label}: ${numericValue.toFixed(2)} ${ctx.dataset.historyUnit || unit}`;
 
             }
           }

@@ -431,33 +431,11 @@ p {
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 160px);
 }
 
-.chart-range {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: grid;
-  grid-template-columns: repeat(5, 38px);
-  overflow: hidden;
-}
-
-.chart-range button {
-  border: 0;
-  border-radius: 0;
-  color: #4a5f86;
+.chart-range-select {
   min-height: 38px;
-  padding: 0;
-}
-
-.chart-range button + button {
-  border-left: 1px solid var(--border);
-}
-
-.chart-range button.active {
-  background: #2563eb;
-  color: #fff;
-  font-weight: 800;
 }
 
 .chart-panel {
@@ -508,10 +486,6 @@ p {
 
 .sidepanel-document .side-panel .chart-controls {
   grid-template-columns: 1fr;
-}
-
-.sidepanel-document .side-panel .chart-range {
-  grid-template-columns: repeat(5, 1fr);
 }
 
 .sidepanel-document .side-panel .chart-panel {

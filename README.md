@@ -138,6 +138,12 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.6 Darstellung Chart verbessert
+* (BenAhrdt) Hover im Chart besser über den Messwerten.
+* (BenAhrdt) Chart in Extension Flackert nicht mehr.
+* (BenAhrdt) Balkendiagramme in Extension möglich.
+* (BenAhrdt) Komplette Zeitauswahl in Extension möglich.
+
 ### V1.8.5 Direktes öffnen der Charts
 * (BenAhrdt) In der Extension kann nun direkt auf die entity geklickt werden, um den chart anzuzeigen
 
