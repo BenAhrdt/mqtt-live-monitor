@@ -138,6 +138,9 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.8 Werte auf 31 Tage speichern
+* (BenAhrdt) Darstellung der Boolschen Werte korrigiert.
+
 ### V1.8.7 Config entfernt
 * (BenAhrdt) Fälschlicherweise hochgeledene config entfernt.
 

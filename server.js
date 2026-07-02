@@ -3568,6 +3568,30 @@ app.get('/api/logics', (req, res) => {
   res.json(data);
 });
 
+function normalizeHistoryBooleanValue(value) {
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (['true', '1', 'on', 'open', 'yes'].includes(normalized)) {
+      return 1;
+    }
+
+    if (['false', '0', 'off', 'closed', 'no'].includes(normalized)) {
+      return 0;
+    }
+  }
+
+  return null;
+}
+
 function sendHistoryResponse(req, res, entityId) {
   const entity = findEntityById(entityId);
   const cfg = getHistoryConfig(entityId);
@@ -3650,16 +3674,49 @@ function sendHistoryResponse(req, res, entityId) {
               });
           }
 
-          const booleanRows =
-              previousRow
-                  ? [
+          let booleanRows = rows;
+
+          if (previousRow) {
+              booleanRows = [
+                  {
+                      t: cutoff,
+                      value: previousRow.value
+                  },
+                  ...rows
+              ];
+          } else if (rows.length > 0) {
+              const firstRow = rows[0];
+              const firstValue =
+                  normalizeHistoryBooleanValue(firstRow.value);
+
+              if (
+                  firstValue !== null
+                  && Number(firstRow.t) > cutoff
+              ) {
+                  booleanRows = [
                       {
                           t: cutoff,
-                          value: previousRow.value
+                          value: firstValue ? 0 : 1,
+                          inferred: true
                       },
                       ...rows
-                  ]
-                  : rows;
+                  ];
+              }
+          } else {
+              const liveValue =
+                  normalizeHistoryBooleanValue(entity?.value);
+
+              booleanRows =
+                  liveValue === null
+                      ? []
+                      : [
+                          {
+                              t: cutoff,
+                              value: liveValue,
+                              inferred: true
+                          }
+                      ];
+          }
 
           res.json(booleanRows);
       });

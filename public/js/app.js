@@ -4674,8 +4674,8 @@ async function fetchNumericHistoryData(entityId, aggregation) {
     return res.json();
 }
 
-function createNumericHistoryPoints(data, valueKey = 'avg') {
-    return data
+function createNumericHistoryPoints(data, valueKey = 'avg', options = {}) {
+    const points = data
         .map(row => ({
             x: Number(row.t),
             y: Number(row[valueKey])
@@ -4684,6 +4684,32 @@ function createNumericHistoryPoints(data, valueKey = 'avg') {
             Number.isFinite(point.x)
             && Number.isFinite(point.y)
         );
+
+    const liveValue = Number(options.liveValue);
+    const now =
+        Number.isFinite(options.now)
+            ? Number(options.now)
+            : Math.floor(Date.now() / 1000);
+
+    if (
+        Number.isFinite(liveValue)
+        && Number.isFinite(now)
+        && (
+            !points.length
+            || points[points.length - 1].x < now
+        )
+    ) {
+        points.push({
+            x: now,
+            y: liveValue
+        });
+    }
+
+    return points;
+}
+
+function getHistoryPointRadius(points) {
+    return points.length <= 1 ? 3 : 0;
 }
 
 function createEnergyHistoryLabels(historyResponses) {
@@ -5596,14 +5622,20 @@ async function openNumericHistory(entityId, options = {}) {
             const label =
                 getHistoryEntityLabel(response.entity);
             if (response.entity.deviceClass !== 'energy') {
+                const points =
+                    createNumericHistoryPoints(response.data, 'avg', {
+                        liveValue: response.entity.value
+                    });
+
                 return [{
                     type: 'line',
                     label,
-                    data: createNumericHistoryPoints(response.data),
+                    data: points,
                     borderColor: color,
                     backgroundColor: `${color}22`,
                     tension: 0.3,
-                    pointRadius: 0,
+                    pointRadius: getHistoryPointRadius(points),
+                    pointHoverRadius: 5,
                     borderWidth: 2,
                     yAxisID: 'y1',
                     historyUnit: response.entity.unit || ''
@@ -5648,15 +5680,20 @@ async function openNumericHistory(entityId, options = {}) {
         .map((response, index) => {
             const color =
                 historyCompareColors[index % historyCompareColors.length];
+            const points =
+                createNumericHistoryPoints(response.data, 'avg', {
+                    liveValue: response.entity.value
+                });
 
 	            return {
 	                label: getHistoryEntityLabel(response.entity),
-	                data: createNumericHistoryPoints(response.data),
+	                data: points,
 	                borderColor: color,
 	                backgroundColor: `${color}22`,
 	                tension: 0.3,
 	                fill: index === 0 && historyResponses.length === 1,
-	                pointRadius: 0,
+	                pointRadius: getHistoryPointRadius(points),
+	                pointHoverRadius: 5,
 	                borderWidth: index === 0 ? 2.5 : 2,
 	                yAxisID: getHistoryAxisId(response.entity, entity),
 	                historyUnit: response.entity.unit || ''

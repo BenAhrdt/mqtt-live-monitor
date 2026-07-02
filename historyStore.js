@@ -248,7 +248,7 @@ function writeHistory(entityId, entity, cfg) {
     );
 }
 const config = {
-  historyRetentionHours: 24 * 7,
+  historyRetentionHours: 24 * 31,
 }
 // Jede Minute cleanup => Alles größer X aus Datenbank schmeißen
 function startCleanup() {
@@ -266,6 +266,24 @@ function startCleanup() {
       DELETE FROM history
       WHERE bucket < ?
     `, [cutoff]);
+
+    db.run(`
+      UPDATE history_boolean
+      SET timestamp = ?
+      WHERE rowid IN (
+        SELECT h1.rowid
+        FROM history_boolean h1
+        WHERE h1.timestamp < ?
+          AND h1.rowid = (
+            SELECT h2.rowid
+            FROM history_boolean h2
+            WHERE h2.entityId = h1.entityId
+              AND h2.timestamp < ?
+            ORDER BY h2.timestamp DESC, h2.rowid DESC
+            LIMIT 1
+          )
+      )
+    `, [cutoff, cutoff, cutoff]);
 
     db.run(`
       DELETE FROM history_boolean
