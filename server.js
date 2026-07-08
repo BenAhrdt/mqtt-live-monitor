@@ -129,6 +129,138 @@ if (isElectron) {
 }
 
 const CONFIG_EXAMPLE_PATH = path.join(__dirname, "config-example.json");
+const BROWSER_EXTENSION_DIR = path.join(__dirname, "browser-extension");
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+
+  for (let i = 0; i < 256; i++) {
+    let value = i;
+    for (let bit = 0; bit < 8; bit++) {
+      value = value & 1
+        ? 0xedb88320 ^ (value >>> 1)
+        : value >>> 1;
+    }
+    table[i] = value >>> 0;
+  }
+
+  return table;
+})();
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function getZipDateTime(date = new Date()) {
+  const year = Math.max(1980, date.getFullYear());
+
+  return {
+    time:
+      (date.getHours() << 11) |
+      (date.getMinutes() << 5) |
+      Math.floor(date.getSeconds() / 2),
+    date:
+      ((year - 1980) << 9) |
+      ((date.getMonth() + 1) << 5) |
+      date.getDate()
+  };
+}
+
+function collectFilesRecursive(dir, baseDir = dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+
+  entries.forEach(entry => {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...collectFilesRecursive(fullPath, baseDir));
+      return;
+    }
+
+    if (!entry.isFile()) return;
+
+    files.push({
+      fullPath,
+      zipPath: path
+        .join("browser-extension", path.relative(baseDir, fullPath))
+        .split(path.sep)
+        .join("/")
+    });
+  });
+
+  return files;
+}
+
+function createZipBuffer(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  files.forEach(file => {
+    const data = fs.readFileSync(file.fullPath);
+    const stats = fs.statSync(file.fullPath);
+    const name = Buffer.from(file.zipPath, "utf8");
+    const checksum = crc32(data);
+    const { time, date } = getZipDateTime(stats.mtime);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(time, 10);
+    localHeader.writeUInt16LE(date, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(name.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    localParts.push(localHeader, name, data);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(time, 12);
+    centralHeader.writeUInt16LE(date, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(name.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+
+    centralParts.push(centralHeader, name);
+    offset += localHeader.length + name.length + data.length;
+  });
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const endRecord = Buffer.alloc(22);
+  endRecord.writeUInt32LE(0x06054b50, 0);
+  endRecord.writeUInt16LE(0, 4);
+  endRecord.writeUInt16LE(0, 6);
+  endRecord.writeUInt16LE(files.length, 8);
+  endRecord.writeUInt16LE(files.length, 10);
+  endRecord.writeUInt32LE(centralDirectory.length, 12);
+  endRecord.writeUInt32LE(offset, 16);
+  endRecord.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, endRecord]);
+}
 
 
 
@@ -560,6 +692,32 @@ app.post('/api/settings/auth', requireAdmin, (req, res) => {
 
   }
 
+});
+
+app.get('/api/browser-extension/download', requireAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(BROWSER_EXTENSION_DIR)) {
+      return res.status(404).json({
+        error: "Browser-Extension Ordner nicht gefunden"
+      });
+    }
+
+    const files = collectFilesRecursive(BROWSER_EXTENSION_DIR);
+    const zip = createZipBuffer(files);
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="mqtt-live-monitor-browser-extension.zip"'
+    );
+    res.setHeader("Content-Length", zip.length);
+    res.send(zip);
+  } catch (err) {
+    console.error("Fehler beim Erstellen des Browser-Extension ZIPs:", err);
+    res.status(500).json({
+      error: "Browser-Extension konnte nicht gepackt werden"
+    });
+  }
 });
 
 app.get('/api/users', (req, res) => {
@@ -2724,11 +2882,29 @@ function createExtensionSource(device, entity, source = {}) {
     stateClass: source.stateClass ?? entity.stateClass ?? "",
     displayValue: formatExtensionValue(value, unit),
     icon: source.icon || getExtensionIcon(entity, key),
+    control: source.control || null,
     historyEnabled: Boolean(historyConfig?.enabled),
     historyBucketSeconds: Number.isFinite(bucketMinutes) && bucketMinutes > 0
       ? bucketMinutes * 60
       : 5 * 60,
     updatedAt: entity.lastUpdate || device.updatedAt || null
+  };
+}
+
+function createToggleControl(action = "set") {
+  return {
+    type: "toggle",
+    action
+  };
+}
+
+function createNumberControl(action, min, max, step) {
+  return {
+    type: "number",
+    action,
+    min,
+    max,
+    step
   };
 }
 
@@ -2741,7 +2917,8 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Status",
         type: "text",
         unit: "",
-        icon: "lightbulb"
+        icon: "lightbulb",
+        control: entity.commandTopic ? createToggleControl("set") : null
       })
     ];
 
@@ -2753,7 +2930,10 @@ function getExtensionSourcesForEntity(device, entity) {
           name: "Helligkeit",
           type: "numeric",
           unit: "%",
-          icon: "sun"
+          icon: "sun",
+          control: entity.commandTopic
+            ? createNumberControl("setBrightness", 0, 100, 1)
+            : null
         })
       );
     }
@@ -2763,6 +2943,17 @@ function getExtensionSourcesForEntity(device, entity) {
 
   if (entity.type === "climate") {
     return [
+      createExtensionSource(device, entity, {
+        id: createExtensionSourceId(entity.id, "mode"),
+        key: "mode",
+        name: "Modus",
+        type: "text",
+        unit: "",
+        icon: "thermometer",
+        control: entity.modeCommandTopic && Array.isArray(entity.modes) && entity.modes.length
+          ? { type: "select", action: "setMode", options: entity.modes }
+          : null
+      }),
       createExtensionSource(device, entity, {
         id: createExtensionSourceId(entity.id, "currentTemperature"),
         key: "currentTemperature",
@@ -2777,7 +2968,15 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Solltemperatur",
         type: "numeric",
         unit: "°C",
-        icon: "thermometer"
+        icon: "thermometer",
+        control: entity.temperatureCommandTopic
+          ? createNumberControl(
+              "setTargetTemperature",
+              entity.minTemp ?? 5,
+              entity.maxTemp ?? 30,
+              entity.tempStep ?? entity.precision ?? 0.5
+            )
+          : null
       })
     ];
   }
@@ -2798,7 +2997,15 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Sollfeuchte",
         type: "numeric",
         unit: "%",
-        icon: "droplets"
+        icon: "droplets",
+        control: entity.targetHumidityCommandTopic
+          ? createNumberControl(
+              "setTargetHumidity",
+              entity.minHumidity ?? 30,
+              entity.maxHumidity ?? 80,
+              1
+            )
+          : null
       }),
       createExtensionSource(device, entity, {
         id: createExtensionSourceId(entity.id, "state"),
@@ -2806,7 +3013,8 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Status",
         type: "text",
         unit: "",
-        icon: "fan"
+        icon: "fan",
+        control: entity.commandTopic ? createToggleControl("set") : null
       })
     ];
   }
@@ -2821,7 +3029,8 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Zustand",
         type: "text",
         unit: "",
-        icon: "blinds"
+        icon: "blinds",
+        control: entity.commandTopic ? { type: "buttons", actions: ["OPEN", "STOP", "CLOSE"] } : null
       })
     );
 
@@ -2849,7 +3058,8 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Zustand",
         type: "text",
         unit: "",
-        icon: "lock"
+        icon: "lock",
+        control: entity.commandTopic ? { type: "buttons", actions: ["LOCK", "UNLOCK", "OPEN"] } : null
       })
     ];
   }
@@ -2862,20 +3072,52 @@ function getExtensionSourcesForEntity(device, entity) {
         name: "Aktivitaet",
         type: "text",
         unit: "",
-        icon: "activity"
+        icon: "activity",
+        control: {
+          type: "buttons",
+          actions: [
+            ...(entity.startMowingCommandTopic ? ["start_mowing"] : []),
+            ...(entity.pauseCommandTopic ? ["pause"] : []),
+            ...(entity.dockCommandTopic ? ["dock"] : [])
+          ]
+        }
       })
     ];
   }
 
   if (entity.type === "button") {
-    return [];
+    return [createExtensionSource(device, entity, {
+      type: "text",
+      unit: "",
+      icon: "circle-dot",
+      control: entity.commandTopic ? { type: "button", action: "press" } : null
+    })];
   }
 
-  if (entity.value === undefined || entity.value === null || entity.value === "") {
-    return [];
+  return [createExtensionSource(device, entity, {
+    control: getExtensionControlForSimpleEntity(entity)
+  })];
+}
+
+function getExtensionControlForSimpleEntity(entity) {
+  if (entity.type === "switch" && entity.commandTopic) {
+    return createToggleControl("set");
   }
 
-  return [createExtensionSource(device, entity)];
+  if (entity.type === "number" && entity.commandTopic) {
+    return createNumberControl(
+      "set",
+      entity.min ?? null,
+      entity.max ?? null,
+      entity.step ?? 1
+    );
+  }
+
+  if (entity.type === "text" && entity.commandTopic) {
+    return { type: "text", action: "set" };
+  }
+
+  return null;
 }
 
 function getAllowedExtensionSources(req) {
@@ -2894,6 +3136,198 @@ function getAllowedExtensionSources(req) {
   return sources.sort((a, b) =>
     a.label.localeCompare(b.label, "de", { sensitivity: "base" })
   );
+}
+
+function publishExtensionCommand(topic, payload, res) {
+  if (!mqttClient) {
+    return res.status(400).json({
+      ok: false,
+      error: "MQTT ist nicht verbunden"
+    });
+  }
+
+  if (!topic) {
+    return res.status(400).json({
+      ok: false,
+      error: "Command-Topic fehlt"
+    });
+  }
+
+  const finalPayload =
+    typeof payload === "string" || typeof payload === "number" || typeof payload === "boolean"
+      ? String(payload)
+      : JSON.stringify(payload);
+
+  mqttClient.publish(String(topic), finalPayload, (err) => {
+    if (err) {
+      return res.status(500).json({
+        ok: false,
+        error: err.message
+      });
+    }
+
+    res.json({ ok: true });
+  });
+}
+
+function clampNumber(value, min = null, max = null, step = null) {
+  let next = Number(value);
+  if (!Number.isFinite(next)) return null;
+
+  const minNumber = Number(min);
+  const maxNumber = Number(max);
+  const stepNumber = Number(step);
+
+  if (Number.isFinite(minNumber)) next = Math.max(minNumber, next);
+  if (Number.isFinite(maxNumber)) next = Math.min(maxNumber, next);
+
+  if (Number.isFinite(stepNumber) && stepNumber > 0) {
+    next = Math.round(next / stepNumber) * stepNumber;
+  }
+
+  return Number(next.toFixed(6));
+}
+
+function buildExtensionCommandPayload(entity, source, action, value) {
+  const key = source.sourceKey || null;
+
+  if (entity.type === "light") {
+    if (!entity.commandTopic) return null;
+
+    if (key === "brightnessPercent" || action === "setBrightness") {
+      const percent = clampNumber(value, 0, 100, 1);
+      if (percent === null) return null;
+
+      const scale = Number(entity.brightnessScale || 255);
+      return {
+        topic: entity.commandTopic,
+        payload: {
+          state: "ON",
+          brightness: Math.round((percent / 100) * scale)
+        }
+      };
+    }
+
+    const isOn = Boolean(value);
+    return {
+      topic: entity.commandTopic,
+      payload: { state: isOn ? "ON" : "OFF" }
+    };
+  }
+
+  if (entity.type === "switch") {
+    if (!entity.commandTopic) return null;
+
+    return {
+      topic: entity.commandTopic,
+      payload: value ? (entity.payloadOn ?? "ON") : (entity.payloadOff ?? "OFF")
+    };
+  }
+
+  if (entity.type === "climate") {
+    if (key === "targetTemperature" || action === "setTargetTemperature") {
+      const temperature = clampNumber(
+        value,
+        entity.minTemp ?? 5,
+        entity.maxTemp ?? 30,
+        entity.tempStep ?? entity.precision ?? 0.5
+      );
+
+      return temperature === null || !entity.temperatureCommandTopic
+        ? null
+        : { topic: entity.temperatureCommandTopic, payload: temperature };
+    }
+
+    if (key === "mode" || action === "setMode") {
+      const mode = String(value ?? "");
+      if (Array.isArray(entity.modes) && entity.modes.length && !entity.modes.includes(mode)) {
+        return null;
+      }
+
+      return !entity.modeCommandTopic
+        ? null
+        : { topic: entity.modeCommandTopic, payload: mode };
+    }
+  }
+
+  if (entity.type === "humidifier") {
+    if (key === "targetHumidity" || action === "setTargetHumidity") {
+      const humidity = clampNumber(
+        value,
+        entity.minHumidity ?? 30,
+        entity.maxHumidity ?? 80,
+        1
+      );
+
+      return humidity === null || !entity.targetHumidityCommandTopic
+        ? null
+        : { topic: entity.targetHumidityCommandTopic, payload: humidity };
+    }
+
+    return !entity.commandTopic
+      ? null
+      : {
+          topic: entity.commandTopic,
+          payload: value ? (entity.payloadOn ?? "ON") : (entity.payloadOff ?? "OFF")
+        };
+  }
+
+  if (entity.type === "cover") {
+    if (!entity.commandTopic || !["OPEN", "CLOSE", "STOP"].includes(action)) return null;
+
+    const payloadByAction = {
+      OPEN: entity.payloadOpen || "OPEN",
+      CLOSE: entity.payloadClose || "CLOSE",
+      STOP: entity.payloadStop || "STOP"
+    };
+
+    return { topic: entity.commandTopic, payload: payloadByAction[action] };
+  }
+
+  if (entity.type === "lock") {
+    if (!entity.commandTopic || !["OPEN", "LOCK", "UNLOCK"].includes(action)) return null;
+
+    const payloadByAction = {
+      OPEN: entity.payloadOpen || "OPEN",
+      LOCK: entity.payloadLock || "LOCK",
+      UNLOCK: entity.payloadUnlock || "UNLOCK"
+    };
+
+    return { topic: entity.commandTopic, payload: payloadByAction[action] };
+  }
+
+  if (entity.type === "lawn_mower") {
+    const commandByAction = {
+      start_mowing: entity.startMowingCommandTopic,
+      pause: entity.pauseCommandTopic,
+      dock: entity.dockCommandTopic
+    };
+
+    return !commandByAction[action]
+      ? null
+      : { topic: commandByAction[action], payload: action };
+  }
+
+  if (entity.type === "button") {
+    return !entity.commandTopic
+      ? null
+      : { topic: entity.commandTopic, payload: entity.payloadPress ?? "PRESS" };
+  }
+
+  if (entity.type === "number") {
+    const next = clampNumber(value, entity.min, entity.max, entity.step ?? 1);
+    return next === null || !entity.commandTopic
+      ? null
+      : { topic: entity.commandTopic, payload: next };
+  }
+
+  if (entity.type === "text") {
+    return !entity.commandTopic
+      ? null
+      : { topic: entity.commandTopic, payload: String(value ?? "") };
+  }
+
+  return null;
 }
 
 function normalizeExtensionConfig(config, allowedSourceIds = new Set()) {
@@ -3887,6 +4321,47 @@ app.get('/api/extension/snapshot', (req, res) => {
     ok: true,
     ...snapshot
   });
+});
+
+app.post('/api/extension/command', (req, res) => {
+  const sourceId = String(req.body?.sourceId || "").trim();
+  const action = String(req.body?.action || "set").trim();
+  const value = req.body?.value;
+
+  const source = getAllowedExtensionSources(req)
+    .find(item => item.id === sourceId);
+
+  if (!source) {
+    return res.status(404).json({
+      ok: false,
+      error: "Extension-Wert nicht gefunden"
+    });
+  }
+
+  if (!source.control) {
+    return res.status(400).json({
+      ok: false,
+      error: "Dieser Wert ist nicht steuerbar"
+    });
+  }
+
+  const entity = findEntityById(source.entityId);
+  if (!entity) {
+    return res.status(404).json({
+      ok: false,
+      error: "Entity nicht gefunden"
+    });
+  }
+
+  const command = buildExtensionCommandPayload(entity, source, action, value);
+  if (!command) {
+    return res.status(400).json({
+      ok: false,
+      error: "Befehl kann fuer diese Entity nicht ausgefuehrt werden"
+    });
+  }
+
+  return publishExtensionCommand(command.topic, command.payload, res);
 });
 
 function sendExtensionHistoryResponse(req, res, sourceId) {

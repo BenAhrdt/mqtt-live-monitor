@@ -189,10 +189,11 @@ function renderItems(layout = 'compact') {
   content.innerHTML = currentItems
     .map(item => {
       const chartEnabled = !!getChartItem(item.sourceId || item.id);
+      const controlHtml = renderItemControl(item);
 
       return `
         <div
-          class="quick-row ${chartEnabled ? 'clickable-chart' : ''}"
+          class="quick-row ${chartEnabled ? 'clickable-chart' : ''} ${controlHtml ? 'has-control' : ''}"
           data-source-id="${escapeHtml(item.sourceId || item.id)}">
 
           <span class="quick-icon ${hasOpenStateBadge(item) ? 'has-alert-badge' : ''}">
@@ -202,10 +203,125 @@ function renderItems(layout = 'compact') {
           <span class="quick-label">${escapeHtml(item.label || item.name)}</span>
 
           <strong class="quick-value">${escapeHtml(formatValue(item))}</strong>
+
+          ${controlHtml}
         </div>
       `;
     })
     .join('');
+}
+
+function renderItemControl(item = {}) {
+  const control = item.control;
+  if (!control) return '';
+
+  const sourceId = escapeHtml(item.sourceId || item.id);
+
+  if (control.type === 'toggle') {
+    const checked = normalizeBooleanValue(item.value) === true;
+    return `
+      <label class="quick-control quick-toggle" title="Schalten">
+        <input type="checkbox" data-command-source="${sourceId}" data-command-action="${escapeHtml(control.action || 'set')}" ${checked ? 'checked' : ''}>
+        <span></span>
+      </label>
+    `;
+  }
+
+  if (control.type === 'number') {
+    const value = item.value === null || item.value === undefined || item.value === ''
+      ? ''
+      : String(item.value);
+    const min = control.min === null || control.min === undefined ? '' : ` min="${escapeHtml(control.min)}"`;
+    const max = control.max === null || control.max === undefined ? '' : ` max="${escapeHtml(control.max)}"`;
+    const step = control.step === null || control.step === undefined ? '' : ` step="${escapeHtml(control.step)}"`;
+
+    return `
+      <form class="quick-control quick-number" data-command-source="${sourceId}" data-command-action="${escapeHtml(control.action || 'set')}">
+        <input type="number" value="${escapeHtml(value)}"${min}${max}${step} aria-label="Wert">
+        <button type="submit">OK</button>
+      </form>
+    `;
+  }
+
+  if (control.type === 'text') {
+    const value = item.value === null || item.value === undefined ? '' : String(item.value);
+    return `
+      <form class="quick-control quick-text" data-command-source="${sourceId}" data-command-action="${escapeHtml(control.action || 'set')}">
+        <input value="${escapeHtml(value)}" aria-label="Text">
+        <button type="submit">OK</button>
+      </form>
+    `;
+  }
+
+  if (control.type === 'select') {
+    const options = Array.isArray(control.options) ? control.options : [];
+    if (!options.length) return '';
+
+    const currentValue = String(item.value ?? '');
+    return `
+      <label class="quick-control quick-select">
+        <select data-command-source="${sourceId}" data-command-action="${escapeHtml(control.action || 'set')}">
+          ${options.map(option => {
+            const value = String(option);
+            return `
+              <option value="${escapeHtml(value)}" ${value === currentValue ? 'selected' : ''}>
+                ${escapeHtml(value)}
+              </option>
+            `;
+          }).join('')}
+        </select>
+      </label>
+    `;
+  }
+
+  if (control.type === 'buttons') {
+    const actions = Array.isArray(control.actions) ? control.actions.filter(Boolean) : [];
+    if (!actions.length) return '';
+
+    return `
+      <div class="quick-control quick-actions">
+        ${actions.map(action => `
+          <button type="button" data-command-source="${sourceId}" data-command-action="${escapeHtml(action)}">
+            ${escapeHtml(commandLabel(action))}
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  if (control.type === 'button') {
+    return `
+      <button class="quick-control quick-button" type="button" data-command-source="${sourceId}" data-command-action="${escapeHtml(control.action || 'press')}">
+        Ausloesen
+      </button>
+    `;
+  }
+
+  return '';
+}
+
+function commandLabel(action) {
+  const labels = {
+    OPEN: 'Auf',
+    CLOSE: 'Zu',
+    STOP: 'Stop',
+    LOCK: 'Lock',
+    UNLOCK: 'Unlock',
+    start_mowing: 'Start',
+    pause: 'Pause',
+    dock: 'Dock'
+  };
+
+  return labels[action] || action;
+}
+
+async function sendExtensionCommand(sourceId, action = 'set', value = null) {
+  await apiFetch('/api/extension/command', {
+    method: 'POST',
+    body: JSON.stringify({ sourceId, action, value })
+  });
+
+  setStatus('Befehl gesendet', 'ok');
 }
 
 function renderSelectedItems() {
@@ -1136,6 +1252,26 @@ reloadBtn.addEventListener('click', async () => {
 });
 
 content.addEventListener('click', async (event) => {
+  const commandButton = event.target.closest('button[data-command-source]');
+  if (commandButton) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      await sendExtensionCommand(
+        commandButton.dataset.commandSource,
+        commandButton.dataset.commandAction || 'set',
+        true
+      );
+    } catch (err) {
+      setStatus(networkErrorMessage(err), 'warn');
+    }
+
+    return;
+  }
+
+  if (event.target.closest('.quick-control')) return;
+
   const row = event.target.closest('.quick-row');
   if (!row) return;
 
@@ -1154,6 +1290,48 @@ content.addEventListener('click', async (event) => {
     await switchTab('chartTab');
   } catch (err) {
     setStatus(err.message || 'Chart konnte nicht geladen werden', 'warn');
+  }
+});
+
+content.addEventListener('change', async (event) => {
+  const input = event.target.closest('.quick-toggle input[data-command-source]');
+  const select = event.target.closest('.quick-select select[data-command-source]');
+  const control = input || select;
+  if (!control) return;
+
+  try {
+    await sendExtensionCommand(
+      control.dataset.commandSource,
+      control.dataset.commandAction || 'set',
+      input ? input.checked : control.value
+    );
+  } catch (err) {
+    if (input) input.checked = !input.checked;
+    setStatus(networkErrorMessage(err), 'warn');
+  }
+});
+
+content.addEventListener('submit', async (event) => {
+  const form = event.target.closest('form[data-command-source]');
+  if (!form) return;
+
+  event.preventDefault();
+
+  const input = form.querySelector('input');
+  const source = sourceById(form.dataset.commandSource) ||
+    currentItems.find(item => (item.sourceId || item.id) === form.dataset.commandSource);
+  const value = source?.control?.type === 'number'
+    ? Number(input?.value)
+    : input?.value;
+
+  try {
+    await sendExtensionCommand(
+      form.dataset.commandSource,
+      form.dataset.commandAction || 'set',
+      value
+    );
+  } catch (err) {
+    setStatus(networkErrorMessage(err), 'warn');
   }
 });
 

@@ -242,11 +242,19 @@ p {
   padding: 8px 12px 8px 8px;
 }
 
+.quick-row.has-control {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
 .compact .quick-row {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 8px;
   min-height: 46px;
   padding: 6px 8px;
+}
+
+.compact .quick-row.has-control {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
 }
 
 .compact .quick-value {
@@ -275,6 +283,10 @@ p {
   align-items: start;
   min-height: 86px;
   padding: 8px;
+}
+
+.tiles .quick-row.has-control {
+  grid-template-columns: 38px 1fr;
 }
 
 .tiles .quick-value {
@@ -342,6 +354,107 @@ p {
   font-weight: 800;
   color: #0b1533;
   font-size: 15px;
+}
+
+.quick-control {
+  grid-column: 2 / -1;
+}
+
+.list .quick-control,
+.compact .quick-control {
+  grid-column: 3;
+}
+
+.quick-toggle {
+  align-items: center;
+  display: inline-flex;
+  height: 26px;
+  justify-self: end;
+  width: 46px;
+}
+
+.quick-toggle input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.quick-toggle span {
+  background: #cbd5e1;
+  border-radius: 999px;
+  display: block;
+  height: 24px;
+  position: relative;
+  transition: background 0.16s ease;
+  width: 44px;
+}
+
+.quick-toggle span::after {
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  content: "";
+  height: 18px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  transition: transform 0.16s ease;
+  width: 18px;
+}
+
+.quick-toggle input:checked + span {
+  background: #22c55e;
+}
+
+.quick-toggle input:checked + span::after {
+  transform: translateX(20px);
+}
+
+.quick-number,
+.quick-text,
+.quick-select {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(64px, 1fr) auto;
+  justify-self: stretch;
+}
+
+.compact .quick-number,
+.compact .quick-text,
+.compact .quick-select,
+.list .quick-number,
+.list .quick-text,
+.list .quick-select {
+  max-width: 150px;
+}
+
+.quick-number input,
+.quick-text input,
+.quick-select select {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.quick-number button,
+.quick-text button,
+.quick-button,
+.quick-actions button {
+  min-height: 30px;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.quick-button {
+  justify-self: end;
 }
 
 .add-card {

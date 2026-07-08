@@ -1795,6 +1795,20 @@ code {
   align-items: flex-start;
 }
 
+.settings-title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-download-btn {
+  align-items: center;
+  display: inline-flex;
+  min-height: 36px;
+  text-decoration: none;
+}
+
 .zigbee-badge {
   position: absolute;
   top: 50%;

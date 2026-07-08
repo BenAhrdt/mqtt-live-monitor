@@ -138,6 +138,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.9 Werte in Browser extension stabiler
+* (BenAhrdt) Werte werden auch angezeigt, wenn sie nur discovered sind, jedoch noch keinen Wert haben.
+* (BenAhrdt) Auch Steuerbare Werte werden korrekt in der Browser extension angezeigt.
+* (BenAhrdt) Browser Extension ist nun aus den Einstellungen als Download erreichbar
+
 ### V1.8.8 Werte auf 31 Tage speichern
 * (BenAhrdt) Darstellung der Boolschen Werte korrigiert.
 

@@ -1,0 +1,39 @@
+{
+  "webPort": 3000,
+  "port": 1883,
+  "topic": "#",
+  "clientId": "LiveMonitor",
+  "discoveryViaPrefixes": [
+    {
+      "value": "lorawan",
+      "enabled": true
+    }
+  ],
+  "enabledEntityTypes": [
+    "light",
+    "climate",
+    "cover",
+    "lock",
+    "humidifier",
+    "lawn_mower",
+    "sensor",
+    "binary_sensor",
+    "switch",
+    "button",
+    "number",
+    "text"
+  ],
+  "customDashboards": [],
+  "chartConfigs": [],
+  "friendlyNames": {},
+  "auth": {
+    "enabled": false
+  },
+  "history": {
+    "enabled": false,
+    "entities": {}
+  },
+  "host": "192.168.2.243",
+  "username": "mqttuser",
+  "password": "MQTTpass1"
+}
