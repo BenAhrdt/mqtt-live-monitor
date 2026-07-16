@@ -2355,13 +2355,24 @@ function extractValueJsonKey(template) {
 }
 
 let isConnecting = false;
+const MQTT_RECONNECT_PERIOD = 3000;
+const MQTT_RECONNECT_WATCHDOG_PERIOD = 10000;
+let mqttReconnectWanted = true;
+let mqttReconnectAttempts = 0;
 
-function disconnectMqtt() {
+function disconnectMqtt({ manual = true } = {}) {
+  if (manual) {
+    mqttReconnectWanted = false;
+    isConnecting = false;
+  }
+
   if (!mqttClient) {
-    emitStatus({
-      connected: false,
-      message: "Nicht verbunden",
-    });
+    if (manual) {
+      emitStatus({
+        connected: false,
+        message: "Manuell getrennt",
+      });
+    }
     return Promise.resolve();
   }
 
@@ -2374,15 +2385,17 @@ function disconnectMqtt() {
       mqttClient.end(true, () => {
         mqttClient = null;
 
-        emitStatus({
-          connected: false,
-          host: mqttConfig.host,
-          port: mqttConfig.port,
-          topic: mqttConfig.topic,
-          message: "Manuell getrennt",
-        });
+        if (manual) {
+          emitStatus({
+            connected: false,
+            host: mqttConfig.host,
+            port: mqttConfig.port,
+            topic: mqttConfig.topic,
+            message: "Manuell getrennt",
+          });
+        }
 
-        console.log("MQTT manuell getrennt");
+        console.log(manual ? "MQTT manuell getrennt" : "Alte MQTT-Verbindung beendet");
         resolve();
       });
 
@@ -2413,9 +2426,10 @@ async function connectMqtt() {
   }
 
   isConnecting = true;
+  mqttReconnectWanted = true;
 
   // 🔥 FIX: sauber warten bis alter Client wirklich weg ist
-  await disconnectMqtt();
+  await disconnectMqtt({ manual: false });
 
   resetStores();
 
@@ -2447,7 +2461,7 @@ async function connectMqtt() {
 
     clean: false,
 
-    reconnectPeriod: 3000,
+    reconnectPeriod: MQTT_RECONNECT_PERIOD,
     connectTimeout: 10000,
     keepalive: 30,
 
@@ -2460,6 +2474,7 @@ async function connectMqtt() {
 
   mqttClient.on("connect", () => {
     console.log("Mit MQTT verbunden");
+    mqttReconnectAttempts = 0;
 
     mqttClient.subscribe(topic, { qos: 0 }, (err) => {
       if (err) {
@@ -2518,22 +2533,27 @@ async function connectMqtt() {
   });
 
   mqttClient.on("reconnect", () => {
+    mqttReconnectAttempts += 1;
     emitStatus({
       connected: false,
       host,
       port,
       topic,
-      message: "Reconnect...",
+      message: `Reconnect-Versuch ${mqttReconnectAttempts}...`,
     });
   });
 
   mqttClient.on("close", () => {
+    isConnecting = false;
+
     emitStatus({
       connected: false,
       host,
       port,
       topic,
-      message: "Verbindung geschlossen",
+      message: mqttReconnectWanted
+        ? `Getrennt – neuer Versuch in ${MQTT_RECONNECT_PERIOD / 1000} Sekunden`
+        : "Manuell getrennt",
     });
   });
 
@@ -2551,6 +2571,28 @@ async function connectMqtt() {
     isConnecting = false;
   });
 }
+
+// MQTT.js versucht selbst zyklisch einen Reconnect. Der Watchdog deckt zusätzlich
+// den Fall ab, dass kein Client mehr existiert oder dessen Reconnect-Schleife steht.
+setInterval(() => {
+  if (!mqttReconnectWanted || mqttStatus.connected || isConnecting) {
+    return;
+  }
+
+  if (!mqttClient) {
+    connectMqtt();
+    return;
+  }
+
+  if (!mqttClient.connected && !mqttClient.reconnecting) {
+    console.log("MQTT-Watchdog startet Reconnect");
+    try {
+      mqttClient.reconnect();
+    } catch (error) {
+      console.error("MQTT-Watchdog-Reconnect fehlgeschlagen:", error.message);
+    }
+  }
+}, MQTT_RECONNECT_WATCHDOG_PERIOD);
 
 function getDevicesForDashboard() {
 
@@ -3371,10 +3413,36 @@ function createExtensionSnapshot(req) {
   const items = config.items
     .map(item => {
       const source = sourceMap.get(item.sourceId);
-      if (!source) return null;
+
+      // Die Auswahl der Schnellansicht ist dauerhaft gespeichert, die MQTT-
+      // Entities existieren dagegen nur im Laufzeitspeicher. Ist der Broker
+      // nicht verbunden, bleiben die konfigurierten Zeilen deshalb sichtbar
+      // und zeigen lediglich keinen aktuellen Wert an.
+      if (!source) {
+        const { entityId, key } = parseExtensionSourceId(item.sourceId);
+
+        return {
+          id: item.sourceId,
+          entityId,
+          sourceKey: key,
+          name: item.label || item.sourceId,
+          label: item.label || item.sourceId,
+          icon: item.icon || "gauge",
+          value: null,
+          displayValue: "-",
+          control: null,
+          updatedAt: null,
+          unavailable: true,
+          order: item.order
+        };
+      }
 
       return {
         ...source,
+        value: mqttStatus.connected ? source.value : null,
+        displayValue: mqttStatus.connected ? source.displayValue : "-",
+        control: mqttStatus.connected ? source.control : null,
+        unavailable: !mqttStatus.connected,
         label: item.label || source.name || source.label,
         icon: item.icon || source.icon,
         order: item.order
@@ -3398,6 +3466,8 @@ function getPublicConfig() {
     discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
     enabledEntityTypes: mqttConfig.enabledEntityTypes,
     authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
+    mqttUsernameConfigured: Boolean(mqttConfig.username),
+    mqttPasswordConfigured: Boolean(mqttConfig.password),
     customDashboards: mqttConfig.customDashboards || [],
     chartConfigs: mqttConfig.chartConfigs || [],
     friendlyNames: mqttConfig.friendlyNames || {},
@@ -3568,7 +3638,10 @@ app.post("/api/config", requireAdmin, (req, res) => {
 
   saveConfigToFile();
 
-  const shouldReconnect = brokerChanged || !mqttClient;
+  // Ein vorhandenes, aber getrenntes Client-Objekt darf "Verbinden" nicht
+  // blockieren. Genau dieser Zustand konnte bisher erst durch "Trennen"
+  // und anschließendes erneutes "Verbinden" behoben werden.
+  const shouldReconnect = brokerChanged || !mqttClient || !mqttStatus.connected;
 
   if (shouldReconnect) {
     connectMqtt();
@@ -3586,6 +3659,8 @@ app.post("/api/config", requireAdmin, (req, res) => {
       discoveryViaPrefixes: mqttConfig.discoveryViaPrefixes,
       enabledEntityTypes: mqttConfig.enabledEntityTypes,
       authConfigured: Boolean(mqttConfig.username || mqttConfig.password),
+      mqttUsernameConfigured: Boolean(mqttConfig.username),
+      mqttPasswordConfigured: Boolean(mqttConfig.password),
       auth: {
         enabled: mqttConfig.auth?.enabled ?? false
       },
@@ -3765,13 +3840,13 @@ app.post("/api/custom-dashboards", requireAdmin, (req, res) => {
   });
 });
 
-app.post("/api/disconnect", requireAdmin, (req, res) => {
-  disconnectMqtt();
+app.post("/api/disconnect", requireAdmin, async (req, res) => {
+  await disconnectMqtt({ manual: true });
   res.json({ success: true });
 });
 
-app.post("/api/reconnect", requireAdmin, (req, res) => {
-  connectMqtt();
+app.post("/api/reconnect", requireAdmin, async (req, res) => {
+  await connectMqtt();
 
   res.json({
     success: true,

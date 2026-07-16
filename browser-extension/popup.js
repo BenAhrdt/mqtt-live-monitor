@@ -58,6 +58,8 @@ let chartReloadTimer = null;
 let chartPointerActive = false;
 let chartReloadPending = false;
 let chartInteractionHoldUntil = 0;
+let mqttConnected = null;
+let mqttSnapshotTimer = null;
 
 const CHART_RELOAD_DELAY_MS = 2500;
 const CHART_INTERACTION_IDLE_MS = 7000;
@@ -1040,6 +1042,29 @@ async function connectSocket() {
   socket.on('connect', () => setStatus('Live', 'ok'));
   socket.on('disconnect', () => setStatus('Getrennt', 'muted'));
   socket.on('connect_error', () => setStatus('Socket blockiert', 'warn'));
+  socket.on('mqtt-status', status => {
+    const connected = status?.connected === true;
+    setStatus(connected ? 'Live' : 'MQTT getrennt', connected ? 'ok' : 'warn');
+
+    if (mqttConnected === connected) return;
+    mqttConnected = connected;
+
+    clearTimeout(mqttSnapshotTimer);
+    loadSnapshot()
+      .then(renderAll)
+      .catch(() => {});
+
+    // Direkt nach dem Subscribe koennen retained Discovery-Nachrichten noch
+    // unterwegs sein. Ein zweiter Snapshot bringt dann Metadaten und Controls
+    // der wieder verfuegbaren Entities zurueck.
+    if (connected) {
+      mqttSnapshotTimer = setTimeout(() => {
+        loadSnapshot()
+          .then(renderAll)
+          .catch(() => {});
+      }, 1000);
+    }
+  });
   socket.on('entity-update', data => {
     let changed = false;
 

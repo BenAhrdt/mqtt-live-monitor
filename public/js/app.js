@@ -2486,8 +2486,12 @@ async function loadConfig() {
     mqttTopicInput.value = config.topic || '#';
     mqttUsernameInput.value = '';
     mqttPasswordInput.value = '';
-    mqttUsernameInput.placeholder = config.authConfigured ? 'gespeichert' : 'optional';
-    mqttPasswordInput.placeholder = config.authConfigured ? 'gespeichert' : 'optional';
+    mqttUsernameInput.placeholder = config.mqttUsernameConfigured
+        ? 'MQTT-Benutzername gespeichert'
+        : 'optional';
+    mqttPasswordInput.placeholder = config.mqttPasswordConfigured
+        ? 'MQTT-Passwort gespeichert'
+        : 'optional';
     mqttClientIdInput.value = config.clientId || '';
     discoveryPrefixes = config.discoveryViaPrefixes || [];
     customDashboards = config.customDashboards || [];
@@ -2990,6 +2994,7 @@ socket.on('mqtt-status', (status) => {
     statusTextEl.textContent = 'Getrennt';
     statusTextEl.className = 'status disconnected';
     connectionStateEl.textContent = 'Getrennt';
+    configMessageEl.textContent = status.message || 'Getrennt';
     }
 });
 

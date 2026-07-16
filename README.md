@@ -138,6 +138,12 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.10 MQTT-Verbindung und Browser-Extension stabilisiert
+* (BenAhrdt) MQTT-Verbindungen werden nach einem Abbruch automatisch und mit zusätzlichem Watchdog neu aufgebaut.
+* (BenAhrdt) Ein manueller Disconnect unterbindet automatische Reconnect-Versuche zuverlässig.
+* (BenAhrdt) Die Browser-Extension behält ihre konfigurierte Schnellansicht auch ohne Broker-Verbindung bei und zeigt nicht verfügbare Werte als `-` an.
+* (BenAhrdt) Gespeicherte MQTT-Zugangsdaten werden direkt nach dem Speichern eindeutig gekennzeichnet.
+
 ### V1.8.9 Werte in Browser extension stabiler
 * (BenAhrdt) Werte werden auch angezeigt, wenn sie nur discovered sind, jedoch noch keinen Wert haben.
 * (BenAhrdt) Auch Steuerbare Werte werden korrekt in der Browser extension angezeigt.
