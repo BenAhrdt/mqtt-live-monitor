@@ -53,6 +53,13 @@ npm install --omit=dev
 echo ">> Rebuild native modules (z. B. bcrypt)"
 npm rebuild
 
+echo ">> Prüfe sqlite3"
+if ! node -e "require('sqlite3')"; then
+  echo ">> sqlite3 ist nicht kompatibel, baue es für dieses System neu"
+  npm rebuild sqlite3 --build-from-source
+fi
+node -e "require('sqlite3'); console.log('sqlite3 funktioniert')"
+
 echo ">> Installiere systemd Service"
 cp deploy/${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service
 
