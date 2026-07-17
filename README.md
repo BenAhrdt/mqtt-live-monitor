@@ -138,7 +138,7 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
-### Nächster Release
+### V1.8.12 Stabilere Updates auf Proxmox-Systemen
 * Installation und Update prüfen nun, ob das native `sqlite3`-Modul mit dem System kompatibel ist.
 * Falls `sqlite3` nach einem Node.js- oder Paket-Update nicht geladen werden kann, wird es automatisch lokal neu kompiliert. Normale Updates bleiben dadurch schnell; der zeitaufwendige Rebuild läuft nur bei Bedarf.
 
