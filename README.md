@@ -138,6 +138,10 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.11 Schutz vor falschem Autofill bei MQTT-Zugangsdaten
+* (BenAhrdt) Das Loginformular kennzeichnet Benutzername und Passwort eindeutig für Browser und Passwortmanager.
+* (BenAhrdt) MQTT-Benutzername und MQTT-Passwort werden erst nach einer bewussten Benutzerinteraktion zur Eingabe freigegeben, damit gespeicherte Web-Logins nicht versehentlich als Broker-Zugangsdaten eingesetzt werden.
+
 ### V1.8.10 MQTT-Verbindung und Browser-Extension stabilisiert
 * (BenAhrdt) MQTT-Verbindungen werden nach einem Abbruch automatisch und mit zusätzlichem Watchdog neu aufgebaut.
 * (BenAhrdt) Ein manueller Disconnect unterbindet automatische Reconnect-Versuche zuverlässig.

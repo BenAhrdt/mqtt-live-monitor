@@ -18,6 +18,22 @@ export function initSettings(deps) {
   const saveConfigBtn = document.getElementById('saveConfigBtn');
   const disconnectBtn = document.getElementById('disconnectBtn');
 
+  // Browser und Passwortmanager ignorieren autocomplete bei Zugangsdaten teils
+  // und verwechseln den Web-Login mit den MQTT-Zugangsdaten. Die Felder werden
+  // deshalb erst nach einer bewussten Maus-/Touch- oder Tastaturaktion editierbar.
+  function unlockCredentialInput(input) {
+    input.removeAttribute('readonly');
+  }
+
+  [mqttUsernameInput, mqttPasswordInput].forEach((input) => {
+    input.addEventListener('pointerdown', () => unlockCredentialInput(input), {
+      once: true
+    });
+    input.addEventListener('keydown', () => unlockCredentialInput(input), {
+      once: true
+    });
+  });
+
   async function saveConfig() {
     const payload = {
       host: mqttHostInput.value.trim(),

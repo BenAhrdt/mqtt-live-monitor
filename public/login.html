@@ -138,9 +138,23 @@
 
     <h2>Login</h2>
 
-    <form onsubmit="login(event)">
-      <input id="username" placeholder="Username">
-      <input id="password" type="password" placeholder="Passwort">
+    <form onsubmit="login(event)" autocomplete="on">
+      <input
+        id="username"
+        name="username"
+        type="text"
+        placeholder="Username"
+        autocomplete="username"
+        autocapitalize="none"
+        spellcheck="false"
+      >
+      <input
+        id="password"
+        name="password"
+        type="password"
+        placeholder="Passwort"
+        autocomplete="current-password"
+      >
       <button type="submit">Login</button>
     </form>
 
