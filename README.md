@@ -142,6 +142,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.16 Mobiles Chart zuverlässig schließen
+* Das Chart beginnt auf Mobilgeräten unterhalb des festen Headers, sodass Titel und Schließen-Schaltfläche vollständig sichtbar bleiben.
+* Die Schließen-Schaltfläche besitzt ein größeres, kontrastreiches Touchziel und bleibt auch bei langen Entity-Namen erreichbar.
+* Die Schaltfläche ist für Screenreader eindeutig als „Chart schließen“ ausgezeichnet.
+
 ### V1.8.15 Fehlende retained States gezielt nachladen
 * Nach dem Discovery-Durchlauf fordert der Monitor nur State-Topics von Entitaeten ohne empfangenen Wert erneut an.
 * Temporaere Zusatz-Subscriptions werden nach Empfang oder nach einem kurzen Timeout wieder entfernt.
