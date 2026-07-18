@@ -142,6 +142,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.15 Fehlende retained States gezielt nachladen
+* Nach dem Discovery-Durchlauf fordert der Monitor nur State-Topics von Entitaeten ohne empfangenen Wert erneut an.
+* Temporaere Zusatz-Subscriptions werden nach Empfang oder nach einem kurzen Timeout wieder entfernt.
+* Ein kompletter automatischer Reconnect und die damit verbundene erneute Uebertragung aller retained Nachrichten werden vermieden.
+
 ### V1.8.14 Zuverlaessige retained MQTT-Werte nach Reconnect
 * Der Monitor verwendet bei jeder MQTT-Verbindung eine frische Session, damit Mosquitto retained Discovery- und State-Nachrichten erneut zustellt.
 * Die Subscription wird nach jedem Connect eindeutig durch den Monitor angelegt; eine zusaetzliche automatische Resubscription ist deaktiviert.

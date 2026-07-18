@@ -1092,6 +1092,9 @@ app.get("/api/version", (req, res) => {
 });
 
 let mqttClient = null;
+let targetedStateRefreshTimer = null;
+let targetedStateRefreshCleanupTimer = null;
+const targetedStateRefreshTopics = new Set();
 
 /**
  * Store 1:
@@ -1974,16 +1977,7 @@ function registerEntityTopics(entity, deviceId) {
 }
 
 function applyPendingStateMessagesForEntity(entity) {
-  const possibleTopics = [
-    entity.stateTopic,
-    entity.positionTopic,
-    entity.modeStateTopic,
-    entity.temperatureStateTopic,
-    entity.currentTemperatureTopic,
-    entity.targetHumidityStateTopic,
-    entity.currentHumidityTopic,
-    entity.activityStateTopic,
-  ].filter(Boolean);
+  const possibleTopics = getEntityStateTopics(entity);
 
   for (const topic of possibleTopics) {
     if (pendingStateMessages[topic]) {
@@ -1997,6 +1991,90 @@ function applyPendingStateMessagesForEntity(entity) {
       }
     }
   }
+}
+
+function getEntityStateTopics(entity) {
+  return [
+    entity.stateTopic,
+    entity.positionTopic,
+    entity.modeStateTopic,
+    entity.temperatureStateTopic,
+    entity.currentTemperatureTopic,
+    entity.targetHumidityStateTopic,
+    entity.currentHumidityTopic,
+    entity.activityStateTopic,
+  ].filter(Boolean);
+}
+
+function clearTargetedStateRefresh() {
+  clearTimeout(targetedStateRefreshTimer);
+  clearTimeout(targetedStateRefreshCleanupTimer);
+  targetedStateRefreshTimer = null;
+  targetedStateRefreshCleanupTimer = null;
+  targetedStateRefreshTopics.clear();
+}
+
+function scheduleTargetedStateRefresh(client) {
+  clearTimeout(targetedStateRefreshTimer);
+
+  targetedStateRefreshTimer = setTimeout(() => {
+    targetedStateRefreshTimer = null;
+
+    if (mqttClient !== client || !client.connected) {
+      return;
+    }
+
+    const topics = [...new Set(
+      Object.values(deviceStore).flatMap(device =>
+        Object.values(device.entities || {}).flatMap(entity =>
+          entity.lastUpdate == null ? getEntityStateTopics(entity) : []
+        )
+      )
+    )];
+
+    if (topics.length === 0) {
+      console.log("Gezieltes State-Nachladen: keine fehlenden Werte");
+      return;
+    }
+
+    topics.forEach(topic => targetedStateRefreshTopics.add(topic));
+    console.log(`Gezieltes State-Nachladen: ${topics.length} Topics`);
+
+    client.subscribe(topics, { qos: 0 }, (err, granted = []) => {
+      if (err) {
+        topics.forEach(topic => targetedStateRefreshTopics.delete(topic));
+        console.error("Gezieltes State-Nachladen fehlgeschlagen:", err.message);
+        return;
+      }
+
+      console.log(`Gezieltes State-Nachladen SUBACK: ${granted.length} Topics`);
+
+      clearTimeout(targetedStateRefreshCleanupTimer);
+      targetedStateRefreshCleanupTimer = setTimeout(() => {
+        const remainingTopics = topics.filter(topic =>
+          targetedStateRefreshTopics.has(topic)
+        );
+
+        if (remainingTopics.length === 0 || mqttClient !== client || !client.connected) {
+          return;
+        }
+
+        const removableTopics = remainingTopics.filter(topic => topic !== mqttConfig.topic);
+
+        if (removableTopics.length > 0) {
+          client.unsubscribe(removableTopics, err => {
+            if (err) {
+              console.error("Aufraeumen der State-Subscriptions fehlgeschlagen:", err.message);
+            }
+          });
+        }
+
+        remainingTopics.forEach(topic => targetedStateRefreshTopics.delete(topic));
+        targetedStateRefreshCleanupTimer = null;
+        console.log(`Gezieltes State-Nachladen beendet: ${remainingTopics.length} Topics ohne Antwort`);
+      }, 10000);
+    });
+  }, 2000);
 }
 
 function handleDiscoveryMessage(topic, message) {
@@ -2482,6 +2560,8 @@ let mqttReconnectWanted = true;
 let mqttReconnectAttempts = 0;
 
 function disconnectMqtt({ manual = true } = {}) {
+  clearTargetedStateRefresh();
+
   if (manual) {
     mqttReconnectWanted = false;
     isConnecting = false;
@@ -2646,10 +2726,27 @@ async function connectMqtt() {
 
       if (discoveryResult.handled) {
         addLog("DISCOVERY", topic, "behandelt");
+        scheduleTargetedStateRefresh(mqttClient);
       }
     } else {
       addLog("STATE", topic, message);
       const stateResult = handleKnownTopicMessage(topic, message);
+
+      if (targetedStateRefreshTopics.delete(topic)) {
+        if (topic !== mqttConfig.topic) {
+          mqttClient.unsubscribe(topic, err => {
+            if (err) {
+              console.error("State-Zusatzsubscription konnte nicht entfernt werden:", err.message);
+            }
+          });
+        }
+
+        if (targetedStateRefreshTopics.size === 0) {
+          clearTimeout(targetedStateRefreshCleanupTimer);
+          targetedStateRefreshCleanupTimer = null;
+          console.log("Gezieltes State-Nachladen abgeschlossen");
+        }
+      }
 
       if (stateResult.handled) {
         // optional logging
