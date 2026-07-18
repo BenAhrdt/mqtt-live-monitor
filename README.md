@@ -142,6 +142,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.14 Zuverlaessige retained MQTT-Werte nach Reconnect
+* Der Monitor verwendet bei jeder MQTT-Verbindung eine frische Session, damit Mosquitto retained Discovery- und State-Nachrichten erneut zustellt.
+* Die Subscription wird nach jedem Connect eindeutig durch den Monitor angelegt; eine zusaetzliche automatische Resubscription ist deaktiviert.
+* Session- und SUBACK-Informationen erleichtern die Diagnose von Verbindungsproblemen ohne nennenswerten Ressourcenverbrauch.
+
 ### V1.8.13 Dauerhafte Benutzeranmeldung
 * Benutzer bleiben auf Mobilgeräten und im Browser bis zu 30 Tage angemeldet.
 * Sitzungen werden dauerhaft in SQLite gespeichert und überleben einen Neustart des Dienstes.

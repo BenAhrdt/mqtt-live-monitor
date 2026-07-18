@@ -2580,24 +2580,30 @@ async function connectMqtt() {
 
     protocolVersion: 4, // MQTT 3.1.1
 
-    clean: false,
+    // Der Monitor baut seinen Zustand bei jeder Verbindung aus retained
+    // Discovery- und State-Nachrichten neu auf. Eine persistente Session kann
+    // dazu fuehren, dass Mosquitto eine bestehende Subscription fortsetzt und
+    // die retained Nachrichten nicht erneut als frischen Snapshot zustellt.
+    clean: true,
 
     reconnectPeriod: MQTT_RECONNECT_PERIOD,
     connectTimeout: 10000,
     keepalive: 30,
 
-    resubscribe: true,
+    // Der Subscribe wird unten bei jedem "connect" bewusst selbst ausgefuehrt.
+    resubscribe: false,
     queueQoSZero: true,
   });
 
   // 🔥 OPTIONAL FIX: doppelte Listener vermeiden (sicher ist sicher)
   mqttClient.removeAllListeners();
 
-  mqttClient.on("connect", () => {
+  mqttClient.on("connect", (connack) => {
     console.log("Mit MQTT verbunden");
+    console.log("MQTT Session vorhanden:", Boolean(connack?.sessionPresent));
     mqttReconnectAttempts = 0;
 
-    mqttClient.subscribe(topic, { qos: 0 }, (err) => {
+    mqttClient.subscribe(topic, { qos: 0 }, (err, granted = []) => {
       if (err) {
         console.error("Subscribe-Fehler:", err.message);
 
@@ -2612,6 +2618,11 @@ async function connectMqtt() {
         isConnecting = false;
         return;
       }
+
+      const subscriptions = granted
+        .map(({ topic: grantedTopic, qos }) => `${grantedTopic} (QoS ${qos})`)
+        .join(", ");
+      console.log(`SUBACK: ${subscriptions || topic}`);
 
       emitStatus({
         connected: true,
