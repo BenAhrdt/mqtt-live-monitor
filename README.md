@@ -117,6 +117,10 @@ Passwort:       admin
 
 Dies sollte nach dem ersten Login durch Anlege eines Benutzers in der Benutzerverwealtung geändert werden.
 
+Nach einer erfolgreichen Anmeldung bleibt die Sitzung bis zu 30 Tage erhalten. Bei aktiver Nutzung verlängert sich dieser Zeitraum automatisch. Die Sitzungen werden serverseitig in `data/sessions.sqlite` gespeichert und bleiben dadurch auch nach einem Neustart des Dienstes gültig.
+
+Für einen sicheren Betrieb sollte `SESSION_SECRET` in der `.env` dauerhaft auf einen langen, zufälligen Wert gesetzt werden. Bei einer Änderung des Secrets werden alle bestehenden Sitzungen ungültig. Über HTTPS muss zusätzlich `USE_HTTPS=true` gesetzt sein.
+
 ## 🔧 Service verwalten
 
 Status anzeigen:
@@ -138,6 +142,12 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.13 Dauerhafte Benutzeranmeldung
+* Benutzer bleiben auf Mobilgeräten und im Browser bis zu 30 Tage angemeldet.
+* Sitzungen werden dauerhaft in SQLite gespeichert und überleben einen Neustart des Dienstes.
+* Abgelaufene Sitzungen werden automatisch entfernt.
+* Logout sowie Änderungen an Passwort, Rollen oder Benutzerstatus widerrufen die betroffenen Sitzungen zuverlässig.
+
 ### V1.8.12 Stabilere Updates auf Proxmox-Systemen
 * Installation und Update prüfen nun, ob das native `sqlite3`-Modul mit dem System kompatibel ist.
 * Falls `sqlite3` nach einem Node.js- oder Paket-Update nicht geladen werden kann, wird es automatisch lokal neu kompiliert. Normale Updates bleiben dadurch schnell; der zeitaufwendige Rebuild läuft nur bei Bedarf.

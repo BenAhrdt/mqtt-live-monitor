@@ -1,4 +1,5 @@
 const session = require('express-session');
+const sqlite3 = require('sqlite3');
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -15,6 +16,96 @@ const { db } = require('./historyStore');
 
 const dotenv = require("dotenv");
 dotenv.config();
+
+const SESSION_DAYS = 30;
+const SESSION_MAX_AGE_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_COOKIE_NAME = 'mqtt_live_monitor_session';
+
+class SQLiteSessionStore extends session.Store {
+  constructor(dbPath) {
+    super();
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    this.db = new sqlite3.Database(dbPath);
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        sid TEXT PRIMARY KEY,
+        session TEXT NOT NULL,
+        username TEXT,
+        expires_at INTEGER NOT NULL
+      )
+    `);
+
+    this.cleanupTimer = setInterval(() => {
+      this.db.run('DELETE FROM sessions WHERE expires_at <= ?', Date.now());
+    }, 60 * 60 * 1000);
+    this.cleanupTimer.unref?.();
+  }
+
+  get(sid, callback) {
+    this.db.get(
+      'SELECT session, expires_at FROM sessions WHERE sid = ?',
+      sid,
+      (err, row) => {
+        if (err) return callback(err);
+        if (!row) return callback(null, null);
+        if (row.expires_at <= Date.now()) {
+          return this.destroy(sid, destroyErr => callback(destroyErr, null));
+        }
+
+        try {
+          callback(null, JSON.parse(row.session));
+        } catch (parseErr) {
+          callback(parseErr);
+        }
+      }
+    );
+  }
+
+  set(sid, sessionData, callback = () => {}) {
+    const expiresAt = sessionData.cookie?.expires
+      ? new Date(sessionData.cookie.expires).getTime()
+      : Date.now() + SESSION_MAX_AGE_MS;
+    const username = sessionData.user?.username || null;
+
+    this.db.run(
+      `INSERT INTO sessions (sid, session, username, expires_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(sid) DO UPDATE SET
+         session = excluded.session,
+         username = excluded.username,
+         expires_at = excluded.expires_at`,
+      sid,
+      JSON.stringify(sessionData),
+      username,
+      expiresAt,
+      callback
+    );
+  }
+
+  destroy(sid, callback = () => {}) {
+    this.db.run('DELETE FROM sessions WHERE sid = ?', sid, callback);
+  }
+
+  touch(sid, sessionData, callback = () => {}) {
+    const expiresAt = sessionData.cookie?.expires
+      ? new Date(sessionData.cookie.expires).getTime()
+      : Date.now() + SESSION_MAX_AGE_MS;
+    this.db.run(
+      'UPDATE sessions SET expires_at = ? WHERE sid = ?',
+      expiresAt,
+      sid,
+      callback
+    );
+  }
+
+  destroyUserSessions(username, exceptSid = null, callback = () => {}) {
+    const sql = exceptSid
+      ? 'DELETE FROM sessions WHERE username = ? AND sid != ?'
+      : 'DELETE FROM sessions WHERE username = ?';
+    const params = exceptSid ? [username, exceptSid] : [username];
+    this.db.run(sql, params, callback);
+  }
+}
 
 let CONFIG_PATH;
 const USER_FILE = path.join(__dirname, "usercredentials.json");
@@ -428,14 +519,22 @@ let allowedDiscoveryViaDevicePrefixes = [
 const app = express();
 app.set("trust proxy", 1)
 
+const sessionStore = new SQLiteSessionStore(
+  path.join(path.dirname(CONFIG_PATH), 'data', 'sessions.sqlite')
+);
+
 const sessionMiddleware = session({
+    name: SESSION_COOKIE_NAME,
+    store: sessionStore,
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
         httpOnly: true,
         secure: process.env.USE_HTTPS === "true",
-        sameSite: "lax"
+        sameSite: "lax",
+        maxAge: SESSION_MAX_AGE_MS
     }
 });
 
@@ -641,7 +740,11 @@ app.post('/api/auth/logout', (req, res) => {
       return res.status(500).json({ error: 'Logout fehlgeschlagen' });
     }
 
-    res.clearCookie('connect.sid'); // 🔥 wichtig
+    res.clearCookie(SESSION_COOKIE_NAME, {
+      httpOnly: true,
+      secure: process.env.USE_HTTPS === "true",
+      sameSite: 'lax'
+    });
     res.json({ success: true });
   });
 });
@@ -805,6 +908,19 @@ app.put('/api/users/:username', async (req, res) => {
 
   writeUsers(data);
 
+  if (password || roles !== undefined || active !== undefined) {
+    const keepCurrentSession = password && isSelfRequest
+      && roles === undefined && active !== false
+      ? req.sessionID
+      : null;
+    await new Promise((resolve, reject) => {
+      sessionStore.destroyUserSessions(username, keepCurrentSession, err => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
   res.json({ success: true });
 });
 
@@ -822,8 +938,13 @@ app.delete('/api/users/:username', (req, res) => {
   data.users = data.users.filter(u => u.username !== req.params.username);
 
   writeUsers(data);
-
-  res.json({ success: true });
+  sessionStore.destroyUserSessions(req.params.username, null, err => {
+    if (err) {
+      console.error('Sessions des gelöschten Benutzers konnten nicht entfernt werden:', err);
+      return res.status(500).json({ error: 'Benutzersitzungen konnten nicht entfernt werden' });
+    }
+    res.json({ success: true });
+  });
 });
 
 app.post("/api/admin/create", requireAdmin, async (req, res) => {
