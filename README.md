@@ -142,6 +142,26 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.17 Mobile Charts und Dashboard-Import verbessert
+* Charts erhalten auf Mobilgeräten auch bei vielen Vergleichswerten eine lesbare Mindesthöhe.
+* Der Chart-Dialog kann auf Mobilgeräten selbst gescrollt werden, ohne die dahinterliegende Seite zu verschieben.
+* Einheitliche SVG-Symbole zeigen bereits im Dashboard, ob sich hinter einer Entity ein Linien-, Balken- oder Statusdiagramm befindet.
+* Virtuelle Geräte werden beim Import neuer sowie beim Zusammenführen bestehender Dashboards vollständig übernommen.
+* Ältere Exporte erkennen virtuelle Geräte zusätzlich anhand ihrer `virtual_...`-ID.
+* Die Geräteliste wird nach einem Dashboard-Import sofort neu aufgebaut, damit importierte virtuelle Geräte ohne Neuladen verfügbar sind.
+* Nach dem Import weist eine Meldung auf reale Geräte hin, die auf dem Zielsystem nicht vorhanden sind und daher nicht wiederhergestellt werden können.
+* Elemente im Logik-Editor springen beim Anklicken ihrer Auswahlfelder nicht mehr an eine andere Position.
+* Positionen im Logik-Editor werden relativ zur Zeichenfläche berechnet, auf deren Grenzen beschränkt und beim Speichern zuverlässig übernommen.
+* Verschobene Elemente werden beim Loslassen automatisch gespeichert und nach einem Neuladen an ihrer letzten Position wiederhergestellt.
+* Neue, geänderte und gelöschte Verbindungen werden automatisch gespeichert; ein Operator kann dadurch dauerhaft mehrere parallele Ausgänge versorgen.
+* Der nicht mehr benötigte Speichern-Button wurde durch eine sichtbare Statusanzeige für das automatische Speichern ersetzt.
+* Die Arbeitsfläche des Logik-Editors nutzt die verfügbare Fensterhöhe und bietet mehr Platz für umfangreichere Logiken.
+* Input-, Operator- und Output-Elemente können über ihre sichtbare ×-Schaltfläche samt angeschlossener Verbindungen gelöscht werden.
+* Output-Elemente können neue berechnete Entities mit frei wählbarem Namen und Einheit anlegen.
+* Name und Einheit einer ausgewählten berechneten Entity können nachträglich direkt im Output-Element bearbeitet werden, ohne ihre ID oder History-Zuordnung zu ändern.
+* Berechnete Entities werden dauerhaft unter dem Gerät „Berechnete Werte“ gespeichert, live aktualisiert und können Dashboards sowie der History hinzugefügt werden.
+* Der Logik-Editor zeigt bei Ausgängen die konfigurierte Einheit an und aktualisiert Ein- sowie Ausgänge live über Socket-Events.
+
 ### V1.8.16 Mobiles Chart zuverlässig schließen
 * Das Chart beginnt auf Mobilgeräten unterhalb des festen Headers, sodass Titel und Schließen-Schaltfläche vollständig sichtbar bleiben.
 * Die Schließen-Schaltfläche besitzt ein größeres, kontrastreiches Touchziel und bleibt auch bei langen Entity-Namen erreichbar.

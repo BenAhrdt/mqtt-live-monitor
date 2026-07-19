@@ -111,6 +111,7 @@ let CONFIG_PATH;
 const USER_FILE = path.join(__dirname, "usercredentials.json");
 const EXTENSION_CONFIG_FILE = path.join(__dirname, "data", "extension-configs.json");
 const EXTENSION_TOKENS_FILE = path.join(__dirname, "data", "extension-tokens.json");
+const LOGICAL_FILE = path.join(__dirname, "data", "logical-devices.json");
 
 function readUsers() {
   try {
@@ -2896,6 +2897,7 @@ function getDevicesForDashboard() {
       min: entity.min,
       max: entity.max,
       step: entity.step,
+      isCalculated: Boolean(entity.isCalculated),
 
     }));
 
@@ -4273,8 +4275,111 @@ app.get('/api/logical-devices', (req, res) => {
         entities: Object.values(d.entities || {}) // 🔥 zurück zu Array
     }));
 
-    res.json({ devices });
+  res.json({ devices });
 
+});
+
+function createCalculatedEntityId(name) {
+  const base = String(name || 'wert')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'wert';
+  let id = `calculated_${base}`;
+  let suffix = 2;
+
+  while (findEntityById(id)) {
+    id = `calculated_${base}_${suffix}`;
+    suffix += 1;
+  }
+
+  return id;
+}
+
+app.post('/api/calculated-entities', requireAdmin, (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  const unit = String(req.body?.unit || '').trim().slice(0, 24);
+
+  if (!name) {
+    return res.status(400).json({ error: 'Name ist erforderlich' });
+  }
+
+  const deviceId = 'logic_calculated_values';
+  const now = new Date().toISOString();
+
+  if (!logicalDeviceStore[deviceId]) {
+    logicalDeviceStore[deviceId] = {
+      id: deviceId,
+      name: 'Berechnete Werte',
+      isLogical: true,
+      entities: {},
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  const entity = {
+    id: createCalculatedEntityId(name),
+    deviceId,
+    name: name.slice(0, 120),
+    type: 'sensor',
+    value: 0,
+    unit,
+    isCalculated: true,
+    createdAt: now,
+    lastUpdate: now
+  };
+
+  logicalDeviceStore[deviceId].entities[entity.id] = entity;
+  logicalDeviceStore[deviceId].updatedAt = now;
+  saveLogicalDevices();
+
+  res.status(201).json({
+    device: {
+      ...logicalDeviceStore[deviceId],
+      entities: Object.values(logicalDeviceStore[deviceId].entities)
+    },
+    entity
+  });
+});
+
+app.patch('/api/calculated-entities/:entityId', requireAdmin, (req, res) => {
+  const entityId = String(req.params.entityId || '').trim();
+  const entity = findEntityById(entityId);
+
+  if (!entity?.isCalculated) {
+    return res.status(404).json({ error: 'Berechnete Entity nicht gefunden' });
+  }
+
+  const name = String(req.body?.name || '').trim();
+  const unit = String(req.body?.unit || '').trim().slice(0, 24);
+
+  if (!name) {
+    return res.status(400).json({ error: 'Name ist erforderlich' });
+  }
+
+  const device = logicalDeviceStore[entity.deviceId];
+  entity.name = name.slice(0, 120);
+  entity.unit = unit;
+  entity.lastUpdate = new Date().toISOString();
+  if (device) device.updatedAt = entity.lastUpdate;
+  saveLogicalDevices();
+
+  io.emit('entity-update', {
+    deviceId: entity.deviceId,
+    entityId: entity.id,
+    entity
+  });
+
+  res.json({
+    device: {
+      ...device,
+      entities: Object.values(device?.entities || {})
+    },
+    entity
+  });
 });
 
 function getCombinedStore() {
@@ -4784,16 +4889,61 @@ function saveLogicalDevices() {
     console.log("💾 Virtuelle Geräte gespeichert");
 }
 
+let logicalSaveTimer = null;
+const activeCalculatedUpdates = new Set();
+
+function scheduleLogicalDevicesSave() {
+    clearTimeout(logicalSaveTimer);
+    logicalSaveTimer = setTimeout(saveLogicalDevices, 250);
+}
+
+function updateCalculatedEntity(entityId, value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return;
+
+    const entity = findEntityById(entityId);
+    if (!entity?.isCalculated) return;
+    if (Math.abs(Number(entity.value) - numericValue) < 0.000001) return;
+
+    const device = logicalDeviceStore[entity.deviceId];
+    const now = new Date().toISOString();
+    entity.value = numericValue;
+    entity.lastUpdate = now;
+    if (device) device.updatedAt = now;
+
+    scheduleLogicalDevicesSave();
+
+    io.emit('entity-update', {
+      deviceId: entity.deviceId,
+      entityId: entity.id,
+      entity
+    });
+
+    getHistoryConfigsForEntity(entity.id).forEach(({ historyId, cfg }) => {
+      historyStore.writeHistory(historyId, entity, cfg);
+    });
+
+    if (!activeCalculatedUpdates.has(entity.id)) {
+      activeCalculatedUpdates.add(entity.id);
+      try {
+        logicEngine.runLogicEngine(entity.id);
+      } finally {
+        activeCalculatedUpdates.delete(entity.id);
+      }
+    }
+}
+
 
 // Logiken laden
+loadLogicalDevices();
+
 if (fs.existsSync(LOGIC_FILE)) {
   const data = JSON.parse(fs.readFileSync(LOGIC_FILE, 'utf-8'));
   logicEngine.setLogics(data);
 }
 
 function findEntityById(entityId) {
-  for (const deviceId in deviceStore) {
-    const device = deviceStore[deviceId];
+  for (const device of Object.values(getCombinedStore())) {
 
     if (!device.entities) continue;
 
@@ -4806,6 +4956,7 @@ function findEntityById(entityId) {
 }
 
 logicEngine.setEntityGetter(findEntityById);
+logicEngine.setComputedEntityWriter(updateCalculatedEntity);
 
 // Anstoßen des Datenbank cleanups
 historyStore.startCleanup();

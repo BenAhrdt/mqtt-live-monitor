@@ -1,5 +1,45 @@
 let connectionStart = null;
 let connections = [];
+let logicSaveQueue = Promise.resolve();
+
+function setLogicSaveStatus(text, state = '') {
+  const status = document.getElementById('logicSaveStatus');
+  if (!status) return;
+
+  status.textContent = text;
+  status.dataset.state = state;
+}
+
+function persistLogic() {
+  const data = exportLogic();
+
+  logicSaveQueue = logicSaveQueue
+    .catch(() => {})
+    .then(async () => {
+      setLogicSaveStatus('Speichert…', 'saving');
+
+      try {
+        const response = await fetch('/api/logics', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          throw new Error('Logik konnte nicht gespeichert werden');
+        }
+
+        setLogicSaveStatus('✓ Automatisch gespeichert', 'saved');
+      } catch (error) {
+        setLogicSaveStatus('Speichern fehlgeschlagen', 'error');
+        throw error;
+      }
+    });
+
+  return logicSaveQueue;
+}
 
 function resetNodeState() {
   document.querySelectorAll('.logic-node').forEach(node => {
@@ -110,32 +150,18 @@ function calculateFlow() {
       const el = to.querySelector('.node-result');
 
       const value = from._value;
-
-      if (el) {
-        el.textContent = from._value.toFixed(2);
-      }
       const select = to.querySelector('.entity-select');
       const entityId = select?.value;
+      const entity = findAvailableLogicEntity(entityId);
+      const unit = entity?.unit || '';
 
-      if (entityId && value !== undefined) {
-        writeEntityValue(entityId, value);
+      if (el) {
+        el.textContent = `${Number(value).toFixed(2)}${unit ? ` ${unit}` : ''}`;
       }
     }
 
   });
 
-}
-
-function writeEntityValue(entityId, value) {
-
-  const entity = getWritableEntities().find(e => e.id === entityId);
-
-  if (!entity) return;
-
-  // 🔥 Nur schreiben wenn Wert sich ändert
-  if (Math.abs(Number(entity.value) - value) < 0.001) return;
-
-  setNumberEntity(entityId, value);
 }
 
 function getNumericEntities() {
@@ -264,13 +290,13 @@ function getWritableEntities() {
       const baseName = entity.name || entity.id;
 
       // 🔹 NUMBER
-      if (entity.type === 'number') {
+      if (entity.type === 'number' || entity.isCalculated) {
         list.push({
           id: entity.id,
           name: baseName,
           device: deviceName,
           unit: entity.unit || '',
-          action: 'setValue'
+          action: entity.isCalculated ? 'calculated' : 'setValue'
         });
       }
 
@@ -340,9 +366,179 @@ return list.sort((a, b) => {
 export function updateLogicView() {
   updateLiveValues();
   calculateFlow();
+  updateCalculatedEntityEditButtons();
 }
 
 let availableDevices = [];
+
+function escapeLogicHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function openCalculatedEntityDialog(options = {}) {
+  return new Promise(resolve => {
+    const isEditing = Boolean(options.entity);
+    const entity = options.entity || {};
+    const overlay = document.createElement('div');
+    overlay.className = 'logic-dialog-backdrop';
+    overlay.innerHTML = `
+      <form class="logic-dialog">
+        <h3>${isEditing ? 'Berechnete Entity bearbeiten' : 'Berechnete Entity anlegen'}</h3>
+        <label>
+          Name
+          <input name="name" maxlength="120" required placeholder="z. B. PV Gesamt"
+                 value="${escapeLogicHtml(entity.name || '')}">
+        </label>
+        <label>
+          Einheit
+          <input name="unit" maxlength="24" placeholder="z. B. W, kWh oder %"
+                 value="${escapeLogicHtml(entity.unit || '')}">
+        </label>
+        <p class="logic-dialog-hint">
+          Die Entity erscheint unter dem Gerät „Berechnete Werte“ und kann
+          anschließend einem Dashboard sowie der History hinzugefügt werden.
+        </p>
+        <div class="logic-dialog-actions">
+          <button type="button" class="btn secondary logic-dialog-cancel">Abbrechen</button>
+          <button type="submit" class="btn primary">${isEditing ? 'Speichern' : 'Anlegen'}</button>
+        </div>
+      </form>
+    `;
+
+    const close = result => {
+      overlay.remove();
+      resolve(result);
+    };
+
+    overlay.querySelector('.logic-dialog-cancel')
+      ?.addEventListener('click', () => close(null));
+    overlay.addEventListener('mousedown', event => {
+      if (event.target === overlay) close(null);
+    });
+    overlay.querySelector('form')?.addEventListener('submit', event => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const name = String(formData.get('name') || '').trim();
+      if (!name) return;
+      close({
+        name,
+        unit: String(formData.get('unit') || '').trim()
+      });
+    });
+
+    document.body.appendChild(overlay);
+    overlay.querySelector('input[name="name"]')?.focus();
+  });
+}
+
+function upsertAvailableLogicDevice(device) {
+  const index = availableDevices.findIndex(item => item.id === device.id);
+  if (index >= 0) {
+    availableDevices[index] = device;
+  } else {
+    availableDevices.push(device);
+  }
+}
+
+function findAvailableLogicEntity(entityId) {
+  for (const device of availableDevices) {
+    const entity = (device.entities || []).find(item => item.id === entityId);
+    if (entity) return entity;
+  }
+  return null;
+}
+
+function updateCalculatedEntityEditButtons() {
+  document.querySelectorAll('.logic-node[data-type="entity_output"]').forEach(node => {
+    const entityId = node.querySelector('.entity-select')?.value;
+    const entity = findAvailableLogicEntity(entityId);
+    node.querySelector('.logic-edit-entity')
+      ?.classList.toggle('hidden', !entity?.isCalculated);
+  });
+}
+
+function renderLogicEntityOptions(entities, includeValue = false) {
+  return entities.map(entity => `
+    <option value="${escapeLogicHtml(entity.id)}">
+      ${escapeLogicHtml(entity.device)} → ${escapeLogicHtml(entity.name)}
+      ${includeValue ? `(${escapeLogicHtml(entity.value)} ${escapeLogicHtml(entity.unit)})` : ''}
+    </option>
+  `).join('');
+}
+
+function refreshLogicEntitySelects() {
+  document.querySelectorAll('.logic-node').forEach(node => {
+    const select = node.querySelector('.entity-select');
+    if (!select) return;
+    const currentValue = select.value;
+    const isInput = node.dataset.type === 'entity_input';
+    const entities = isInput ? getNumericEntities() : getWritableEntities();
+
+    select.innerHTML = `
+      <option value="">-- wählen --</option>
+      ${renderLogicEntityOptions(entities, isInput)}
+    `;
+    select.value = currentValue;
+  });
+  updateCalculatedEntityEditButtons();
+}
+
+async function createCalculatedEntityForNode(node) {
+  const input = await openCalculatedEntityDialog();
+  if (!input) return;
+
+  const response = await fetch('/api/calculated-entities', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Berechnete Entity konnte nicht angelegt werden');
+  }
+
+  upsertAvailableLogicDevice(data.device);
+  refreshLogicEntitySelects();
+
+  const select = node.querySelector('.entity-select');
+  if (select) select.value = data.entity.id;
+  updateCalculatedEntityEditButtons();
+  await persistLogic();
+}
+
+async function editCalculatedEntityForNode(node) {
+  const select = node.querySelector('.entity-select');
+  const entity = findAvailableLogicEntity(select?.value);
+  if (!entity?.isCalculated) return;
+
+  const input = await openCalculatedEntityDialog({ entity });
+  if (!input) return;
+
+  const response = await fetch(
+    `/api/calculated-entities/${encodeURIComponent(entity.id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    }
+  );
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Berechnete Entity konnte nicht geändert werden');
+  }
+
+  upsertAvailableLogicDevice(data.device);
+  refreshLogicEntitySelects();
+  if (select) select.value = data.entity.id;
+  updateCalculatedEntityEditButtons();
+}
 
 export function renderLogicView(container, devices){
   availableDevices = devices || [];
@@ -366,7 +562,9 @@ export function renderLogicView(container, devices){
             <div class="logic-item" draggable="true" data-type="entity_output">
                 📤 Output
             </div>
-            <button id="saveLogicBtn">💾 Speichern</button>
+            <div id="logicSaveStatus" class="logic-save-status" data-state="saved">
+                ✓ Automatisches Speichern
+            </div>
         </div>
 
         <!-- 🔹 Canvas -->
@@ -385,22 +583,6 @@ export function renderLogicView(container, devices){
     .then(data => {
       importLogic(data);
     });
-    
-  document.getElementById('saveLogicBtn')?.addEventListener('click', async () => {
-
-    const data = exportLogic();
-
-    console.log('LOGIC:', data);
-
-    await fetch('/api/logics', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-
-  });
 }
 
 function initLogicDragAndDrop() {
@@ -421,8 +603,20 @@ function initLogicDragAndDrop() {
   canvas.addEventListener('drop', e => {
     e.preventDefault();
 
-    const node = createLogicNode(draggedType, e.offsetX, e.offsetY);
+    if (!draggedType) return;
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const node = createLogicNode(
+      draggedType,
+      e.clientX - canvasRect.left,
+      e.clientY - canvasRect.top
+    );
     canvas.appendChild(node);
+    draggedType = null;
+
+    persistLogic().catch(error => {
+      console.error('Neues Element konnte nicht gespeichert werden:', error);
+    });
   });
 }
 
@@ -440,11 +634,7 @@ function createLogicNode(type, x, y) {
 
     const entities = getNumericEntities();
 
-    const options = entities.map(e =>
-      `<option value="${e.id}">
-        ${e.device} → ${e.name} (${e.value} ${e.unit})
-      </option>`
-    ).join('');
+    const options = renderLogicEntityOptions(entities, true);
 
     node.innerHTML = `
       <div class="node-label">Eingang</div>
@@ -471,11 +661,7 @@ function createLogicNode(type, x, y) {
 
       const entities = getWritableEntities();
 
-      const options = entities.map(e =>
-        `<option value="${e.id}">
-          ${e.device} → ${e.name}
-        </option>`
-      ).join('');
+      const options = renderLogicEntityOptions(entities);
 
       node.innerHTML = `
         <div class="node-input center"></div>
@@ -486,6 +672,15 @@ function createLogicNode(type, x, y) {
           <option value="">-- wählen --</option>
           ${options}
         </select>
+
+        <div class="logic-entity-actions">
+          <button type="button" class="logic-create-entity">
+            + Neue Entity
+          </button>
+          <button type="button" class="logic-edit-entity hidden">
+            Bearbeiten
+          </button>
+        </div>
         
         <div class="node-result">0</div>
       `;
@@ -516,6 +711,49 @@ function createLogicNode(type, x, y) {
     `;
     }
 
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'logic-node-delete';
+  deleteButton.title = 'Element löschen';
+  deleteButton.setAttribute('aria-label', 'Element löschen');
+  deleteButton.textContent = '×';
+  node.appendChild(deleteButton);
+
+  deleteButton.addEventListener('click', () => {
+    const attachedConnections = connections.filter(connection =>
+      connection.fromNode === node || connection.toNode === node
+    );
+    const connectionText = attachedConnections.length
+      ? ` und ${attachedConnections.length} Verbindung(en)`
+      : '';
+
+    if (!confirm(`Dieses Element${connectionText} löschen?`)) return;
+
+    attachedConnections.forEach(connection => connection.line.remove());
+    connections = connections.filter(connection =>
+      connection.fromNode !== node && connection.toNode !== node
+    );
+    node.remove();
+    calculateFlow();
+    persistLogic().catch(error => {
+      console.error('Element konnte nicht gelöscht werden:', error);
+    });
+  });
+
+  node.querySelector('.logic-create-entity')?.addEventListener('click', () => {
+    createCalculatedEntityForNode(node).catch(error => {
+      console.error(error);
+      alert(error.message);
+    });
+  });
+
+  node.querySelector('.logic-edit-entity')?.addEventListener('click', () => {
+    editCalculatedEntityForNode(node).catch(error => {
+      console.error(error);
+      alert(error.message);
+    });
+  });
+
   node.style.left = x + 'px';
   node.style.top = y + 'px';
   node.style.position = 'absolute';
@@ -533,7 +771,7 @@ function createLogicNode(type, x, y) {
             console.log('❌ gleiche Node verboten');
             return;
             }
-            createConnection(connectionStart.port, input);
+            createConnection(connectionStart.port, input, { persist: true });
 
             connectionStart = null;
 
@@ -557,6 +795,15 @@ function createLogicNode(type, x, y) {
 
   makeNodeDraggable(node); // falls du das hast
 
+  node.querySelectorAll('select').forEach(select => {
+    select.addEventListener('change', () => {
+      updateCalculatedEntityEditButtons();
+      persistLogic().catch(error => {
+        console.error('Logik-Auswahl konnte nicht gespeichert werden:', error);
+      });
+    });
+  });
+
   return node;
 }
 
@@ -564,14 +811,24 @@ function makeNodeDraggable(node) {
   let offsetX = 0;
   let offsetY = 0;
   let isDragging = false;
+  let hasMoved = false;
 
   node.addEventListener('mousedown', (e) => {
-    isDragging = true;
+    if (e.button !== 0) return;
+    if (e.target.closest('select, input, button, .node-input, .node-output')) {
+      return;
+    }
 
-    offsetX = e.offsetX;
-    offsetY = e.offsetY;
+    const nodeRect = node.getBoundingClientRect();
+
+    isDragging = true;
+    hasMoved = false;
+    offsetX = e.clientX - nodeRect.left;
+    offsetY = e.clientY - nodeRect.top;
 
     node.style.zIndex = 1000; // nach vorne
+    node.classList.add('dragging');
+    e.preventDefault();
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -579,21 +836,34 @@ function makeNodeDraggable(node) {
 
     const canvas = document.getElementById('logicCanvas');
     const rect = canvas.getBoundingClientRect();
+    const maxX = Math.max(0, canvas.clientWidth - node.offsetWidth);
+    const maxY = Math.max(0, canvas.clientHeight - node.offsetHeight);
+    const x = Math.min(maxX, Math.max(0, e.clientX - rect.left - offsetX));
+    const y = Math.min(maxY, Math.max(0, e.clientY - rect.top - offsetY));
 
-    node.style.left = (e.clientX - rect.left - offsetX) + 'px';
-    node.style.top = (e.clientY - rect.top - offsetY) + 'px';
+    node.style.left = `${Math.round(x)}px`;
+    node.style.top = `${Math.round(y)}px`;
+    hasMoved = true;
     connections.forEach(conn => {
         updateLinePosition(conn.line, conn.fromPort, conn.toPort);
         });
   });
 
   document.addEventListener('mouseup', () => {
+    if (!isDragging) return;
     isDragging = false;
     node.style.zIndex = '';
+    node.classList.remove('dragging');
+
+    if (hasMoved) {
+      persistLogic().catch(error => {
+        console.error('Position konnte nicht gespeichert werden:', error);
+      });
+    }
   });
 }
 
-function createConnection(fromPort, toPort) {
+function createConnection(fromPort, toPort, options = {}) {
   const svg = document.getElementById('logicConnections');
 
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -611,6 +881,10 @@ function createConnection(fromPort, toPort) {
 
     // auch aus array entfernen
     connections = connections.filter(c => c.line !== line);
+
+    persistLogic().catch(error => {
+      console.error('Gelöschte Verbindung konnte nicht gespeichert werden:', error);
+    });
     });
 
   connections.push({
@@ -623,6 +897,12 @@ function createConnection(fromPort, toPort) {
     fromIndex: getPortIndex(fromPort),
     toIndex: getPortIndex(toPort)
   });
+
+  if (options.persist) {
+    persistLogic().catch(error => {
+      console.error('Verbindung konnte nicht gespeichert werden:', error);
+    });
+  }
 }
 
 function getPortIndex(port) {
@@ -669,8 +949,8 @@ export function exportLogic() {
     const base = {
       id: node.dataset.id,
       type,
-      x: parseInt(node.style.left),
-      y: parseInt(node.style.top)
+      x: Math.round(Number.parseFloat(node.style.left) || 0),
+      y: Math.round(Number.parseFloat(node.style.top) || 0)
     };
 
     // 🔹 Input
@@ -753,27 +1033,31 @@ export function importLogic(data) {
 
   updateLiveValues();
   calculateFlow();
+  updateCalculatedEntityEditButtons();
 }
 
 import socket from '../socket.js';
 socket.on('entity-update', (data) => {
+  const entity = findAvailableLogicEntity(data.entityId);
+  if (entity && data.entity) {
+    Object.assign(entity, data.entity);
+  }
 
-  document.querySelectorAll('.logic-node').forEach(node => {
+  updateLiveValues();
+  calculateFlow();
 
-    if (node.dataset.type !== 'entity_input') return;
+  document.querySelectorAll('.logic-node[data-type="entity_output"]')
+    .forEach(node => {
+      const select = node.querySelector('.entity-select');
+      if (select?.value !== data.entityId) return;
 
-    const select = node.querySelector('.entity-select');
-    if (!select) return;
+      const value = Number(data.entity?.value ?? data.entity?.state);
+      if (!Number.isFinite(value)) return;
 
-    if (select.value !== data.entityId) return;
-
-    const val = Number(data.entity?.value ?? data.entity?.state ?? 0);
-
-    node._value = val;
-
-    const el = node.querySelector('.node-result');
-    if (el) {
-      el.textContent = val.toFixed(2);
-    }
-  });
+      const unit = data.entity?.unit || entity?.unit || '';
+      const display = node.querySelector('.node-result');
+      if (display) {
+        display.textContent = `${value.toFixed(2)}${unit ? ` ${unit}` : ''}`;
+      }
+    });
 });

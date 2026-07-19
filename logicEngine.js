@@ -10,6 +10,11 @@ function setMqttPublisher(fn) {
   mqttPublish = fn;
 }
 
+let writeComputedEntity = null;
+function setComputedEntityWriter(fn) {
+  writeComputedEntity = fn;
+}
+
 
 function setLogics(data) {
 
@@ -154,6 +159,16 @@ async function applyEntityValueFromLogic(entityId, value) {
     return;
   }
 
+  if (entity.isCalculated) {
+    if (typeof writeComputedEntity !== 'function') {
+      console.warn('Logic write: Writer für berechnete Entity fehlt', entityId);
+      return;
+    }
+
+    writeComputedEntity(entityId, Number(value));
+    return;
+  }
+
   if (entity.type !== 'number') {
     console.log('LOGIC: skip (noch nicht unterstützt)', entity.type);
     return;
@@ -197,5 +212,6 @@ module.exports = {
   runLogicEngine,
   applyEntityValueFromLogic,
   setEntityGetter,
-  setMqttPublisher
+  setMqttPublisher,
+  setComputedEntityWriter
 };

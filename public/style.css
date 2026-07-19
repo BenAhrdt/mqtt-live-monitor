@@ -3262,6 +3262,8 @@ select {
     height: auto;
     padding: 8px;
     align-items: stretch;
+    overflow: hidden;
+    overscroll-behavior: contain;
   }
 
   #historyModal .modal-content-chart {
@@ -3275,11 +3277,20 @@ select {
 
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
-  .chart-container {
-    min-height: 0;
-    flex: 1 1 0;
+  #historyModal .chart-container {
+    /* Die Bedienelemente duerfen den Chart bei vielen Entities nicht
+       auf wenige Pixel zusammendruecken. Der Dialog scrollt stattdessen. */
+    min-height: 320px;
+    height: 42vh;
+    height: 42dvh;
+    flex: 0 0 auto;
   }
 }
 
@@ -3322,10 +3333,36 @@ select {
 .history-icon {
     position: static;
     flex-shrink: 0;
-
-    width: 14px;
-    display: flex;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    color: var(--accent);
+}
+
+.history-icon svg {
+    width: 18px;
+    height: 18px;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.history-icon-bar {
+    color: #f59e0b;
+}
+
+.history-icon-bar svg rect {
+    fill: currentColor;
+    stroke: none;
+}
+
+.history-icon-state {
+    color: #10b981;
 }
 
 .sensor-row-multiline {

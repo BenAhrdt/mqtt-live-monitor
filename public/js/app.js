@@ -945,6 +945,26 @@ function exportCustomDashboards() {
     URL.revokeObjectURL(url);
 }
 
+function normalizeImportedDashboardDevice(device) {
+    const deviceId = String(device?.deviceId || '').trim();
+    const isVirtual = Boolean(device?.isVirtual)
+        || deviceId.startsWith('virtual_');
+
+    return {
+        deviceId,
+        entityIds: Array.isArray(device?.entityIds)
+            ? device.entityIds
+                .map(id => String(id).trim())
+                .filter(Boolean)
+            : [],
+        ...(isVirtual ? {
+            isVirtual: true,
+            name: String(device?.name || 'Virtuelles Gerät').trim()
+                || 'Virtuelles Gerät'
+        } : {})
+    };
+}
+
 async function importCustomDashboardsFromFile(file) {
     if (!file) return;
 
@@ -1001,6 +1021,8 @@ async function importCustomDashboardsFromFile(file) {
                 allowedRoles: normalizeDashboardRoles(importedDashboard),
                 devices: Array.isArray(importedDashboard.devices)
                     ? importedDashboard.devices
+                        .map(normalizeImportedDashboardDevice)
+                        .filter(device => device.deviceId)
                     : []
             });
             return;
@@ -1018,20 +1040,17 @@ async function importCustomDashboardsFromFile(file) {
         );
 
         (importedDashboard.devices || []).forEach((importedDevice) => {
-            const deviceId = String(importedDevice.deviceId || '').trim();
+            const normalizedDevice =
+                normalizeImportedDashboardDevice(importedDevice);
+            const deviceId = normalizedDevice.deviceId;
             if (!deviceId) return;
 
-            const importedEntityIds = Array.isArray(importedDevice.entityIds)
-                ? importedDevice.entityIds.map(id => String(id).trim()).filter(Boolean)
-                : [];
+            const importedEntityIds = normalizedDevice.entityIds;
 
             const existingDevice = deviceMap.get(deviceId);
 
             if (!existingDevice) {
-                deviceMap.set(deviceId, {
-                    deviceId,
-                    entityIds: importedEntityIds
-                });
+                deviceMap.set(deviceId, normalizedDevice);
                 return;
             }
 
@@ -1041,6 +1060,11 @@ async function importCustomDashboardsFromFile(file) {
             ]);
 
             existingDevice.entityIds = Array.from(mergedEntityIds);
+
+            if (normalizedDevice.isVirtual) {
+                existingDevice.isVirtual = true;
+                existingDevice.name = normalizedDevice.name;
+            }
         });
 
         existingDashboard.devices = Array.from(deviceMap.values());
@@ -1056,6 +1080,7 @@ async function importCustomDashboardsFromFile(file) {
     dashboardRenderer.renderCustomDashboardsNav();
 
     await saveCustomDashboards();
+    await loadDashboardDevices();
     await fetch('/api/friendly-names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1064,7 +1089,26 @@ async function importCustomDashboardsFromFile(file) {
         })
     });
 
-    alert('Dashboards und Friendly Names importiert');
+    const availableDeviceIds = new Set(
+        dashboardDevices.map(device => device.id)
+    );
+    const missingDeviceIds = Array.from(new Set(
+        customDashboards.flatMap(dashboard =>
+            (dashboard.devices || [])
+                .map(device => device.deviceId)
+                .filter(deviceId => !availableDeviceIds.has(deviceId))
+        )
+    ));
+
+    if (missingDeviceIds.length) {
+        alert(
+            `Dashboards und Friendly Names importiert.\n\n`
+            + `${missingDeviceIds.length} Gerät(e) sind auf diesem System nicht vorhanden:\n`
+            + missingDeviceIds.join('\n')
+        );
+    } else {
+        alert('Dashboards und Friendly Names importiert');
+    }
 }
 
 async function addAllDevicesToCustomDashboard(dashboardId) {

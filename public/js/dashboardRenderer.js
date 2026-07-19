@@ -39,6 +39,39 @@ export function createDashboardRenderer(deps) {
     canAccessDashboard
   } = deps;
 
+    function renderHistoryIcon(type = 'line') {
+        const icons = {
+            line: `
+                <polyline points="3 15 7 10 11 12 16 5 21 8"></polyline>
+            `,
+            bar: `
+                <line x1="3" y1="20" x2="21" y2="20"></line>
+                <rect x="4" y="12" width="3" height="6" rx="0.5"></rect>
+                <rect x="10.5" y="7" width="3" height="11" rx="0.5"></rect>
+                <rect x="17" y="3" width="3" height="15" rx="0.5"></rect>
+            `,
+            state: `
+                <polyline points="3 17 8 17 8 7 15 7 15 12 21 12"></polyline>
+            `
+        };
+        const labels = {
+            line: 'Linienverlauf öffnen',
+            bar: 'Balkendiagramm öffnen',
+            state: 'Statusverlauf öffnen'
+        };
+        const iconType = icons[type] ? type : 'line';
+
+        return `
+            <span class="history-icon history-icon-${iconType}"
+                  title="${labels[iconType]}"
+                  aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    ${icons[iconType]}
+                </svg>
+            </span>
+        `;
+    }
+
     function setupSettingsDragAndDrop(container, dashboardId) {
 
         let draggedId = null;
@@ -204,12 +237,10 @@ export function createDashboardRenderer(deps) {
         const cfg = history?.entities?.[entity.id];
         const hasHistory = history?.enabled && cfg && cfg.enabled;
         const historyIcon = hasHistory
-        ? (
-            entity.deviceClass === 'energy'
-            ? '📊'
-            : '📈'
-        )
-        : '';
+            ? renderHistoryIcon(
+                entity.deviceClass === 'energy' ? 'bar' : 'line'
+            )
+            : '';
 
         const valueText = formatSensorValue(entity);
 
@@ -225,10 +256,7 @@ export function createDashboardRenderer(deps) {
             >
 
                 <div class="sensor-name-wrap">
-                ${historyIcon
-                    ? `<span class="history-icon">${historyIcon}</span>`
-                    : ''
-                }    
+                ${historyIcon}
                 <span
                         class="sensor-name"
                     >
@@ -261,7 +289,7 @@ export function createDashboardRenderer(deps) {
             cfg.enabled;
 
         const historyIcon =
-            hasHistory ? '🔄' : '';
+            hasHistory ? renderHistoryIcon('state') : '';
 
         let text = '';
         let colorClass = '';
@@ -297,10 +325,7 @@ export function createDashboardRenderer(deps) {
                 data-entity-id="${entity.id}"
             >
             <div class="sensor-name-wrap">
-                ${historyIcon
-                    ? `<span class="history-icon">${historyIcon}</span>`
-                    : ''
-                }
+                ${historyIcon}
                 <span class="sensor-name">
                     ${escapeHtml(getEntityDisplayName(entity, entity._renderDeviceId || entity.deviceId))}
                 </span>
@@ -498,7 +523,7 @@ export function createDashboardRenderer(deps) {
                 class="climate-current-line ${hasCurrentTempHistory ? 'has-history climate-history-row' : ''}"
                 data-entity-id="${currentTempHistoryId}"
             >
-            ${hasCurrentTempHistory ? '<span class="history-icon">📈</span>' : ''}
+            ${hasCurrentTempHistory ? renderHistoryIcon('line') : ''}
             Isttemperatur <strong>${currentTemp.toFixed(1)} °C</strong>
             </div>
 
@@ -507,7 +532,7 @@ export function createDashboardRenderer(deps) {
                 class="climate-target-label ${hasTargetTempHistory ? 'has-history climate-history-row' : ''}"
                 data-entity-id="${targetTempHistoryId}"
             >
-                ${hasTargetTempHistory ? '<span class="history-icon">📈</span>' : ''}
+                ${hasTargetTempHistory ? renderHistoryIcon('line') : ''}
                 Solltemperatur
             </div>
 
