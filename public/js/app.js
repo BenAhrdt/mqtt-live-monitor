@@ -2743,6 +2743,17 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
+    const removeMissingDeviceBtn = e.target.closest(
+        '.action-remove-missing-dashboard-device'
+    );
+    if (removeMissingDeviceBtn) {
+        await removeDeviceFromCustomDashboard(
+            removeMissingDeviceBtn.dataset.dashboardId,
+            removeMissingDeviceBtn.dataset.deviceId
+        );
+        return;
+    }
+
 
     // Operand Auswahl Logik
     const select = e.target.closest('.logic-input');

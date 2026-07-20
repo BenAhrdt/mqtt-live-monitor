@@ -142,6 +142,11 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.18 Fehlende Dashboard-Geräte entfernen
+* Geräte, die nicht mehr vom MQTT-Server geliefert werden, behalten in der Dashboard-Konfiguration eine Schaltfläche zum Entfernen.
+* Die Dashboard-Konfiguration bleibt auch dann bedienbar, wenn aktuell überhaupt keine MQTT-Geräte verfügbar sind.
+* Importierte virtuelle Geräte werden weiterhin wiederhergestellt und sind von der Anzeige für tatsächlich fehlende Geräte nicht betroffen.
+
 ### V1.8.17 Mobile Charts und Dashboard-Import verbessert
 * Charts erhalten auf Mobilgeräten auch bei vielen Vergleichswerten eine lesbare Mindesthöhe.
 * Der Chart-Dialog kann auf Mobilgeräten selbst gescrollt werden, ohne die dahinterliegende Seite zu verschieben.

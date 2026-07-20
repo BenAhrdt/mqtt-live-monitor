@@ -162,11 +162,8 @@ export function createDashboardRenderer(deps) {
     }
 
     function renderDashboardDeviceSelector(dashboard, openDeviceKeys = new Set()) {
-        const dashboardDevices = getDashboardDevices();
+        const dashboardDevices = getDashboardDevices() || [];
         const friendlyNames = getFriendlyNames();
-        if (!dashboardDevices || !dashboardDevices.length) {
-        return '<div class="muted">Keine Geräte verfügbar</div>';
-        }
 
         const selectedDeviceIds = new Set((dashboard.devices || []).map(d => d.deviceId));
 
@@ -215,9 +212,22 @@ export function createDashboardRenderer(deps) {
             let device = dashboardDevices.find(d => d.id === deviceConfig.deviceId);
 
             if (!device) {
+                const safeDashboardId = escapeHtml(dashboard.id);
+                const safeDeviceId = escapeHtml(deviceConfig.deviceId);
+
                 return `
                 <div class="custom-dashboard-device-card">
-                    <div class="muted">Gerät nicht gefunden: ${escapeHtml(deviceConfig.deviceId)}</div>
+                    <div class="custom-device-summary">
+                        <div class="muted">Gerät nicht gefunden: ${safeDeviceId}</div>
+                        <button
+                            type="button"
+                            class="btn danger small-btn action-remove-missing-dashboard-device"
+                            data-dashboard-id="${safeDashboardId}"
+                            data-device-id="${safeDeviceId}"
+                        >
+                            Entfernen
+                        </button>
+                    </div>
                 </div>
                 `;
             }
