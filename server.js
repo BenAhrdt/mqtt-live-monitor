@@ -2676,8 +2676,10 @@ async function connectMqtt() {
     queueQoSZero: true,
   });
 
-  // 🔥 OPTIONAL FIX: doppelte Listener vermeiden (sicher ist sicher)
-  mqttClient.removeAllListeners();
+  // mqtt.connect() registriert bereits interne Listener, unter anderem einen
+  // close-Handler, der den naechsten Reconnect plant. Diese Listener duerfen
+  // am neuen Client nicht entfernt werden, sonst endet die Reconnect-Schleife
+  // bereits nach dem ersten fehlgeschlagenen Verbindungsversuch.
 
   mqttClient.on("connect", (connack) => {
     console.log("Mit MQTT verbunden");

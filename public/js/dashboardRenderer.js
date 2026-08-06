@@ -1669,16 +1669,22 @@ export function createDashboardRenderer(deps) {
                 let entity = null;
 
                 for (const d of getDashboardDevices()) {
+                    if (d.isVirtual) continue;
                     entity = d.entities?.find(e => e.id === entityId);
                     if (entity) break;
                 }
 
-                if (!entity) return '';
+                const isAvailable = Boolean(entity);
+                const displayEntity = entity || {
+                    id: entityId,
+                    name: entityId,
+                    type: ''
+                };
 
                 return `
                     <div
                         class="custom-entity-row"
-                        data-entity-id="${escapeHtml(entity.id)}"
+                        data-entity-id="${escapeHtml(displayEntity.id)}"
                     >
 
                         <div
@@ -1691,20 +1697,31 @@ export function createDashboardRenderer(deps) {
                         <div class="custom-entity-main">
                             <span
                                 class="custom-entity-title"
-                                title="${escapeHtml(getOriginalDeviceName(entity.deviceId))}: ${escapeHtml(entity.name)}">
-                                ${escapeHtml(getEntityDisplayName(entity, device.id))}
+                                title="${isAvailable ? `${escapeHtml(getOriginalDeviceName(displayEntity.deviceId))}: ${escapeHtml(displayEntity.name)}` : escapeHtml(displayEntity.id)}">
+                                ${escapeHtml(getEntityDisplayName(displayEntity, device.id))}
                             </span>
+                            ${isAvailable ? '' : '<span class="entity-unavailable-label">(gerade nicht verfügbar)</span>'}
 
-                            ${renderRenameEntityButton(entity.id, {
+                            ${isAvailable ? renderRenameEntityButton(displayEntity.id, {
                                 forceVisible: true,
                                 dashboardId: dashboard.id,
                                 deviceId: device.id
-                            })}
+                            }) : ''}
                         </div>
 
                         <small class="custom-entity-type">
-                            ${escapeHtml(entity.type)}
+                            ${escapeHtml(displayEntity.type)}
                         </small>
+
+                        <button
+                            type="button"
+                            class="btn danger small-btn action-remove-virtual-entity"
+                            data-dashboard-id="${escapeHtml(dashboard.id)}"
+                            data-device-id="${escapeHtml(device.id)}"
+                            data-entity-id="${escapeHtml(displayEntity.id)}"
+                        >
+                            Entfernen
+                        </button>
 
                     </div>
                 `;

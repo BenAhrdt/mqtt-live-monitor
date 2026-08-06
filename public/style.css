@@ -2391,6 +2391,13 @@ code {
     text-overflow: ellipsis;
 }
 
+.entity-unavailable-label {
+    color: #b45309;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .custom-entity-type {
     margin-left: auto;
     opacity: 0.7;

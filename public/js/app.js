@@ -1706,6 +1706,12 @@ async function toggleDashboardEntity(dashboardId, deviceId, entityId, enabled) {
     await saveCustomDashboards();
 }
 
+async function removeVirtualDashboardEntity(dashboardId, deviceId, entityId) {
+    await toggleDashboardEntity(dashboardId, deviceId, entityId, false);
+    dashboardRenderer.renderCustomDashboards();
+    dashboardRenderer.renderDashboard();
+}
+
 async function loadDashboardDevices() {
     try {
         const response = await fetch('/api/devices');
@@ -2731,6 +2737,16 @@ document.addEventListener('click', async (e) => {
         return;
     }
 
+    const removeVirtualEntityBtn = e.target.closest('.action-remove-virtual-entity');
+    if (removeVirtualEntityBtn) {
+        await removeVirtualDashboardEntity(
+            removeVirtualEntityBtn.dataset.dashboardId,
+            removeVirtualEntityBtn.dataset.deviceId,
+            removeVirtualEntityBtn.dataset.entityId
+        );
+        return;
+    }
+
     // 🔥 ADD ENTITY (Virtuelles Gerät)
     const addEntityBtn = e.target.closest('.action-add-entity');
     if (addEntityBtn) {
@@ -3464,7 +3480,7 @@ function openEntitySelectModal(dashboardId, deviceId) {
 
     currentEntitySelectionSet = currentSelectedEntityIds;
 
-    const allEntities = dashboardDevices
+    const availableEntities = dashboardDevices
         .filter(device => !device.isVirtual)
         .flatMap(device =>
             (device.entities || []).map(entity => ({
@@ -3474,6 +3490,20 @@ function openEntitySelectModal(dashboardId, deviceId) {
                 originalEntityName: entity.name || entity.id
             }))
         );
+
+    const availableEntityIds = new Set(availableEntities.map(entity => entity.id));
+    const missingSelectedEntities = Array.from(currentSelectedEntityIds)
+        .filter(entityId => !availableEntityIds.has(entityId))
+        .map(entityId => ({
+            id: entityId,
+            name: entityId,
+            type: '',
+            deviceName: 'Unbekanntes Gerät',
+            originalDeviceName: 'Unbekanntes Gerät',
+            originalEntityName: entityId,
+            unavailable: true
+        }));
+    const allEntities = [...missingSelectedEntities, ...availableEntities];
 
     function render(filter = '') {
         list.innerHTML = '';
@@ -3513,12 +3543,13 @@ function openEntitySelectModal(dashboardId, deviceId) {
             const originalDevice = entity.originalDeviceName;
 
             row.innerHTML = `
-                <input type="checkbox" value="${entity.id}" ${checked ? 'checked' : ''}>
+                <input type="checkbox" value="${escapeHtml(entity.id)}" ${checked ? 'checked' : ''}>
 
                 <span class="entity-name">
-                    ${friendlyEntity}
-                    ${`<small class="muted">${originalDevice}</small>`}
-                    ${`<small class="muted">${originalEntity}</small>`}
+                    ${escapeHtml(friendlyEntity)}
+                    ${entity.unavailable ? '<span class="entity-unavailable-label">(gerade nicht verfügbar)</span>' : ''}
+                    ${`<small class="muted">${escapeHtml(originalDevice)}</small>`}
+                    ${`<small class="muted">${escapeHtml(originalEntity)}</small>`}
                 </span>
             `;
 

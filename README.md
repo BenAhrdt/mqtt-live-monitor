@@ -142,6 +142,12 @@ journalctl -u mqtt-live-monitor -f
 ---
 
 ## Changelog
+### V1.8.19 MQTT-Reconnect und virtuelle Entitaeten verbessert
+* Der MQTT Live Monitor versucht nach einem fehlgeschlagenen initialen Verbindungsaufbau dauerhaft weiter, den Broker zu erreichen. Dadurch verbindet er sich nach einem Proxmox-Neustart automatisch, auch wenn der Broker erst deutlich spaeter bereit ist.
+* Ein manueller Disconnect unterbindet die automatischen Reconnect-Versuche weiterhin.
+* Bereits zugeordnete, aktuell nicht verfuegbare Entitaeten virtueller Geraete bleiben in der Entitaetsauswahl sichtbar und werden entsprechend gekennzeichnet.
+* Entitaeten koennen direkt in der Konfiguration eines virtuellen Geraets entfernt werden. Dies entspricht dem Abwaehlen in der Entitaetsauswahl.
+
 ### V1.8.18 Fehlende Dashboard-Geräte entfernen
 * Geräte, die nicht mehr vom MQTT-Server geliefert werden, behalten in der Dashboard-Konfiguration eine Schaltfläche zum Entfernen.
 * Die Dashboard-Konfiguration bleibt auch dann bedienbar, wenn aktuell überhaupt keine MQTT-Geräte verfügbar sind.
