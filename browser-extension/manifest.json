@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
   "name": "MQTT Live Monitor",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Schnellansicht fuer ausgewaehlte MQTT Live Monitor Werte.",
   "action": {
     "default_title": "MQTT Live Monitor",
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "options_page": "options.html",
   "side_panel": {

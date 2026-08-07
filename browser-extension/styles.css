@@ -626,10 +626,6 @@ p {
   width: 100%;
 }
 
-.sidepanel-document .side-panel #openSidePanel {
-  display: none;
-}
-
 .sidepanel-document .side-panel .content,
 .sidepanel-document .side-panel .content.compact,
 .sidepanel-document .side-panel .content.tiles {

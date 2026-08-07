@@ -141,7 +141,25 @@ journalctl -u mqtt-live-monitor -f
 
 ---
 
+## Browser-Extension: Popup und Side Panel
+
+Die Browser-Extension kann wahlweise als kompaktes Popup oder dauerhaft im rechten Side Panel verwendet werden:
+
+- Mit `⇥` im Popup wird die Extension als Side Panel angeheftet.
+- Danach öffnet ein Klick auf das Extension-Symbol direkt das Side Panel – auch nachdem es über `×` geschlossen oder der Browser neu gestartet wurde.
+- Mit `⇤` im Side Panel wird die Extension wieder gelöst. Das Extension-Symbol öffnet anschließend erneut das Popup.
+
+Die Auswahl wird lokal im Browser gespeichert. Der native Pin in der Chrome-Kopfleiste verwaltet dagegen nur die Sichtbarkeit des Extension-Symbols und ist von diesem Modus unabhängig.
+
+---
+
 ## Changelog
+### V1.8.20 Dauerhafter Side-Panel-Modus der Browser-Extension
+* Die Browser-Extension speichert, ob sie als Popup oder im rechten Side Panel geöffnet werden soll.
+* Nach dem Schließen des Side Panels und nach einem Browser-Neustart öffnet das Extension-Symbol wieder den zuletzt gewählten Modus.
+* Das Popup besitzt eine Schaltfläche zum Anheften; im Side Panel kann die Extension über dieselbe Position wieder gelöst werden.
+* Beim Lösen wird das Side Panel in aktuellen Chrome-Versionen automatisch geschlossen.
+
 ### V1.8.19 MQTT-Reconnect und virtuelle Entitaeten verbessert
 * Der MQTT Live Monitor versucht nach einem fehlgeschlagenen initialen Verbindungsaufbau dauerhaft weiter, den Broker zu erreichen. Dadurch verbindet er sich nach einem Proxmox-Neustart automatisch, auch wenn der Broker erst deutlich spaeter bereit ist.
 * Ein manueller Disconnect unterbindet die automatischen Reconnect-Versuche weiterhin.

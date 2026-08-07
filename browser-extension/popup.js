@@ -63,15 +63,37 @@ let mqttSnapshotTimer = null;
 
 const CHART_RELOAD_DELAY_MS = 2500;
 const CHART_INTERACTION_IDLE_MS = 7000;
+const DISPLAY_MODE_KEY = 'displayMode';
 
 openSidePanelBtn?.addEventListener('click', async () => {
   try {
-    if (!chrome.sidePanel?.open) return;
     const currentWindow = await chrome.windows.getCurrent();
+    const isSidePanel = document.body.classList.contains('side-panel');
+
+    if (isSidePanel) {
+      await chrome.storage.local.set({ [DISPLAY_MODE_KEY]: 'popup' });
+      await chrome.action.setPopup({ popup: 'popup.html' });
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+
+      if (chrome.sidePanel?.close) {
+        await chrome.sidePanel.close({ windowId: currentWindow.id });
+      } else {
+        setStatus('Gelöst – dieses Panel bitte einmal über × schließen', 'warn');
+      }
+      return;
+    }
+
+    if (!chrome.sidePanel?.open) throw new Error('Side Panel nicht verfügbar');
+    const persistMode = Promise.all([
+      chrome.storage.local.set({ [DISPLAY_MODE_KEY]: 'sidePanel' }),
+      chrome.action.setPopup({ popup: '' }),
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    ]);
     await chrome.sidePanel.open({ windowId: currentWindow.id });
+    await persistMode;
     window.close();
-  } catch {
-    setStatus('Side Panel nicht verfuegbar', 'warn');
+  } catch (err) {
+    setStatus(err?.message || 'Side Panel nicht verfügbar', 'warn');
   }
 });
 
